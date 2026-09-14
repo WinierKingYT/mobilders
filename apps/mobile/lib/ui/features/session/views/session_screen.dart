@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../../../core/app_theme.dart';
 import '../../../../domain/models/solution_step.dart';
 import '../../touchpad/math_touchpad.dart';
+import '../../accessibility/dyscalculia_helpers.dart';
+import '../../accessibility/tunnel_focus_mode.dart';
 import '../view_models/session_view_model.dart';
 
 class SessionScreen extends StatefulWidget {
@@ -52,6 +54,144 @@ class _SessionScreenState extends State<SessionScreen> {
   Widget build(BuildContext context) {
     final viewModel = context.watch<SessionViewModel>();
 
+    final mainContent = SafeArea(
+      child: Column(
+        children: [
+          // Offline Pending Steps Banner
+          if (viewModel.pendingOfflineCount > 0)
+            Container(
+              color: const Color(0xFFF59E0B).withValues(alpha: 0.18),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              child: Row(
+                children: [
+                  const Icon(Icons.cloud_off, color: Color(0xFFF59E0B), size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${viewModel.pendingOfflineCount} adım çevrimdışı kuyrukta bekliyor',
+                    style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => viewModel.syncPendingOfflineSteps(),
+                    child: const Text('Şimdi Senkronize Et', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+
+          // Dyscalculia Visual Aids Strip
+          if (viewModel.isDyscalculiaHelper)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              color: const Color(0xFF0F172A),
+              child: Column(
+                children: [
+                  ColorCodedAlgebraicExpression(expression: viewModel.targetEquation),
+                  const SizedBox(height: 6),
+                  VisualNumberLine(
+                    currentPosition: (viewModel.steps.length * 2.0).clamp(-10.0, 10.0),
+                    targetPosition: 6.0,
+                  ),
+                ],
+              ),
+            ),
+
+          // Middle 45%: Solution Steps Whiteboard Canvas
+          Expanded(
+            child: viewModel.steps.isEmpty
+                ? _buildEmptyState(viewModel)
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    itemCount: viewModel.steps.length,
+                    itemBuilder: (context, index) {
+                      final step = viewModel.steps[index];
+                      return _buildStepCard(context, step, index, viewModel);
+                    },
+                  ),
+          ),
+
+          // Solution Completed Banner
+          if (viewModel.isTargetReached)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+              color: AppColors.accentCorrect.withValues(alpha: 0.15),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.check_circle_rounded, color: AppColors.accentCorrect, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Tebrikler! Denklem Çözüldü.',
+                    style: TextStyle(
+                      color: AppColors.accentCorrect,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Active Input Live Preview Strip
+          Container(
+            color: AppColors.bgPrimary,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Text(
+                  'Adım ${viewModel.steps.length + 1}:',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _inputController,
+                    builder: (context, value, _) {
+                      return Text(
+                        value.text.isEmpty ? '...' : value.text,
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 18,
+                          color: value.text.isEmpty ? AppColors.textMuted : AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(height: 1, color: AppColors.bgCard),
+
+          // Bottom: Dual-mode Input Area (Touchpad or Virtual Keyboard or Inking)
+          MathTouchpad(
+            controller: _inputController,
+            inputMode: viewModel.inputMode,
+            onModeChanged: viewModel.setInputMode,
+            isSubmitting: viewModel.isSubmitting,
+            onSubmit: () => _handleSubmit(viewModel),
+          ),
+        ],
+      ),
+    );
+
+    final wrappedContent = viewModel.isTunnelFocusMode
+        ? TunnelFocusContainer(
+            isTunnelModeEnabled: true,
+            onToggleTunnelMode: viewModel.toggleTunnelFocusMode,
+            activeGoalText: 'Hedef: ${viewModel.targetEquation}',
+            child: mainContent,
+          )
+        : mainContent;
+
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -69,6 +209,22 @@ class _SessionScreenState extends State<SessionScreen> {
         ),
         actions: [
           IconButton(
+            icon: Icon(
+              Icons.center_focus_strong,
+              color: viewModel.isTunnelFocusMode ? const Color(0xFF38BDF8) : AppColors.textMuted,
+            ),
+            tooltip: 'DEHB Tünel Odak Modu',
+            onPressed: viewModel.toggleTunnelFocusMode,
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.linear_scale,
+              color: viewModel.isDyscalculiaHelper ? const Color(0xFF10B981) : AppColors.textMuted,
+            ),
+            tooltip: 'Diskalkuli Desteği',
+            onPressed: viewModel.toggleDyscalculiaHelper,
+          ),
+          IconButton(
             icon: const Icon(Icons.lightbulb_outline_rounded, color: AppColors.accentWarning),
             tooltip: '💡 Takıldım (Sokratik İpucu)',
             onPressed: () => _showSocraticHint(context, viewModel),
@@ -84,95 +240,7 @@ class _SessionScreenState extends State<SessionScreen> {
           ),
         ),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Middle 45%: Solution Steps Whiteboard Canvas
-            Expanded(
-              child: viewModel.steps.isEmpty
-                  ? _buildEmptyState(viewModel)
-                  : ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      itemCount: viewModel.steps.length,
-                      itemBuilder: (context, index) {
-                        final step = viewModel.steps[index];
-                        return _buildStepCard(context, step, index, viewModel);
-                      },
-                    ),
-            ),
-
-            // Solution Completed Banner
-            if (viewModel.isTargetReached)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                color: AppColors.accentCorrect.withValues(alpha: 0.15),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.check_circle_rounded, color: AppColors.accentCorrect, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Tebrikler! Denklem Çözüldü.',
-                      style: TextStyle(
-                        color: AppColors.accentCorrect,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            // Active Input Live Preview Strip
-            Container(
-              color: AppColors.bgPrimary,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Text(
-                    'Adım ${viewModel.steps.length + 1}:',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ValueListenableBuilder<TextEditingValue>(
-                      valueListenable: _inputController,
-                      builder: (context, value, _) {
-                        return Text(
-                          value.text.isEmpty ? '...' : value.text,
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 18,
-                            color: value.text.isEmpty ? AppColors.textMuted : AppColors.textPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const Divider(height: 1, color: AppColors.bgCard),
-
-            // Bottom 40%: Dual-mode Input Area (Touchpad or Virtual Keyboard)
-            MathTouchpad(
-              controller: _inputController,
-              inputMode: viewModel.inputMode,
-              onModeChanged: viewModel.setInputMode,
-              isSubmitting: viewModel.isSubmitting,
-              onSubmit: () => _handleSubmit(viewModel),
-            ),
-          ],
-        ),
-      ),
+      body: wrappedContent,
     );
   }
 

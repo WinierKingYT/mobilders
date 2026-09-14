@@ -35,6 +35,8 @@ class EngineApiService {
     String? previousStep,
     int? elapsedMs,
     double? currentPl,
+    String? clientMsgId,
+    DateTime? clientTimestamp,
   }) async {
     final uri = Uri.parse('$baseUrl/api/v1/session/step/verify');
     final payload = {
@@ -46,6 +48,8 @@ class EngineApiService {
       if (previousStep != null) 'previous_step': previousStep,
       if (elapsedMs != null) 'elapsed_ms': elapsedMs,
       if (currentPl != null) 'current_p_l': currentPl,
+      if (clientMsgId != null) 'client_msg_id': clientMsgId,
+      if (clientTimestamp != null) 'client_timestamp': clientTimestamp.toIso8601String(),
     };
 
     final response = await _client.post(
@@ -62,6 +66,32 @@ class EngineApiService {
         userExpression: userExpression,
         elapsedMs: elapsedMs ?? 0,
       );
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> replayOfflineBatch({
+    required String sessionId,
+    required List<Map<String, dynamic>> events,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/session/replay-queue');
+    final payload = {
+      'session_id': sessionId,
+      'events': events,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
     } else {
       throw HttpException(
         'Server returned ${response.statusCode}: ${response.body}',

@@ -54,4 +54,43 @@ void main() {
     // Verify that the phase switched
     expect(find.text('Faz 1: Bilişsel Isınma (3 Dakika)'), findsNothing);
   });
+
+  testWidgets('DailyJourneyScreen opens settings modal and shows accessibility switches', (tester) async {
+    final apiService = EngineApiService();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<EngineApiService>.value(value: apiService),
+          ChangeNotifierProvider<SessionViewModel>(
+            create: (_) => SessionViewModel(
+              apiService: apiService,
+              sessionId: 'test-session-002',
+              targetEquation: 'x^2 + 6x - 2 = 0',
+            ),
+          ),
+          ChangeNotifierProvider<DiagnosticViewModel>(
+            create: (_) => DiagnosticViewModel(
+              apiService: apiService,
+              sessionId: 'test-cat-002',
+            ),
+          ),
+        ],
+        child: const MaterialApp(
+          home: DailyJourneyScreen(),
+        ),
+      ),
+    );
+
+    // Tap tune/settings icon
+    await tester.tap(find.byIcon(Icons.tune_rounded));
+    await tester.pumpAndSettle();
+
+    // Verify settings modal title and options
+    expect(find.text('Erişilebilirlik & Müfredat Ayarları'), findsOneWidget);
+    expect(find.text('DEHB Tünel Odak Modu'), findsOneWidget);
+    expect(find.text('Diskalkuli Görsel Desteği'), findsOneWidget);
+    expect(find.text('Müfredat Standardı'), findsOneWidget);
+    expect(find.textContaining('Türkiye MEB'), findsWidgets);
+  });
 }

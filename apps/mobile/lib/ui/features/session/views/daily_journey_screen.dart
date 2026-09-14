@@ -6,6 +6,8 @@ import 'session_screen.dart';
 import 'scratchpad_overlay.dart';
 import 'al_khwarizmi_canvas.dart';
 import '../../analytics/views/cognitive_health_atlas_screen.dart';
+import '../../../../core/localization.dart';
+import '../view_models/session_view_model.dart';
 
 enum DailyPhase {
   warmup,      // Phase 1: 3 min (Spaced Retrieval)
@@ -116,6 +118,15 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                     ),
                   );
                 },
+              ),
+              // Accessibility & Curriculum Settings Button
+              IconButton(
+                icon: const Icon(
+                  Icons.tune_rounded,
+                  color: Color(0xFF38BDF8),
+                ),
+                tooltip: "Erişilebilirlik & Müfredat Ayarları",
+                onPressed: () => _showSettingsModal(context),
               ),
             ],
           ),
@@ -425,6 +436,134 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showSettingsModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return Consumer<SessionViewModel>(
+          builder: (context, sessionVm, _) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.tune_rounded, color: Color(0xFF38BDF8)),
+                        const SizedBox(width: 8),
+                        const Text(
+                          "Erişilebilirlik & Müfredat Ayarları",
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white60, size: 20),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const Divider(color: Color(0xFF1E293B)),
+
+                    // ADHD Tunnel Focus Mode Toggle
+                    SwitchListTile(
+                      value: sessionVm.isTunnelFocusMode,
+                      activeColor: const Color(0xFF38BDF8),
+                      title: const Text("DEHB Tünel Odak Modu", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                      subtitle: const Text("Obsidyen siyahı ve yüksek kontrast ile dikkat dağıtıcıları sıfırlar.", style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                      onChanged: (_) => sessionVm.toggleTunnelFocusMode(),
+                    ),
+
+                    // Dyscalculia Visual Aids Toggle
+                    SwitchListTile(
+                      value: sessionVm.isDyscalculiaHelper,
+                      activeColor: const Color(0xFF10B981),
+                      title: const Text("Diskalkuli Görsel Desteği", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                      subtitle: const Text("Uzamsal sayı çizgisi ve renk kodlu cebirsel terim rozetleri.", style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                      onChanged: (_) => sessionVm.toggleDyscalculiaHelper(),
+                    ),
+
+                    const SizedBox(height: 12),
+                    const Text("Müfredat Standardı", style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+
+                    // Curriculum Standard Dropdown
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButton<CurriculumType>(
+                        value: AppLocalization.currentCurriculum,
+                        dropdownColor: const Color(0xFF1E293B),
+                        isExpanded: true,
+                        underline: const SizedBox(),
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        items: CurriculumType.values.map((type) {
+                          return DropdownMenuItem<CurriculumType>(
+                            value: type,
+                            child: Text(type.displayName),
+                          );
+                        }).toList(),
+                        onChanged: (newType) {
+                          if (newType != null) {
+                            setState(() {
+                              AppLocalization.setCurriculum(newType);
+                            });
+                          }
+                        },
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+                    // Offline Queue Status
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            sessionVm.pendingOfflineCount > 0 ? Icons.cloud_off : Icons.cloud_done,
+                            color: sessionVm.pendingOfflineCount > 0 ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              sessionVm.pendingOfflineCount > 0
+                                  ? "${sessionVm.pendingOfflineCount} adım çevrimdışı kuyrukta bekliyor"
+                                  : "Tüm adımlar bulutla senkronize",
+                              style: const TextStyle(color: Colors.white70, fontSize: 12),
+                            ),
+                          ),
+                          if (sessionVm.pendingOfflineCount > 0)
+                            TextButton(
+                              onPressed: () => sessionVm.syncPendingOfflineSteps(),
+                              child: const Text("Eşzamanla", style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12)),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

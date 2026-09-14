@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import '../../../../data/services/engine_api_service.dart';
+import '../../../../data/services/offline_sync_queue.dart';
 import '../../../../domain/models/solution_step.dart';
 import '../../touchpad/math_touchpad.dart';
 
 class SessionViewModel extends ChangeNotifier {
   final EngineApiService _apiService;
+  final OfflineSyncQueue _syncQueue;
 
   final String sessionId;
   final String targetEquation;
@@ -17,13 +19,19 @@ class SessionViewModel extends ChangeNotifier {
   InputMode _inputMode = InputMode.touchpad;
   DateTime _stepStartTime = DateTime.now();
 
+  // Accessibility States
+  bool _isTunnelFocusMode = false;
+  bool _isDyscalculiaHelper = false;
+
   SessionViewModel({
     required EngineApiService apiService,
     required this.sessionId,
     required this.targetEquation,
     this.nodeId = 'N15',
     double initialPl = 0.20,
+    OfflineSyncQueue? syncQueue,
   })  : _apiService = apiService,
+        _syncQueue = syncQueue ?? OfflineSyncQueue(),
         _currentPl = initialPl {
     _stepStartTime = DateTime.now();
   }
@@ -34,9 +42,23 @@ class SessionViewModel extends ChangeNotifier {
   bool get isTargetReached => _isTargetReached;
   double get currentPl => _currentPl;
   InputMode get inputMode => _inputMode;
+  OfflineSyncQueue get syncQueue => _syncQueue;
+  bool get isTunnelFocusMode => _isTunnelFocusMode;
+  bool get isDyscalculiaHelper => _isDyscalculiaHelper;
+  int get pendingOfflineCount => _syncQueue.pendingCount;
 
   void setInputMode(InputMode mode) {
     _inputMode = mode;
+    notifyListeners();
+  }
+
+  void toggleTunnelFocusMode() {
+    _isTunnelFocusMode = !_isTunnelFocusMode;
+    notifyListeners();
+  }
+
+  void toggleDyscalculiaHelper() {
+    _isDyscalculiaHelper = !_isDyscalculiaHelper;
     notifyListeners();
   }
 
@@ -49,9 +71,9 @@ class SessionViewModel extends ChangeNotifier {
 
     final now = DateTime.now();
     final elapsedMs = now.difference(_stepStartTime).inMilliseconds;
-
     final stepNumber = _steps.length + 1;
     final previousStep = _steps.isNotEmpty ? _steps.last.userExpression : null;
+    final clientMsgId = 'evt_${DateTime.now().microsecondsSinceEpoch}';
 
     try {
       final verifiedStep = await _apiService.verifyStep(
@@ -63,6 +85,8 @@ class SessionViewModel extends ChangeNotifier {
         previousStep: previousStep,
         elapsedMs: elapsedMs,
         currentPl: _currentPl,
+        clientMsgId: clientMsgId,
+        clientTimestamp: now,
       );
 
       _steps.add(verifiedStep);
@@ -76,18 +100,37 @@ class SessionViewModel extends ChangeNotifier {
         }
       }
 
+      // Check if there are any pending offline steps to sync in the background
+      if (_syncQueue.pendingCount > 0) {
+        _syncQueue.replayQueue(_apiService);
+      }
+
       _stepStartTime = DateTime.now();
       _isSubmitting = false;
       notifyListeners();
       return verifiedStep;
     } catch (e) {
-      // Offline fallback or network error
+      // Offline fallback: enqueue step into local persistent queue
+      final offlineEvent = UnsyncedStepEvent(
+        clientMsgId: clientMsgId,
+        sessionId: sessionId,
+        nodeId: nodeId,
+        stepNumber: stepNumber,
+        userExpression: trimmed,
+        targetEquation: targetEquation,
+        previousStep: previousStep,
+        clientTimestamp: now,
+        elapsedMs: elapsedMs,
+        currentPl: _currentPl,
+      );
+      _syncQueue.enqueueStep(offlineEvent);
+
       final fallbackStep = SolutionStep(
         stepNumber: stepNumber,
         userExpression: trimmed,
         isValid: false,
         isTargetReached: false,
-        errorMessage: 'Bağlantı hatası: Adım yerel olarak kaydedildi.',
+        errorMessage: 'Bağlantı kesildi: Adım çevrimdışı kuyruğa güvenle kaydedildi (${_syncQueue.pendingCount} bekliyor).',
         elapsedMs: elapsedMs,
       );
       _steps.add(fallbackStep);
@@ -95,6 +138,12 @@ class SessionViewModel extends ChangeNotifier {
       notifyListeners();
       return fallbackStep;
     }
+  }
+
+  Future<int> syncPendingOfflineSteps() async {
+    final count = await _syncQueue.replayQueue(_apiService);
+    notifyListeners();
+    return count;
   }
 
   void rollbackToStep(int stepIndex) {

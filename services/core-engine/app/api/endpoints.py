@@ -4,6 +4,8 @@ from fastapi import APIRouter, HTTPException, status, WebSocket, WebSocketDiscon
 from app.models.schemas import (
     StepVerificationRequest,
     StepVerificationResponse,
+    OfflineBatchReplayRequest,
+    OfflineBatchReplayResponse,
     StepPsychometrics,
     CATNextItemRequest,
     CATItemResponse,
@@ -71,6 +73,10 @@ dp_exporter = DifferentialPrivacyExporter()
 model_benchmark = CognitiveModelBenchmark()
 
 
+# Idempotency Cache for offline event replay and network duplicate protection
+_IDEMPOTENCY_CACHE: Dict[str, StepVerificationResponse] = {}
+
+
 # ==========================================
 # 1. ADIM BAZLI ÇÖZÜM TAHTASI DOĞRULAMA API
 # ==========================================
@@ -80,7 +86,13 @@ async def verify_step(request: StepVerificationRequest) -> StepVerificationRespo
     """
     Öğrencinin girdiği cebirsel adımı deterministik olarak doğrular.
     Doğru değilse 5 temel bozuk kuralı (Buggy Rules) arar.
+    Destekler: client_msg_id ile tam idempotent yanıt önbelleklemesi.
     """
+    # 0. İdempotentlik Denetimi: Önceden işlenmiş adım tekrarlanırsa önbellekten dön
+    if request.client_msg_id and request.client_msg_id in _IDEMPOTENCY_CACHE:
+        cached_resp = _IDEMPOTENCY_CACHE[request.client_msg_id]
+        return cached_resp.model_copy(update={"is_replayed": True})
+
     start_time = time.perf_counter()
 
     try:
@@ -143,7 +155,7 @@ async def verify_step(request: StepVerificationRequest) -> StepVerificationRespo
             detected_bug_id=detected_bug.bug_id if detected_bug else None,
         )
 
-        return StepVerificationResponse(
+        resp = StepVerificationResponse(
             is_valid=is_equiv,
             is_target_reached=is_equiv and ("=" in request.user_expression and not ("**2" in request.user_expression or "^2" in request.user_expression)),
             detected_bug=detected_bug,
@@ -151,7 +163,13 @@ async def verify_step(request: StepVerificationRequest) -> StepVerificationRespo
             error_message=None,
             analysis_latency_ms=total_latency_ms,
             psychometrics=psychometrics,
+            is_replayed=False,
         )
+
+        if request.client_msg_id:
+            _IDEMPOTENCY_CACHE[request.client_msg_id] = resp
+
+        return resp
 
     except SecurityViolationError as sve:
         raise HTTPException(
@@ -167,7 +185,36 @@ async def verify_step(request: StepVerificationRequest) -> StepVerificationRespo
             canonical_expression=None,
             error_message=f"Ayrıştırma hatası: {str(e)}",
             analysis_latency_ms=total_latency_ms,
+            is_replayed=False,
         )
+
+
+@router.post("/api/v1/session/replay-queue", response_model=OfflineBatchReplayResponse)
+async def replay_offline_queue(request: OfflineBatchReplayRequest) -> OfflineBatchReplayResponse:
+    """
+    Çevrimdışıyken biriken adımları kronolojik sırayla idempotent olarak sunucuya aktarır (Event Replay).
+    Sunucu BKT ve FSRS durumlarını geriye dönük deterministik olarak sırayla günceller.
+    """
+    replayed_steps: List[StepVerificationResponse] = []
+    current_pl = 0.20
+    is_target_reached = False
+
+    for event in request.events:
+        event.current_p_l = current_pl
+        step_res = await verify_step(event)
+        replayed_steps.append(step_res)
+        if step_res.psychometrics:
+            current_pl = step_res.psychometrics.bkt_posterior_p_l
+        if step_res.is_target_reached:
+            is_target_reached = True
+
+    return OfflineBatchReplayResponse(
+        session_id=request.session_id,
+        synced_count=len(replayed_steps),
+        replayed_steps=replayed_steps,
+        latest_p_l=round(current_pl, 4),
+        is_target_reached=is_target_reached,
+    )
 
 
 # ==========================================

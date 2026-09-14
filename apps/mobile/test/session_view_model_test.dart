@@ -1,11 +1,15 @@
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_learning_engine/data/services/engine_api_service.dart';
+import 'package:personal_learning_engine/data/services/offline_sync_queue.dart';
 import 'package:personal_learning_engine/domain/models/diagnostic_bug.dart';
 import 'package:personal_learning_engine/domain/models/solution_step.dart';
 import 'package:personal_learning_engine/domain/models/step_psychometrics.dart';
 import 'package:personal_learning_engine/ui/features/session/view_models/session_view_model.dart';
 
 class FakeEngineApiService extends EngineApiService {
+  bool throwNetworkError = false;
+
   FakeEngineApiService() : super(baseUrl: 'http://localhost:8000');
 
   @override
@@ -18,7 +22,12 @@ class FakeEngineApiService extends EngineApiService {
     String? previousStep,
     int? elapsedMs,
     double? currentPl,
+    String? clientMsgId,
+    DateTime? clientTimestamp,
   }) async {
+    if (throwNetworkError) {
+      throw const HttpException('Simulated network offline');
+    }
     if (userExpression == '(x - 2)(x - 3) = 0') {
       return SolutionStep(
         stepNumber: stepNumber,
@@ -124,6 +133,36 @@ void main() {
       viewModel.rollbackToStep(1);
       expect(viewModel.steps.length, 1);
       expect(viewModel.steps.first.userExpression, '(x - 2)(x - 3) = 0');
+    });
+
+    test('Submitting step during network disconnection enqueues step into offline syncQueue', () async {
+      final fakeApi = FakeEngineApiService();
+      fakeApi.throwNetworkError = true;
+      final offlineQueue = OfflineSyncQueue();
+      final vm = SessionViewModel(
+        apiService: fakeApi,
+        sessionId: 'test-session-offline',
+        targetEquation: 'x^2 - 5x + 6 = 0',
+        syncQueue: offlineQueue,
+      );
+
+      final step = await vm.submitStep('(x - 2)(x - 3) = 0');
+      expect(step, isNotNull);
+      expect(step!.isValid, isFalse);
+      expect(step.errorMessage, contains('çevrimdışı kuyruğa'));
+      expect(vm.pendingOfflineCount, 1);
+      expect(offlineQueue.pendingEvents.first.userExpression, '(x - 2)(x - 3) = 0');
+    });
+
+    test('Accessibility toggles update ViewModel states', () {
+      expect(viewModel.isTunnelFocusMode, isFalse);
+      expect(viewModel.isDyscalculiaHelper, isFalse);
+
+      viewModel.toggleTunnelFocusMode();
+      expect(viewModel.isTunnelFocusMode, isTrue);
+
+      viewModel.toggleDyscalculiaHelper();
+      expect(viewModel.isDyscalculiaHelper, isTrue);
     });
   });
 }

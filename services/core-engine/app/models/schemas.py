@@ -29,6 +29,8 @@ class StepVerificationRequest(BaseModel):
     elapsed_ms: Optional[int] = Field(None, ge=0, description="Adımı yazarken geçen süre (milisaniye)")
     confidence_rating: Optional[float] = Field(None, ge=0.0, le=1.0, description="Metabilişsel güven beyanı")
     current_p_l: Optional[float] = Field(0.20, ge=0.0, le=1.0, description="Mevcut BKT ustalık düzeyi P(L)")
+    client_msg_id: Optional[str] = Field(None, description="Çevrimdışı ve tekrar oynatma idempotentlik anahtarı (UUID)")
+    client_timestamp: Optional[str] = Field(None, description="İstemcide adımın atıldığı anlık ISO zaman damgası")
 
 
 class StepVerificationResponse(BaseModel):
@@ -39,6 +41,20 @@ class StepVerificationResponse(BaseModel):
     error_message: Optional[str] = Field(None, description="Sözdizimi veya ayrıştırma hatası")
     analysis_latency_ms: float = Field(..., description="CAS analiz süresi")
     psychometrics: Optional[StepPsychometrics] = Field(None, description="Anlık bilişsel ve psikometrik kestirim")
+    is_replayed: bool = Field(False, description="Idempotent önbellekten veya çevrimdışı kuyruktan mı döndü?")
+
+
+class OfflineBatchReplayRequest(BaseModel):
+    session_id: str = Field(..., description="Oturum UUID")
+    events: List[StepVerificationRequest] = Field(..., description="Çevrimdışı kaydedilen adımlar listesi")
+
+
+class OfflineBatchReplayResponse(BaseModel):
+    session_id: str = Field(..., description="Oturum UUID")
+    synced_count: int = Field(..., description="Başarıyla işlenen ve senkronize edilen adım sayısı")
+    replayed_steps: List[StepVerificationResponse] = Field(..., description="Doğrulanan adımların yanıtları")
+    latest_p_l: float = Field(..., description="Tüm adımlardan sonra güncellenen BKT ustalık düzeyi")
+    is_target_reached: bool = Field(..., description="Hedef denklemin nihai çözümüne ulaşıldı mı?")
 
 
 class CATItemResponse(BaseModel):
