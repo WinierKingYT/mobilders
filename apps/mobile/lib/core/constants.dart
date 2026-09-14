@@ -8,3 +8,7 @@ class AppConstants {
   static const double targetDesignWidth = 390.0;
   static const double targetDesignHeight = 844.0;
 }
+
+class ApiConstants {
+  static const String baseUrl = 'http://127.0.0.1:8000';
+}

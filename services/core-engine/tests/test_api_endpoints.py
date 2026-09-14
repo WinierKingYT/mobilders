@@ -151,3 +151,58 @@ def test_api_cat_submit_progression_and_completion():
     assert len(data_final["seeded_mastery"]) == 20
     assert data_final["zpd_candidates"] is not None
 
+
+def test_api_socratic_respond():
+    payload = {
+        "user_input": "x(x+6) = 2 ise x = 2",
+        "target_equation": "x**2 + 6*x - 2 = 0",
+        "previous_step": "x*(x+6) = 2",
+        "solution_roots": [-6.32, 0.32],
+        "affective_state": "FLOW",
+        "scaffolding_level": 2,
+    }
+    response = client.post("/api/v1/socratic/respond", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["final_output"] is not None
+    assert data["socratic_ratio"] >= 1.0
+    assert "?" in data["final_output"]
+
+
+def test_websocket_session_lifecycle():
+    with client.websocket_connect("/ws/v1/session") as ws:
+        init_msg = ws.receive_json()
+        assert init_msg["type"] == "SESSION_READY"
+        assert init_msg["status"] == "CONNECTED"
+
+        # 1. Send valid step
+        ws.send_json({
+            "type": "STEP_SUBMIT",
+            "client_msg_id": "cmsg_001",
+            "payload": {
+                "raw_latex": "x**2 + 6*x = 2",
+                "previous_canonical": "x**2 + 6*x - 2 = 0",
+                "target_equation": "x**2 + 6*x - 2 = 0",
+                "latency_ms": 3000,
+            }
+        })
+        val_msg = ws.receive_json()
+        assert val_msg["type"] == "STEP_VALIDATED"
+        assert val_msg["payload"]["is_correct"] is True
+
+        # 2. Send confidence
+        ws.send_json({
+            "type": "CONFIDENCE_SUBMIT",
+            "client_msg_id": "cmsg_002",
+            "payload": {"confidence_level": 0.90}
+        })
+        conf_msg = ws.receive_json()
+        assert conf_msg["type"] == "CONFIDENCE_ACK"
+        assert conf_msg["payload"]["status"] == "RECORDED"
+
+        # 3. Ping / Pong
+        ws.send_json({"type": "PING"})
+        pong_msg = ws.receive_json()
+        assert pong_msg["type"] == "PONG"
+
+

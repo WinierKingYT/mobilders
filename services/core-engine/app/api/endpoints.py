@@ -1,6 +1,6 @@
 import time
-from typing import Optional
-from fastapi import APIRouter, HTTPException, status
+from typing import Optional, Dict, List, Any
+from fastapi import APIRouter, HTTPException, status, WebSocket, WebSocketDisconnect
 from app.models.schemas import (
     StepVerificationRequest,
     StepVerificationResponse,
@@ -16,14 +16,18 @@ from app.graph.knowledge_dag import KnowledgeDAG
 from app.adaptive.cat_engine import CATEngine
 from app.psychometrics.bkt import IndividualizedBKT
 from app.psychometrics.ddm import EZDiffusionSolver
+from app.affect.detector import AffectiveStateDetector, BehaviorObservation
+from app.socratic.pipeline import SocraticPipeline, SocraticRequest, InnerMonologueLog
 
-router = APIRouter(tags=["Session, Verification & Diagnostic"])
+router = APIRouter(tags=["Session, Verification, Diagnostic & WebSocket"])
 
 # Tekil motor örnekleri (Singletons)
 cas_engine = SymbolicEquivalenceEngine()
 misconception_detector = QuadraticMisconceptionDetector(cas_engine)
 knowledge_dag = KnowledgeDAG()
 cat_engine = CATEngine(dag=knowledge_dag)
+affective_detector = AffectiveStateDetector()
+socratic_pipeline = SocraticPipeline()
 
 
 # ==========================================
@@ -185,3 +189,149 @@ async def submit_cat_response(request: CATSubmitRequest) -> CATSubmitResponse:
         seeded_mastery=seeded_mastery,
         zpd_candidates=zpd_candidates,
     )
+
+
+# ==========================================
+# 3. SOKRATİK AI DİYALOG VE GÜVENLİK API
+# ==========================================
+
+@router.post("/api/v1/socratic/respond", response_model=InnerMonologueLog)
+async def get_socratic_response(request: SocraticRequest) -> InnerMonologueLog:
+    """
+    4-Katmanlı İç Monolog hattı ve Zero-Leakage sübabı ile
+    öğrenciye doğrudan cevabı vermeyen Sokratik rehberlik üretir.
+    """
+    return socratic_pipeline.process(request)
+
+
+# ==========================================
+# 4. WEBSOCKET CANLI OTURUM KANALI (/ws/v1/session)
+# ==========================================
+
+@router.websocket("/ws/v1/session")
+async def session_websocket_endpoint(websocket: WebSocket):
+    """
+    Canlı mobil oturum çift yönlü telemetri, adım doğrulama ve afektif şalter kanalı.
+    """
+    await websocket.accept()
+    await websocket.send_json({
+        "type": "SESSION_READY",
+        "status": "CONNECTED",
+        "timestamp": time.time(),
+    })
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+            msg_type = data.get("type")
+            client_msg_id = data.get("client_msg_id", "cmsg_default")
+            payload = data.get("payload", {})
+
+            if msg_type == "STEP_SUBMIT":
+                raw_latex = payload.get("raw_latex", "")
+                prev_canonical = payload.get("previous_canonical", "x**2 + 6*x - 2 = 0")
+                target_eq = payload.get("target_equation", "x**2 + 6*x - 2 = 0")
+                latency_ms = payload.get("latency_ms", 2000.0)
+                thrash_count = payload.get("hesitation_pauses_count", 0)
+
+                # 1. CAS Verification
+                try:
+                    is_valid, elapsed, diff = cas_engine.verify_equivalence(raw_latex, target_eq)
+                except Exception:
+                    is_valid = False
+                    diff = None
+
+                detected_bug = None
+                socratic_prompt = None
+                if not is_valid:
+                    detected_bug = misconception_detector.detect(raw_latex, prev_canonical, target_eq)
+                    # Generate Socratic probe
+                    socr_req = SocraticRequest(
+                        user_input=raw_latex,
+                        target_equation=target_eq,
+                        previous_step=prev_canonical,
+                        diagnostic_bug=detected_bug,
+                    )
+                    socr_log = socratic_pipeline.process(socr_req)
+                    socratic_prompt = {
+                        "agent_role": "socratic_coach",
+                        "message": socr_log.final_output,
+                        "scaffold_level": 2,
+                    }
+
+                # 2. Affective evaluation
+                obs = BehaviorObservation(
+                    response_time_ms=float(latency_ms),
+                    is_correct=is_valid,
+                    thrash_events_count=thrash_count,
+                    consecutive_errors=0 if is_valid else 1,
+                )
+                affective_assessment = affective_detector.evaluate_telemetry(obs)
+
+                if affective_assessment.is_circuit_breaker_tripped:
+                    await websocket.send_json({
+                        "type": "AFFECTIVE_ALERT",
+                        "payload": {
+                            "circuit_breaker_triggered": True,
+                            "action": "TRIGGER_BREATHE_MODAL",
+                            "f_score": affective_assessment.frustration_score,
+                            "support_message": affective_assessment.intervention_message,
+                        }
+                    })
+
+                # Send STEP_VALIDATED
+                await websocket.send_json({
+                    "type": "STEP_VALIDATED",
+                    "client_msg_id": client_msg_id,
+                    "status": "VALID" if is_valid else ("BUGGY_RULE_DETECTED" if detected_bug else "INVALID"),
+                    "payload": {
+                        "is_correct": is_valid,
+                        "is_terminal_step": is_valid and ("=" in raw_latex and not ("^2" in raw_latex or "**2" in raw_latex)),
+                        "canonical_latex": raw_latex,
+                        "buggy_rule": {
+                            "rule_id": detected_bug.bug_id,
+                            "description": detected_bug.description,
+                        } if detected_bug else None,
+                        "haptic_feedback": "light_impact" if is_valid else "heavy_error",
+                        "socratic_prompt": socratic_prompt,
+                    }
+                })
+
+            elif msg_type == "CONFIDENCE_SUBMIT":
+                conf = float(payload.get("confidence_level", 0.5))
+                # Proper scoring rule: 10 - 20 * (conf - y)^2
+                await websocket.send_json({
+                    "type": "CONFIDENCE_ACK",
+                    "client_msg_id": client_msg_id,
+                    "payload": {
+                        "confidence_recorded": conf,
+                        "status": "RECORDED",
+                    }
+                })
+
+            elif msg_type == "HINT_REQUEST":
+                current_latex = payload.get("current_latex", "")
+                socr_req = SocraticRequest(
+                    user_input=f"Yardım istiyorum: {current_latex}",
+                    target_equation="x**2 + 6*x - 2 = 0",
+                    previous_step=current_latex,
+                )
+                socr_log = socratic_pipeline.process(socr_req)
+                await websocket.send_json({
+                    "type": "HINT_RESPONSE",
+                    "client_msg_id": client_msg_id,
+                    "payload": {
+                        "socratic_prompt": {
+                            "agent_role": "socratic_coach",
+                            "message": socr_log.final_output,
+                            "scaffold_level": 1,
+                        }
+                    }
+                })
+
+            elif msg_type == "PING":
+                await websocket.send_json({"type": "PONG", "timestamp": time.time()})
+
+    except WebSocketDisconnect:
+        pass
+

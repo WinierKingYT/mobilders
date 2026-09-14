@@ -126,12 +126,24 @@ class SymbolicEquivalenceEngine:
             user_expr = self.parse_to_sympy(user_expr_str)
             target_expr = self.parse_to_sympy(target_expr_str)
 
-            # Eşdeğerlik testi: user_expr - target_expr == 0 ?
+            # 1. Doğrudan fark testi: user_expr - target_expr == 0 ?
             diff = sp.simplify(user_expr - target_expr)
-            is_equiv = diff == 0
+            if diff == 0:
+                elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+                return True, elapsed_ms, "0"
+
+            # 2. Skaler kat denklem eşdeğerliği (c * target_expr == user_expr, c != 0)
+            if target_expr != 0 and user_expr != 0:
+                try:
+                    ratio = sp.simplify(user_expr / target_expr)
+                    if ratio.is_number and ratio != 0:
+                        elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+                        return True, elapsed_ms, "0"
+                except Exception:
+                    pass
 
             elapsed_ms = (time.perf_counter() - start_time) * 1000.0
-            return is_equiv, elapsed_ms, str(diff)
+            return False, elapsed_ms, str(diff)
         except Exception as e:
             elapsed_ms = (time.perf_counter() - start_time) * 1000.0
             raise e
