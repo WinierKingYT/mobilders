@@ -17,31 +17,38 @@ class ZeroLeakageGuardrail:
     SAFE_FALLBACK_PROMPT = (
         "Adımlarını çok iyi ilerletiyorsun! Şimdi bu aşamada eşitliği sağlamak için her iki tarafa hangi işlemi uygulamalıyız?"
     )
+    SAFE_FALLBACK_PROMPT_EN = (
+        "You are making great progress! What algebraic operation should we apply to both sides now to maintain balance?"
+    )
 
     # General solution disclosure patterns
     LEAK_PATTERNS = [
-        r"(cevap|sonuç|kökler?|roots?|answer)\s*(?:=|:|\s+ise|\s+olur|\s+çıkar|\s+dir|\s+dır)?\s*[-+]?\d+(?:[./]\d+)?",
+        r"(cevap|sonuç|kökler?|roots?|answer|solution)\s*(?:=|:|\s+ise|\s+olur|\s+çıkar|\s+dir|\s+dır|\s+is|\s+are)?\s*[-+]?\d+(?:[./]\d+)?",
         r"\b[xyztXYZT]\s*=\s*[-+]?\d+(?:[./]\d+)?",
         r"\b[xyztXYZT]_\{?[12]\}?\s*=\s*[-+]?\d+(?:[./]\d+)?",
         r"\b[xyztXYZT]_\{?1\s*,\s*2\}?\s*=",
         r"\b[xyztXYZT]\s*=\s*[-+]?\d*\s*(?:\\pm|\+/-|\+-)\s*\\?sqrt",
         r"\b(Ç|C)\.?\s*(K|k)\.?\s*=\s*\{[^}]*\}",
-        r"çözüm\s*kümesi\s*\{[^}]*\}",
+        r"(çözüm\s*kümesi|solution\s*set)\s*\{[^}]*\}",
         r"[xyztXYZT]\s*=\s*\(.*?\)\s*/\s*\d+",
         r"\\frac\{[-+]?\d+\}\{[-+]?\d+\}",
     ]
 
     @classmethod
     def enforce_zero_leakage(
-        cls, proposed_text: str, solution_roots: Optional[List[Any]] = None
+        cls,
+        proposed_text: str,
+        solution_roots: Optional[List[Any]] = None,
+        language: str = "tr",
     ) -> Tuple[str, bool]:
         """
         Inspects text for direct root values or solution disclosures.
         If a leak is found, overrides the output with the safe Socratic fallback prompt.
         Returns (sanitized_text, was_intercepted).
         """
+        fallback = cls.SAFE_FALLBACK_PROMPT_EN if language == "en" else cls.SAFE_FALLBACK_PROMPT
         if not proposed_text:
-            return cls.SAFE_FALLBACK_PROMPT, True
+            return fallback, True
 
         # 1. Check against specific numerical roots of the active problem
         if solution_roots:
@@ -64,16 +71,17 @@ class ZeroLeakageGuardrail:
                     r"\bcevap\s*(?:[=:]|\s+)?[-+]?" + escaped + r"\b",
                     r"\bsonu(ç|c)\s*(?:[=:]|\s+)?[-+]?" + escaped + r"\b",
                     r"\bde(ğ|g)er\s*(?:[=:]|\s+)?[-+]?" + escaped + r"\b",
+                    r"\b(root|roots|solution|answer|zeros?)\s*(?:[=:]|\s+is|\s+are)?\s*[-+]?" + escaped + r"\b",
                 ]
 
                 for pat in root_patterns:
                     if re.search(pat, proposed_text, re.IGNORECASE):
-                        return cls.SAFE_FALLBACK_PROMPT, True
+                        return fallback, True
 
         # 2. Check general answer leakage regexes
         for pat in cls.LEAK_PATTERNS:
             if re.search(pat, proposed_text, re.IGNORECASE):
-                return cls.SAFE_FALLBACK_PROMPT, True
+                return fallback, True
 
         return proposed_text, False
 

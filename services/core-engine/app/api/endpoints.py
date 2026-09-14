@@ -9,10 +9,30 @@ from app.models.schemas import (
     CATItemResponse,
     CATSubmitRequest,
     CATSubmitResponse,
+    StrokeRecognitionRequest,
+    StrokeRecognitionResponse,
+    MultimodalStepVerificationRequest,
+    MultimodalStepVerificationResponse,
+    CurriculumStandard,
+    CurriculumListResponse,
+    ClassroomAnalyticsResponse,
+    LTILaunchPayload,
+    LTIGradeScoreRequest,
+    VoiceSocraticRequest,
+    VoiceSocraticResponse,
+    CurriculumSynthesizeRequest,
+    SynthesizedCurriculumResponse,
+    SimulationCohortRequest,
+    SimulationCohortResponse,
+    DPExportRequest,
+    DPExportResponse,
+    LeaderboardResponse,
 )
 from app.cas.symbolic_engine import SymbolicEquivalenceEngine, SecurityViolationError
+from app.cas.stroke_parser import StrokeToASTParser
 from app.misconceptions.detector import QuadraticMisconceptionDetector
 from app.graph.knowledge_dag import KnowledgeDAG
+from app.graph.curriculum_mapper import CurriculumOntologyRegistry
 from app.adaptive.cat_engine import CATEngine
 from app.psychometrics.bkt import IndividualizedBKT
 from app.psychometrics.ddm import EZDiffusionSolver
@@ -20,19 +40,35 @@ from app.affect.detector import AffectiveStateDetector, BehaviorObservation
 from app.socratic.pipeline import SocraticPipeline, SocraticRequest, InnerMonologueLog
 from app.retention.fsrs import FSRSEngine
 from app.analytics.local_reporter import LocalAnalyticsReporter
+from app.analytics.classroom_reporter import ClassroomAnalyticsReporter
+from app.lti.service import LTI13Service
+from app.voice.service import VoiceSocraticEngine
+from app.curriculum_generator.dag_synthesizer import AutonomousCurriculumSynthesizer
+from app.simulation.cohort_factory import VectorizedCohortSimulationFactory
+from app.research.dp_exporter import DifferentialPrivacyExporter
+from app.research.leaderboard import CognitiveModelBenchmark
 from app.core.logging_config import telemetry_logger
 
-router = APIRouter(tags=["Session, Verification, Diagnostic & WebSocket"])
+router = APIRouter(tags=["Session, Verification, Diagnostic, Multimodal, LTI, Voice, Autonomous Generator & Benchmark"])
 
 # Tekil motor örnekleri (Singletons)
 cas_engine = SymbolicEquivalenceEngine()
 misconception_detector = QuadraticMisconceptionDetector(cas_engine)
 knowledge_dag = KnowledgeDAG()
+curriculum_registry = CurriculumOntologyRegistry()
 cat_engine = CATEngine(dag=knowledge_dag)
 fsrs_engine = FSRSEngine()
 affective_detector = AffectiveStateDetector()
 socratic_pipeline = SocraticPipeline()
 local_analytics = LocalAnalyticsReporter(dag=knowledge_dag, fsrs=fsrs_engine)
+classroom_reporter = ClassroomAnalyticsReporter(dag=knowledge_dag)
+stroke_parser = StrokeToASTParser()
+lti_service = LTI13Service()
+voice_engine = VoiceSocraticEngine(socratic_pipeline=socratic_pipeline, guardrail=socratic_pipeline.guardrail)
+curriculum_synthesizer = AutonomousCurriculumSynthesizer()
+simulation_factory = VectorizedCohortSimulationFactory()
+dp_exporter = DifferentialPrivacyExporter()
+model_benchmark = CognitiveModelBenchmark()
 
 
 # ==========================================
@@ -147,6 +183,7 @@ async def get_next_cat_item(request: CATNextItemRequest) -> Optional[CATItemResp
     item = cat_engine.select_next_item(
         current_theta=request.current_theta,
         administered_item_ids=set(request.administered_item_ids),
+        curriculum=request.curriculum,
     )
     if not item:
         return None
@@ -188,7 +225,9 @@ async def submit_cat_response(request: CATSubmitRequest) -> CATSubmitResponse:
     else:
         # Test devam ediyor: Sıradaki maddeyi seç
         administered_ids = {it_id for it_id, _ in updated_history}
-        next_item = cat_engine.select_next_item(theta_hat, administered_ids)
+        next_item = cat_engine.select_next_item(
+            theta_hat, administered_ids, curriculum=request.curriculum
+        )
         if next_item:
             next_item_resp = CATItemResponse(
                 item_id=next_item.item_id,
@@ -458,4 +497,215 @@ async def session_websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         pass
+
+
+# ==========================================
+# 5. MULTIMODAL INKING & STROKE-TO-AST API
+# ==========================================
+
+@router.post("/api/v1/multimodal/stroke-to-ast", response_model=StrokeRecognitionResponse)
+async def recognize_ink_strokes(request: StrokeRecognitionRequest) -> StrokeRecognitionResponse:
+    """
+    Kullanıcının çizdiği serbest el yazısı çizgilerini ayrıştırıp aday LaTeX ve SymPy üretir.
+    """
+    return stroke_parser.parse_strokes(request.strokes)
+
+
+@router.post("/api/v1/multimodal/ink/verify", response_model=MultimodalStepVerificationResponse)
+async def verify_ink_step(request: MultimodalStepVerificationRequest) -> MultimodalStepVerificationResponse:
+    """
+    Çizilen el yazısı matematik adımlarını ayrıştırır ve Nöro-Sembolik Güvenlik Sınırı dahilinde
+    %100 deterministik SymPy CAS motoru ve bozuk kural teşhisiyle doğrular.
+    """
+    start_time = time.perf_counter()
+
+    # 1. Çizgi Ayrıştırma (Stroke-to-AST)
+    recognition = stroke_parser.parse_strokes(request.strokes)
+    candidate_expr = recognition.sympy_expression
+
+    # 2. Deterministik CAS Doğrulama (Tanıma sonucu asla kendi kendini doğrulayamaz)
+    is_equiv, cas_latency, diff_str = False, 0.0, None
+    detected_bug = None
+    error_msg = None
+
+    if candidate_expr:
+        try:
+            is_equiv, cas_latency, diff_str = cas_engine.verify_equivalence(
+                candidate_expr, request.target_equation
+            )
+            if not is_equiv:
+                detected_bug = misconception_detector.detect(
+                    user_step_str=candidate_expr,
+                    previous_step_str=request.previous_step or request.target_equation,
+                    target_equation_str=request.target_equation,
+                )
+        except SecurityViolationError as e:
+            error_msg = f"Güvenlik ihlali: {str(e)}"
+        except Exception as e:
+            error_msg = f"Cebirsel ayrıştırma uyarısı: {str(e)}"
+    else:
+        error_msg = "Çizimden geçerli bir matematiksel ifade çıkarılamadı."
+
+    total_latency_ms = (time.perf_counter() - start_time) * 1000.0
+
+    # 3. Psikometri ve Bilişsel Modelleme (iBKT)
+    current_pl = request.current_p_l if request.current_p_l is not None else 0.20
+    post_pl, next_pl = IndividualizedBKT.update_mastery(p_l=current_pl, is_correct=is_equiv)
+    psychometrics = StepPsychometrics(
+        bkt_posterior_p_l=round(post_pl, 4),
+        bkt_next_p_l=round(next_pl, 4),
+        ddm_drift_rate=None,
+        ddm_boundary_separation=None,
+        ddm_cognitive_state="fluent_inking_mastery" if is_equiv else "inking_exploration",
+    )
+
+    is_target_reached = is_equiv and any(kw in candidate_expr for kw in ["x=", "x =", "x1=", "x2="])
+
+    return MultimodalStepVerificationResponse(
+        recognized_latex=recognition.raw_latex,
+        recognized_sympy=recognition.sympy_expression,
+        is_valid=is_equiv,
+        is_target_reached=is_target_reached,
+        detected_bug=detected_bug,
+        canonical_expression=candidate_expr,
+        error_message=error_msg,
+        recognition_confidence=recognition.confidence,
+        total_latency_ms=round(total_latency_ms, 2),
+        psychometrics=psychometrics,
+    )
+
+
+# ==========================================
+# 6. ULUSLARARASI MÜFREDAT ONTOLOJİ API
+# ==========================================
+
+@router.get("/api/v1/curriculum/standards", response_model=CurriculumListResponse)
+async def get_curriculum_standards(curriculum: Optional[str] = None) -> CurriculumListResponse:
+    """
+    MEB, IB DP, US Common Core ve AP Precalculus ontoloji kazanım standartlarını listeler.
+    """
+    if curriculum and curriculum.upper() not in ["ALL", "DEFAULT"]:
+        standards = curriculum_registry.get_standards_for_curriculum(curriculum)
+    else:
+        standards = curriculum_registry.get_all_standards()
+
+    return CurriculumListResponse(
+        curricula=CurriculumOntologyRegistry.CURRICULA,
+        total_standards=len(standards),
+        standards=standards,
+    )
+
+
+# ==========================================
+# 7. OKUL VE LMS ENTEGRASYONU (LTI 1.3 & AGS)
+# ==========================================
+
+@router.post("/api/v1/lti/login")
+async def lti_oidc_login(payload: LTILaunchPayload):
+    """
+    LMS (Canvas, Moodle, Google Classroom) 3. taraf OIDC oturum açma başlangıcı.
+    """
+    return lti_service.initiate_login(payload)
+
+
+@router.post("/api/v1/lti/launch")
+async def lti_resource_launch(id_token: str, state: Optional[str] = None):
+    """
+    LTI 1.3 Kaynak Bağlantısı Başlatma ve Sıfır-PII anonim kullanıcı doğrulama.
+    """
+    return lti_service.handle_launch(id_token, state)
+
+
+@router.get("/api/v1/lti/jwks")
+async def lti_jwks():
+    """
+    Öğrenme Motoru'nun LMS doğrulama açık anahtar kümesi (JWKS / RS256).
+    """
+    return lti_service.get_jwks()
+
+
+@router.post("/api/v1/lti/ags/scores")
+async def lti_sync_grade(request: LTIGradeScoreRequest):
+    """
+    LTI 1.3 AGS Not Defteri ile çift yönlü puan ve yetkinlik senkronizasyonu.
+    """
+    return lti_service.sync_grade_to_lms(request)
+
+
+# ==========================================
+# 8. SIFIR-PII SINIF VE ÖĞRETMEN ANALİTİK API
+# ==========================================
+
+@router.get("/api/v1/classroom/analytics", response_model=ClassroomAnalyticsResponse)
+async def get_classroom_analytics(
+    cohort_id: str = "CLASS-10A", students: int = 28
+) -> ClassroomAnalyticsResponse:
+    """
+    Öğretmenler için öğrencilerin ZPD dağılımını, yaygın bozuk kuralları ve Paas bilişsel
+    yük indeksini kişisel veri içermeksizin (Zero-PII) raporlar.
+    """
+    return classroom_reporter.generate_classroom_report(cohort_id=cohort_id, student_count=students)
+
+
+# ==========================================
+# 9. BİLİŞSEL SESLİ SOKRATİK REHBERLİK API
+# ==========================================
+
+@router.post("/api/v1/voice/socratic-turn", response_model=VoiceSocraticResponse)
+async def voice_socratic_turn(request: VoiceSocraticRequest) -> VoiceSocraticResponse:
+    """
+    Yazma güçlüğü çeken öğrenciler için konuşmadan-metne ve metinden-konuşmaya destekli,
+    Zero-Leakage filtresiyle güvence altına alınmış Sokratik rehberlik sunar.
+    """
+    return voice_engine.process_voice_turn(request)
+
+
+# ==========================================
+# 10. OTONOM MÜFREDAT VE FORMEL KANIT API
+# ==========================================
+
+@router.post("/api/v1/curriculum/synthesize", response_model=SynthesizedCurriculumResponse)
+async def synthesize_curriculum(request: CurriculumSynthesizeRequest) -> SynthesizedCurriculumResponse:
+    """
+    İleri matematik konusunu girdi alarak 30 düğümlü döngüsüz Bilgi Grafı (DAG),
+    kavram yanılgısı kataloğu ve SymPy ile formel olarak kanıtlanmış öğrenme adımları sentezler.
+    """
+    return curriculum_synthesizer.synthesize(request)
+
+
+# ==========================================
+# 11. 100.000 SENTETİK ÖĞRENCİ İKİZİ SİMÜLASYON API
+# ==========================================
+
+@router.post("/api/v1/simulation/run-cohort", response_model=SimulationCohortResponse)
+async def run_cohort_simulation(request: SimulationCohortRequest) -> SimulationCohortResponse:
+    """
+    Farklı bilişsel profillere sahip 100.000 sentetik öğrenci ikizi üzerinde
+    30 günlük sanal zaman hızlandırmasıyla Monte Carlo simülasyonu yürütür ve dar boğazları eler.
+    """
+    return simulation_factory.run_simulation(request)
+
+
+# ==========================================
+# 12. AÇIK AKADEMİK ARAŞTIRMA VE LİDERLİK TABLOSU API
+# ==========================================
+
+@router.post("/api/v1/research/export/dp-dataset", response_model=DPExportResponse)
+async def export_dp_research_dataset(request: DPExportRequest) -> DPExportResponse:
+    """
+    Bilişsel bilim araştırmacıları için tamamen anonimleştirilmiş (sıfır-PII),
+    diferansiyel gizlilik (epsilon-DP) korumalı açık veri seti üretir.
+    """
+    return dp_exporter.export_dataset(request)
+
+
+@router.get("/api/v1/research/leaderboard", response_model=LeaderboardResponse)
+async def get_cognitive_models_leaderboard() -> LeaderboardResponse:
+    """
+    iBKT, DDM, FSRS ve IRT modellerinin kestirimsel başarılarını karşılaştıran
+    küresel Öğrenme Bilimleri Liderlik Tablosunu döner.
+    """
+    return model_benchmark.get_leaderboard()
+
+
 

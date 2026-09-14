@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
+import 'vector_inking_canvas.dart';
 
 enum InputMode {
   touchpad,
   virtualKeyboard,
+  inkingCanvas,
 }
 
 class MathTouchpad extends StatelessWidget {
@@ -79,8 +81,45 @@ class MathTouchpad extends StatelessWidget {
   Widget build(BuildContext context) {
     if (inputMode == InputMode.virtualKeyboard) {
       return _buildKeyboardMode(context);
+    } else if (inputMode == InputMode.inkingCanvas) {
+      return _buildInkingMode(context);
     }
     return _buildTouchpadGrid(context);
+  }
+
+  Widget _buildInkingMode(BuildContext context) {
+    return Container(
+      height: 280,
+      color: AppColors.bgSurface,
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.grid_view_rounded, color: AppColors.accentPrimary),
+                tooltip: 'Matematik Touchpadine Geç',
+                onPressed: () => onModeChanged(InputMode.touchpad),
+              ),
+              IconButton(
+                icon: const Icon(Icons.keyboard_outlined, color: AppColors.textMuted),
+                tooltip: 'Klavyeye Geç',
+                onPressed: () => onModeChanged(InputMode.virtualKeyboard),
+              ),
+              const Spacer(),
+            ],
+          ),
+          Expanded(
+            child: VectorInkingCanvas(
+              onExpressionRecognized: (expr) {
+                controller.text = expr;
+                onSubmit();
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildKeyboardMode(BuildContext context) {
@@ -97,6 +136,12 @@ class MathTouchpad extends StatelessWidget {
                 tooltip: 'Matematik Touchpadine Geç',
                 onPressed: () => onModeChanged(InputMode.touchpad),
               ),
+              IconButton(
+                icon: const Icon(Icons.draw_rounded, color: Color(0xFF38BDF8)),
+                tooltip: 'El Yazısı Kanvasına Geç',
+                onPressed: () => onModeChanged(InputMode.inkingCanvas),
+              ),
+              const SizedBox(width: 4),
               Expanded(
                 child: TextField(
                   controller: controller,
@@ -146,10 +191,28 @@ class MathTouchpad extends StatelessWidget {
   Widget _buildTouchpadGrid(BuildContext context) {
     return Container(
       color: AppColors.bgSurface,
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 16),
+      padding: const EdgeInsets.fromLTRB(10, 6, 10, 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Input Mode Quick Switch Bar
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton.icon(
+                onPressed: () => onModeChanged(InputMode.inkingCanvas),
+                icon: const Icon(Icons.draw_rounded, size: 16, color: Color(0xFF38BDF8)),
+                label: const Text("El Yazısı Kanvası", style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12)),
+              ),
+              const SizedBox(width: 8),
+              TextButton.icon(
+                onPressed: () => onModeChanged(InputMode.virtualKeyboard),
+                icon: const Icon(Icons.keyboard_outlined, size: 16, color: AppColors.textMuted),
+                label: const Text("Klavye", style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
           // Row 1: Math Variables & Functions
           _buildRow([
             _key('x', () => _insertText('x'), flex: 1),

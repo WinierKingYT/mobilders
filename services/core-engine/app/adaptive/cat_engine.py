@@ -12,6 +12,7 @@ class CATItem:
     discrimination_a: float
     prompt: str
     canonical_answer: str
+    curriculum: str = "DEFAULT"
 
 
 class CATEngine:
@@ -206,9 +207,117 @@ class CATEngine:
                 prompt="f(x) = x² - 4x parabolünün x eksenini kestiği pozitif apsis değerini bulunuz.",
                 canonical_answer="4",
             ),
+            # MEB Curriculum Calibrated Items
+            CATItem(
+                item_id="CAT-MEB-01",
+                target_node_id="N10",
+                difficulty_b=-0.60,
+                discrimination_a=2.60,
+                prompt="MEB: 2x² - 8x = 0 denkleminin çözüm kümesini bulunuz.",
+                canonical_answer="{0, 4}",
+                curriculum="MEB",
+            ),
+            CATItem(
+                item_id="CAT-MEB-02",
+                target_node_id="N12",
+                difficulty_b=0.10,
+                discrimination_a=2.90,
+                prompt="MEB: x² - 7x + 10 = 0 denklemini çarpanlarına ayırarak çözünüz.",
+                canonical_answer="{2, 5}",
+                curriculum="MEB",
+            ),
+            CATItem(
+                item_id="CAT-MEB-03",
+                target_node_id="N18",
+                difficulty_b=1.10,
+                discrimination_a=2.80,
+                prompt="MEB: x² - 4x + 1 = 0 denklemini kuadratik formül ile çözünüz.",
+                canonical_answer="2 ± √3",
+                curriculum="MEB",
+            ),
+            CATItem(
+                item_id="CAT-MEB-04",
+                target_node_id="N20",
+                difficulty_b=1.35,
+                discrimination_a=2.85,
+                prompt="MEB: x² + 2x + 5 = 0 denkleminin reel sayılardaki çözüm kümesini diskriminant ile inceleyiniz.",
+                canonical_answer="Boş küme (Reel kök yok)",
+                curriculum="MEB",
+            ),
+            # IB Curriculum Calibrated Items
+            CATItem(
+                item_id="CAT-IB-01",
+                target_node_id="N10",
+                difficulty_b=-0.40,
+                discrimination_a=2.75,
+                prompt="IB: Express the quadratic function f(x) = 2x² - 12x + 10 in standard form.",
+                canonical_answer="2(x - 1)(x - 5)",
+                curriculum="IB",
+            ),
+            CATItem(
+                item_id="CAT-IB-02",
+                target_node_id="N15",
+                difficulty_b=0.75,
+                discrimination_a=2.85,
+                prompt="IB: Write f(x) = x² + 8x + 11 in vertex form a(x-h)² + k by completing the square.",
+                canonical_answer="(x + 4)² - 5",
+                curriculum="IB",
+            ),
+            CATItem(
+                item_id="CAT-IB-03",
+                target_node_id="N22",
+                difficulty_b=1.40,
+                discrimination_a=2.90,
+                prompt="IB: Solve the quadratic inequality x² - 5x - 14 ≤ 0.",
+                canonical_answer="[-2, 7]",
+                curriculum="IB",
+            ),
+            # US Common Core (CCSS) Calibrated Items
+            CATItem(
+                item_id="CAT-CCSS-01",
+                target_node_id="N08",
+                difficulty_b=-0.30,
+                discrimination_a=2.80,
+                prompt="CCSS: Factor the quadratic trinomial x² + 9x + 20.",
+                canonical_answer="(x + 4)(x + 5)",
+                curriculum="CCSS",
+            ),
+            CATItem(
+                item_id="CAT-CCSS-02",
+                target_node_id="N12",
+                difficulty_b=0.20,
+                discrimination_a=2.85,
+                prompt="CCSS: Solve (x - 4)(x + 7) = 0 by applying the zero product property.",
+                canonical_answer="x = 4, x = -7",
+                curriculum="CCSS",
+            ),
+            # AP Precalculus Calibrated Items
+            CATItem(
+                item_id="CAT-AP-01",
+                target_node_id="N24",
+                difficulty_b=1.20,
+                discrimination_a=2.80,
+                prompt="AP: Find the axis of symmetry and vertex for the function f(x) = -2(x - 3)² + 8.",
+                canonical_answer="x = 3, (3, 8)",
+                curriculum="AP",
+            ),
+            CATItem(
+                item_id="CAT-AP-02",
+                target_node_id="N25",
+                difficulty_b=1.60,
+                discrimination_a=2.90,
+                prompt="AP: Describe the transformation of y = x² to obtain g(x) = 0.5(x + 2)² - 4.",
+                canonical_answer="Horizontal shift left 2, vertical compression by 0.5, vertical shift down 4",
+                curriculum="AP",
+            ),
         ]
         for it in items:
             self.item_pool[it.item_id] = it
+
+    def get_items_by_curriculum(self, curriculum: str) -> List[CATItem]:
+        """Returns all items tagged with a specific curriculum."""
+        curr = curriculum.upper()
+        return [it for it in self.item_pool.values() if it.curriculum.upper() == curr]
 
     def update_item_pool(self, calibrated_params: Dict[str, Tuple[float, float]]) -> None:
         """MMLE-EM veya harici kalibrasyondan gelen (a_i, b_i) parametrelerini madde havuzuna uygular."""
@@ -250,33 +359,35 @@ class CATEngine:
         prior_weight = 1.0 / self.PRIOR_VARIANCE
 
         for _ in range(25):
-            first_deriv = -theta * prior_weight
-            second_deriv = -prior_weight
+            f_prime = - (theta / self.PRIOR_VARIANCE)
+            f_double_prime = - (1.0 / self.PRIOR_VARIANCE)
 
             for item_id, is_correct in administered_responses:
+                if item_id not in self.item_pool:
+                    continue
                 item = self.item_pool[item_id]
-                p = self.probability_correct(theta, item.discrimination_a, item.difficulty_b)
+                a = item.discrimination_a
+                b = item.difficulty_b
+                p = self.probability_correct(theta, a, b)
                 y = 1.0 if is_correct else 0.0
 
-                first_deriv += self.D * item.discrimination_a * (y - p)
-                info = self.fisher_information(theta, item.discrimination_a, item.difficulty_b)
-                second_deriv -= info
+                f_prime += self.D * a * (y - p)
+                f_double_prime -= (self.D ** 2) * (a ** 2) * p * (1.0 - p)
 
-            if abs(second_deriv) < 1e-9:
+            if abs(f_double_prime) < 1e-9:
                 break
 
-            step = first_deriv / second_deriv
-            theta = theta - step
+            delta = f_prime / f_double_prime
+            theta -= delta
 
-            # Uç değer kırpma (-3.5 ile +3.5 aralığı)
-            theta = max(-3.5, min(3.5, theta))
-
-            if abs(step) < 1e-4:
+            if abs(delta) < 1e-4:
                 break
 
-        # Standart Hata (SE)
+        # Standard Error: SE(theta) = 1 / sqrt(I(theta) + 1/sigma^2)
         total_info = prior_weight
         for item_id, _ in administered_responses:
+            if item_id not in self.item_pool:
+                continue
             item = self.item_pool[item_id]
             total_info += self.fisher_information(theta, item.discrimination_a, item.difficulty_b)
 
@@ -284,7 +395,10 @@ class CATEngine:
         return theta, standard_error
 
     def select_next_item(
-        self, current_theta: float, administered_item_ids: Set[str]
+        self,
+        current_theta: float,
+        administered_item_ids: Set[str],
+        curriculum: Optional[str] = None,
     ) -> Optional[CATItem]:
         """Kullanılmamış maddeler arasında Fisher bilgisini maksimize eden maddeyi seçer."""
         available_items = [
@@ -293,6 +407,13 @@ class CATEngine:
 
         if not available_items:
             return None
+
+        # Filter by curriculum if specified and non-default
+        if curriculum and curriculum.upper() not in ["DEFAULT", "ALL"]:
+            curr_target = curriculum.upper()
+            curr_filtered = [it for it in available_items if it.curriculum.upper() == curr_target]
+            if curr_filtered:
+                available_items = curr_filtered
 
         # Fisher bilgisini en yüksek yapan maddeyi bul
         best_item = max(
