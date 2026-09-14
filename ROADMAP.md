@@ -125,21 +125,21 @@ Bu yol haritası, **18 temel referans şartname dokümanında** tanımlanan kura
 
 ---
 
-### FAZ 5: İNTERAKTİF ÇÖZÜM TAHTASI VE KULLANICI DENEYİMİ (CLIENT UX)
-* **Hedef:** Matematiksel yazım sürtünmesini sıfırlayan, Al-Harezmi karoları ile cebirsel adımları eşzamanlı görselleştiren web arayüzünün inşası.
-* **Girdi Dokümanları:** [`11-CONTENT-AND-REPRESENTATION-SYSTEM.md`](11-CONTENT-AND-REPRESENTATION-SYSTEM.md), [`12-UX-AND-CORE-LEARNING-LOOP.md`](12-UX-AND-CORE-LEARNING-LOOP.md).
+### FAZ 5: FLUTTER MOBİL İSTEMCİ VE KULLANICI DENEYİMİ (MOBILE CLIENT UX)
+* **Hedef:** Akıllı telefon dikey yöneliminde ($390 \times 844$) başparmak ergonomisine tam uyumlu, çift modlu matematiksel girdi (Touchpad / Serbest Klavye) sunan akıcı (60 FPS) mobil arayüzün inşası.
+* **Girdi Dokümanları:** [`11-CONTENT-AND-REPRESENTATION-SYSTEM.md`](11-CONTENT-AND-REPRESENTATION-SYSTEM.md), [`12-UX-AND-CORE-LEARNING-LOOP.md`](12-UX-AND-CORE-LEARNING-LOOP.md), [`20-UI-UX-DESIGN-SYSTEM-AND-WIREFRAMES.md`](20-UI-UX-DESIGN-SYSTEM-AND-WIREFRAMES.md), [`21-TECH-STACK-AND-LANGUAGE-DECISIONS.md`](21-TECH-STACK-AND-LANGUAGE-DECISIONS.md).
 * **Kilometre Taşları:**
-  - **M5.1 (Frontend Scaffold):** Next.js 14 (App Router), TypeScript, Tailwind CSS, shadcn/ui.
-  - **M5.2 (Interactive Scratchpad):** MathLive klavye entegrasyonu, Akıllı Sembol Tuşları (`x`, `²`, `±`, `√`, `= 0`), adım adım girdi kutusu.
-  - **M5.3 (Al-Khwarizmi SVG Tiles Canvas):** $x^2$, $x$ ve $1$ birimlik karo yerleşim motoru, eksik köşe vurgusu, sıfır çifti iptal animasyonu.
-  - **M5.4 (Dynamic Parabola Canvas):** $f(x) = a(x-h)^2 + k$ tepe noktası formu ve köklerin simetri ekseninden sapma animasyonu ($\delta = \frac{\sqrt{\Delta}}{2|a|}$).
-  - **M5.5 (Linked Dual-View Synchronizer):** Sembolik adım atıldığında geometrik karoların otomatik hizalanması ve tersi (Sweller Bölünmüş Dikkat koruması).
-  - **M5.6 (Living Brain Map):** React Flow tabanlı 30 düğümlü etkileşimli Cebir Atlası haritası.
-  - **M5.7 (PF Dual View & Affective Overlay):** Bölünmüş ekran Karşılaştırmalı Vakalar görünümü ve nefes dairesi içeren Şefkatli Mola modalı.
+  - **M5.1 (Flutter Mobile Scaffold):** Flutter 3.19+ (iOS & Android), Dart 3.3+, `flutter_riverpod`, koyu Slate/Zinc tema motoru.
+  - **M5.2 (Çift Modlu Giriş & Scratchpad):** Özel Dokunmatik Tuş Takımı (Touchpad) + Serbest Sistem Klavyesi değiştirici mimarisi, `flutter_math_fork` TeX render, adım adım kart listesi.
+  - **M5.3 (Al-Harezmi Alan Karoları Kanvası):** `CustomPainter` ile donanım hızlandırmalı $x^2, x, 1$ karoları, eksik köşe parıldaması ve tamamlama animasyonu.
+  - **M5.4 (Dinamik Parabol & Sekmeli Görünüm):** Mobil dikey alana uygun Segmented Control ile Karo $\leftrightarrow$ Parabol geçişi.
+  - **M5.5 (Cebir Atlası Dikey Ağaç Görünümü):** 20 düğümlü dikey kaydırılabilir zihinsel gelişim haritası.
+  - **M5.6 (Mobil Haptik ve Afektif Şalter):** `HapticFeedback` dokunsal geri bildirimleri (doğrulamada hafif, hatada tok titreşim), nefes dairesi modalı.
+  - **M5.7 (Sirkadiyen Kilit & Yerel Önbellek):** Isar / SQLite yerel adım önbelleği, 14 saatlik uyku konsolidasyonu kilidi ve sabah push bildirimi.
 * **Çıkış Kriterleri (DoD):**
-  - [ ] First Contentful Paint (FCP) $\le 1.2\text{ s}$, Time to Interactive (TTI) $\le 2.0\text{ s}$.
-  - [ ] Scratchpad sembol yazma gecikmesi $\le 50\text{ ms}$.
-  - [ ] WCAG 2.1 AA erişilebilirlik ve tam mobil dokunmatik uyumluluğu.
+  - [ ] Android ve iOS cihazlarda sabit 60 FPS akıcı kanvas ve arayüz performansı.
+  - [ ] Çift modlu klavye geçişinde sıfır arayüz sıçraması (zero layout shift) ve $<30\text{ ms}$ dokunma tepki süresi.
+  - [ ] Dart analizinde 0 hata, 0 uyarı (`dart analyze`), sound null-safety.
 
 ---
 
@@ -170,18 +170,19 @@ graph TD
 
     F0[Faz 0: Şartname ve Referans Kütüphanesi Lock]:::done
     
-    F0 --> M1[Faz 1: Sembolik CAS ve 5 Buggy Rule Engine]:::core
+    F0 --> M1[Faz 1: Sembolik CAS ve 5 Buggy Rule Engine]:::done
     
-    M1 --> M2[Faz 2: 30 Düğümlü DAG, CAT ve Yaşayan Öğrenici Modeli]:::brain
+    M1 --> M2[Faz 2: 20 Düğümlü DAG, CAT ve Yaşayan Öğrenici Modeli]:::brain
     
     M2 --> M3[Faz 3: FSRS-4.5, Parça-Bütün, PF ve Afektif HMM]:::brain
     
     M1 & M3 --> M4[Faz 4: Sokratik AI ve Zero-Leakage Guardrail]:::core
     
-    M1 & M3 --> M5[Faz 5: Next.js 14 Scratchpad, Karolar ve UI]:::ui
+    M1 & M3 --> M5[Faz 5: Flutter Mobil İstemci, Çift Modlu Tuş Takımı ve UI]:::ui
     
     M2 & M4 & M5 --> M6[Faz 6: Olay Kaynağı Backend, 20 Dk Seans ve Pilot]:::deploy
 ```
+
 
 ---
 

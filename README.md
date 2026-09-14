@@ -43,7 +43,7 @@ Depo, birbirini tamamlayan ve katı bağımlılık ilişkileriyle birbirine bağ
 | **18** | [18-FOUNDATION-GOALS-AND-DEFINITION-OF-DONE.md](18-FOUNDATION-GOALS-AND-DEFINITION-OF-DONE.md) | Temel Hedefler ve Bitiş Kriterleri | 6 Katı Kabul Kapısı (DoD), Hata Toleransı, Kabul Kontratları |
 | **19** | [19-APPLICATION-FLOW-AND-USER-JOURNEY.md](19-APPLICATION-FLOW-AND-USER-JOURNEY.md) | Uygulama Akışı ve Kullanıcı Yolculuğu | Makro FSM, 20 Dk Günlük Seans Evreleri, Çözüm Tahtası Mikro-Döngüsü |
 | **20** | [20-UI-UX-DESIGN-SYSTEM-AND-WIREFRAMES.md](20-UI-UX-DESIGN-SYSTEM-AND-WIREFRAMES.md) | UI/UX Tasarım Sistemi ve Ekran Şemaları | Minimalist Bilişsel Tasarım, Renk Belirteçleri, 7 Ekran ASCII Wireframe'i |
-| **21** | [21-TECH-STACK-AND-LANGUAGE-DECISIONS.md](21-TECH-STACK-AND-LANGUAGE-DECISIONS.md) | Teknoloji Yığını ve Dil Kararları | Python 3.11/FastAPI + Next.js 14, Pydantic v2, PostgreSQL, Monorepo |
+| **21** | [21-TECH-STACK-AND-LANGUAGE-DECISIONS.md](21-TECH-STACK-AND-LANGUAGE-DECISIONS.md) | Teknoloji Yığını ve Dil Kararları | Python 3.11/FastAPI + Flutter Mobile, Çift Modlu Giriş, Isar/PostgreSQL |
 
 ---
 
@@ -143,6 +143,6 @@ Sistemin çalışan bir yazılıma dönüştürülme süreci, katı Definition o
   - **Faz 2:** 30 Düğümlü Bilgi Grafı, 2PL-IRT CAT ve Yaşayan Öğrenici Modeli
   - **Faz 3:** FSRS-4.5 Aralıklı Tekrar, Üretici Başarısızlık ve Afektif HMM
   - **Faz 4:** Sokratik AI Orkestrasyonu ve Zero-Leakage Regex Kalkanı
-  - **Faz 5:** Next.js 14 Çözüm Tahtası, Al-Harezmi Karoları ve Canlı Arayüz
+  - **Faz 5:** Flutter Mobil İstemci (iOS/Android), Çift Modlu Giriş ve Scratchpad
   - **Faz 6:** Olay Kaynağı Backend (FastAPI/Postgres/Redis) ve 50 Kişilik Kohort Pilotu
 

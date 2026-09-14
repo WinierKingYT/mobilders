@@ -1,25 +1,41 @@
 # 21-TECH-STACK-AND-LANGUAGE-DECISIONS.md
 # TEKNOLOJİ YIĞINI VE PROGRAMLAMA DİLİ KARARLARI (TECH STACK & LANGUAGE DECISIONS)
-## Karşılaştırmalı Dil Analizi, Mimari Katmanlar, Kütüphane Bağımlılıkları ve Dizin Yapısı
+## Karşılaştırmalı Mobil Dil Analizi, Hibrit Mimari Katmanları, Kütüphaneler ve Dizin Yapısı
 
 ---
 
 ## 1. MİMARİ KARAR GEREKÇESİ (ARCHITECTURE DECISION RECORD - ADR-001)
 
 ### Karar Başlığı:
-**Kişisel Öğrenme Motoru İçin Hibrit Nöro-Sembolik Teknoloji Yığını Seçimi**
+**Kişisel Öğrenme Motoru İçin Mobil Öncelikli (Flutter + Python Çekirdek) Nöro-Sembolik Teknoloji Yığını**
 
 ### Bağlam:
-Sistem üç farklı doğadaki görevi eşzamanlı olarak yerine getirmek zorundadır:
-1. **Deterministik Sembolik Matematik ve Psikometri:** Cebirsel adımların AST analizi, DDM diferansiyel denklemleri, 2PL-IRT matris işlemleri.
-2. **Yüksek Performanslı ve Düşük Gecikmeli Web API:** Kullanıcının her adımını $<180\text{ ms}$ sürede doğrulayan olay güdümlü backend.
-3. **Zengin ve Düşük Sürtünmeli İstemci Arayüzü:** Matematiksel klavye (MathLive), dinamik SVG alan karoları, parabol animasyonları ve interaktif graf ağları.
+Sistem, akıllı telefon form faktöründe ($390 \times 844$ dikey yönelim) üç farklı doğadaki görevi eşzamanlı olarak yerine getirmek zorundadır:
+1. **Yüksek Performanslı Mobil İstemci (Flutter):** 60/120 FPS akıcı kanvas çizimi (Al-Harezmi alan karoları ve dinamik paraboller), çift modlu matematiksel girdi (Özel Dokunmatik Tuş Takımı / Serbest Klavye geçişi) ve düşük sürtünmeli dikey ergonomi.
+2. **Deterministik Sembolik Matematik ve Bilişsel Backend (Python 3.11):** Cebirsel adımların SymPy AST analizi, bozuk kural (Buggy Rules) tespiti, DDM diferansiyel denklemleri ve 2PL-IRT CAT seviye tayini.
+3. **Düşük Gecikmeli Mobil API İletişimi:** Her matematiksel adımın mobilden sunucuya iletilip $<180\text{ ms}$ sürede doğrulanarak dokunsal (haptik) geri bildirimle ekrana yansıtılması.
 
 ---
 
-## 2. PROGRAMLAMA DİLLERİ KARŞILAŞTIRMA VE SEÇİM MATRİSİ
+## 2. MOBİL PROGRAMLAMA DİLLERİ KARŞILAŞTIRMA VE SEÇİM MATRİSİ
 
-### A. Backend & Matematiksel CAS Katmanı Seçimi
+### A. Mobil İstemci Çerçevesi (Mobile Client Framework) Seçimi
+
+| Kriter | Flutter (Dart 3.x) | React Native (TypeScript) | Saf Yerel (Swift & Kotlin) | Web / PWA |
+| :--- | :---: | :---: | :---: | :---: |
+| **Grafik & Kanvas Performansı** | ⭐⭐⭐⭐⭐ (Impeller Motoru / 120 FPS) | ⭐⭐⭐ (Bridge / Fabric gecikmesi) | ⭐⭐⭐⭐⭐ (Metal / Vulkan) | ⭐⭐ (Mobil tarayıcı kısıtları) |
+| **Özel Matematik Klavyesi (Touchpad)** | ⭐⭐⭐⭐⭐ (Hafif ve tam özelleştirilebilir) | ⭐⭐⭐⭐ (Third-party bağımlılığı) | ⭐⭐⭐⭐⭐ (Tam yerel kontrol) | ⭐⭐⭐ (Sanal klavye çakışmaları) |
+| **Girdi Modu Değiştirme (Çift Mod)** | ⭐⭐⭐⭐⭐ (Anlık ve titreşimsiz geçiş) | ⭐⭐⭐ (Layout shift riski) | ⭐⭐⭐⭐⭐ (Mükemmel) | ⭐⭐ (Viewport kayma sorunu) |
+| **Geliştirme Hızı & Tek Kod Tabanı** | ⭐⭐⭐⭐⭐ (iOS & Android %100 ortak) | ⭐⭐⭐⭐⭐ (Ortak JS kod tabanı) | ⭐ (İki ayrı ekip ve kod tabanı) | ⭐⭐⭐⭐⭐ (Tek web kodu) |
+| **Dokunsal Geri Bildirim (Haptics)** | ⭐⭐⭐⭐⭐ (`HapticFeedback` yerel API) | ⭐⭐⭐⭐ (Modül bağımlılığı) | ⭐⭐⭐⭐⭐ (CoreHaptics) | ⭐ (Mobil webde zayıf/desteksiz) |
+| **Çevrimdışı Çalışma & Yerel Önbellek** | ⭐⭐⭐⭐⭐ (Isar / Hive / SQLite) | ⭐⭐⭐⭐ (WatermelonDB / MMKV) | ⭐⭐⭐⭐⭐ (CoreData / Room) | ⭐⭐⭐ (IndexedDB kısıtları) |
+| **NİHAİ KARAR** | **SEÇİLDİ (KAZANAN) ✅** | Elendi (Kanvas/animasyon sürtünmesi) | Elendi (İki kat maliyet) | Elendi (Mobil deneyim yetersiz) |
+
+> **Karar:** Mobil istemci **Flutter (Dart 3.x)** olarak kilitlenmiştir. Flutter'ın donanım hızlandırmalı Impeller grafik motoru; cebirsel alan karolarını birleştiren animasyonlar, dinamik parabol morflamaları ve çift modlu matematik giriş takımı için benzersiz bir akıcılık sağlar.
+
+---
+
+### B. Backend & Matematiksel CAS Katmanı Seçimi
 
 | Kriter | Python 3.11+ (FastAPI) | Go (Golang) | Node.js (TypeScript) | Rust |
 | :--- | :---: | :---: | :---: | :---: |
@@ -30,46 +46,35 @@ Sistem üç farklı doğadaki görevi eşzamanlı olarak yerine getirmek zorunda
 | **LLM & AI Entegrasyonu** | ⭐⭐⭐⭐⭐ (Resmi google-genai SDK) | ⭐⭐⭐ (İkincil SDK) | ⭐⭐⭐⭐ (JS SDK) | ⭐⭐ (Topluluk sarmalayıcıları) |
 | **NİHAİ KARAR** | **SEÇİLDİ (KAZANAN) ✅** | Elendi (CAS desteği yok) | Elendi (Sembolik CAS yok) | Elendi (Gereksiz karmaşıklık) |
 
-> **Karar:** Backend çekirdeği **Python 3.11+ ve FastAPI** olarak kilitlenmiştir. SymPy olmadan cebirsel eşdeğerliği ve bozuk kuralları deterministik analiz etmek imkansızdır. Pydantic v2'nin Rust tabanlı serileştirmesiyle milisaniye altı veri doğrulama sağlanır.
+> **Karar:** Backend çekirdeği **Python 3.11+ ve FastAPI** olarak kilitlenmiştir. SymPy motoru ile cebirsel adımların matematiksel eşdeğerliği ve bozuk kurallar deterministik olarak analiz edilir.
 
 ---
 
-### B. Frontend ve Arayüz Katmanı Seçimi
-
-| Kriter | TypeScript / Next.js 14 | TypeScript / Vite + React | SvelteKit | Flutter Web |
-| :--- | :---: | :---: | :---: | :---: |
-| **Matematiksel Klavye (MathLive)** | ⭐⭐⭐⭐⭐ (Mükemmel Web Component) | ⭐⭐⭐⭐⭐ (İyi) | ⭐⭐⭐ (Entegrasyon pürüzlü) | ⭐ (Web'de DOM/Canvas sorunu) |
-| **İnteraktif Graf (React Flow)** | ⭐⭐⭐⭐⭐ (Endüstri standardı) | ⭐⭐⭐⭐⭐ (İyi) | ⭐⭐ (Svelte Flow zayıf) | ⭐ (Hazır kütüphane yok) |
-| **İlk Yükleme Hızı (FCP / TTI)** | ⭐⭐⭐⭐⭐ (SSR/SSG ile <1.2s) | ⭐⭐⭐ (SPA gecikmesi) | ⭐⭐⭐⭐⭐ (Hızlı) | ⭐ (Canvas yüklemesi >4s) |
-| **PWA & Dokunmatik Ergonomi** | ⭐⭐⭐⭐⭐ (Tam uyumlu) | ⭐⭐⭐⭐ (İyi) | ⭐⭐⭐⭐ (İyi) | ⭐⭐⭐ (Ağır paket) |
-| **NİHAİ KARAR** | **SEÇİLDİ (KAZANAN) ✅** | Elendi (SSR avantajı yok) | Elendi (Ekosistem darlığı) | Elendi (Web performansı zayıf) |
-
-> **Karar:** Frontend **TypeScript ve Next.js 14 (App Router)** olarak kilitlenmiştir. Tailwind CSS, shadcn/ui bileşenleri, MathLive ve React Flow ile tam entegre çalışır.
-
----
-
-## 3. SEÇİLEN TEKNOLOJİ YIĞINI BİLEŞENLERİ (THE FULL STACK SPEC)
+## 3. SEÇİLEN TEKNOLOJİ YIĞINI BİLEŞENLERİ (THE MOBILE FULL-STACK SPEC)
 
 ```text
 +─────────────────────────────────────────────────────────────────────────────+
-|                                TEKNOLOJİ YIĞINI                             |
+|                        MOBİL TEKNOLOJİ YIĞINI                               |
 +─────────────────────────────────────────────────────────────────────────────+
-| [ İSTEMCİ / FRONTEND ]                                                      |
-| - Dil: TypeScript 5.4+                                                      |
-| - Çerçeve: Next.js 14 (App Router, Server Components, PWA)                 |
-| - Stil: Tailwind CSS 3.4+ & shadcn/ui (Radix UI tabanlı)                    |
-| - Matematik Girişi: MathLive (LaTeX Sanal Klavye & Web Component)          |
-| - Matematik Render: KaTeX (Yüksek hızlı LaTeX render)                       |
-| - Görsel Temsiller: Lucide Icons, SVG Canvas, Dinamik Parabol Çizici        |
-| - Bilgi Grafı: React Flow 11+ (Cebir Atlası DAG Görselleştirici)            |
+| [ MOBİL İSTEMCİ / FLUTTER ]                                                 |
+| - Dil: Dart 3.3+ (Sound Null Safety)                                        |
+| - Çerçeve: Flutter 3.19+ (iOS & Android Native)                              |
+| - Durum Yönetimi: flutter_riverpod (Reaktif, test edilebilir ve güvenli)    |
+| - Matematik Render: flutter_math_fork (Yüksek hızlı TeX/LaTeX render)        |
+| - Girdi Mimarisi (Çift Modlu Giriş):                                        |
+|     * Mod A: Özel Dokunmatik Tuş Takımı (Math Touchpad - Grid Layout)       |
+|     * Mod B: Serbest Sistem Klavyesi (ASCII / LaTeX Sözdizim Dönüştürücü)   |
+| - Vektör & Kanvas Çizim: CustomPainter + RepaintBoundary (Alan Karoları)   |
+| - Yerel Önbellek & Olay Kuyruğu: Isar Database / SQLite (Çevrimdışı adım)   |
+| - Dokunsal Geri Bildirim: HapticFeedback (Doğru adımda hafif, hatada tok)   |
 +─────────────────────────────────────────────────────────────────────────────+
                                        │ (REST API & WebSockets / JSON)
                                        ▼
 +─────────────────────────────────────────────────────────────────────────────+
 | [ SUNUCU / BACKEND CORE ]                                                   |
 | - Dil: Python 3.11+                                                         |
-| - Web Çerçevesi: FastAPI (Uvicorn / Starlette / AsyncIO)                    |
-| - Şema Doğrulama: Pydantic v2 (Rust motorlu yüksek hızlı tip denetimi)      |
+| - Web Çerçevesi: FastAPI (Uvicorn / AsyncIO)                                |
+| - Şema Doğrulama: Pydantic v2 (Rust tabanlı yüksek hızlı tip denetimi)       |
 | - Sembolik CAS: SymPy 1.13+ (AST Ziyaretçisi, Bozuk Kural Dedektörü)        |
 | - İstatistik & Psikometri: NumPy 1.26+, SciPy 1.12+ (DDM, IRT, BKT)         |
 | - Çoklu İşlem Sandbox'ı: Python `multiprocessing` (500ms timeout / memlimit)|
@@ -80,92 +85,129 @@ Sistem üç farklı doğadaki görevi eşzamanlı olarak yerine getirmek zorunda
 +─────────────────────────────────────────────────────────────────────────────+
 | [ VERİ TABANI VE DURUM KATMANI ]                                            |
 | - Olay Deposu (Event Store): PostgreSQL 15+ (Append-Only Events, JSONB)     |
-| - Hızlı Önbellek & Durum: Redis 7.2+ (ZPD düğüm kümeleri, Rate Limiter)     |
+| - Hızlı Önbellek & Durum: Redis 7.2+ (ZPD düğüm kümeleri, Seans TTL)        |
 | - ORM / Veri Erişimi: SQLAlchemy 2.0 (Async) + Alembic                      |
 +─────────────────────────────────────────────────────────────────────────────+
                                        │
                                        ▼
 +─────────────────────────────────────────────────────────────────────────────+
 | [ TEST VE KALİTE GÜVENCESİ (QA) ]                                           |
+| - Mobil Test: Flutter Driver, flutter_test (Widget & Unit), ARTEMIS MCP     |
 | - Backend Test: PyTest 8.0+, pytest-asyncio, Hypothesis (Property Testing)  |
-| - Frontend Test: Vitest, React Testing Library, Playwright (E2E)            |
-| - Statik Analiz: Ruff (Python linter/formatter), ESLint, Prettier           |
+| - Statik Analiz: `dart analyze`, Ruff (Python linter/formatter)             |
 +─────────────────────────────────────────────────────────────────────────────+
 ```
 
 ---
 
-## 4. PROJE DİZİN VE MODÜL MİMARİSİ (MONOREPO / CLEAN ARCHITECTURE)
+## 4. MOBİL ÇİFT MODLU GİRDİ (DUAL-MODE INPUT) MİMARİSİ
 
-Proje, bağımlılıkları temiz tutan modüler bir mimaride organize edilir:
+Öğrencinin bilişsel stiline ve anlık tercihine göre giriş modunu değiştirebilmesi için ayrık iki arayüz katmanı tanımlanmıştır:
+
+```text
++───────────────────────────────────────────────────────────────────+
+|                  GİRDİ ALANI SEÇİCİ KONTROLÜ                      |
+|       [ 🧮 Matematik Tuş Takımı ]   |   [ ⌨️ Serbest Klavye ]      |
++───────────────────────────────────────────────────────────────────+
+
+  [ MOD A: ÖZEL MATEMATİK TUŞ TAKIMI (TOUCHPAD) ]
+  ┌─────┬─────┬─────┬─────┬─────────┐
+  │  x  │ x²  │  √  │  ±  │   DEL   │
+  ├─────┼─────┼─────┼─────┼─────────┤
+  │  7  │  8  │  9  │  (  │    )    │
+  ├─────┼─────┼─────┼─────┼─────────┤
+  │  4  │  5  │  6  │  +  │    -    │
+  ├─────┼─────┼─────┼─────┼─────────┤
+  │  1  │  2  │  3  │  =  │ ADIM AT │
+  ├─────┴─────┼─────┼─────┴─────────┤
+  │     0     │  /  │    GÖNDER     │
+  └───────────┴─────┴───────────────┘
+  * Avantajı: Tek dokunuşla formül inşası, sözdizimi hatası sıfıra yakın.
+
+  [ MOD B: SERBEST SİSTEM KLAVYESİ ]
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ [ Girdi Kutusu: x^2 + 6x = 2                                  ] │
+  │ ┌───┬───┬───┬───┬───┬───┬───┬───┬───┬───┐                     │
+  │ │ q │ w │ e │ r │ t │ y │ u │ i │ o │ p │  (Standart iOS/       │
+  │ └───┴───┴───┴───┴───┴───┴───┴───┴───┴───┘   Android Klavyesi)  │
+  └─────────────────────────────────────────────────────────────────┘
+  * Avantajı: Hızlı klavye kullanan veya harici klavye bağlayanlar için özgürlük.
+  * Parser: `^` işaretini otomatik `**` üs işlemine, `x2` yazımını `x^2`ye tamamlar.
+```
+
+---
+
+## 5. PROJE DİZİN VE MODÜL MİMARİSİ (FLUTTER + FASTAPI)
 
 ```text
 uyugulama1/
 ├── README.md                                # Ana proje indeksi ve genel mimari
 ├── ROADMAP.md                               # Geliştirme fazları ve DoD kapıları
-├── 00-PROJECT-VISION.md ... 17-GAPS.md      # 18 Referans Şartname Dokümanı
-├── 18-FOUNDATION-GOALS-AND-DOD.md           # Bitiş kriterleri ve kabul kapıları
-├── 19-APPLICATION-FLOW-AND-USER-JOURNEY.md  # Oturum durum makinesi ve kullanıcı akışı
-├── 20-UI-UX-DESIGN-SYSTEM-AND-WIREFRAMES.md # Ekran şemaları ve tasarım sistemi
-├── 21-TECH-STACK-AND-LANGUAGE-DECISIONS.md  # Teknoloji yığını ve dil şartnamesi
+├── Referans/                                # 18 Referans Şartname Dokümanı
+│   ├── 00-PROJECT-VISION.md ... 17-GAPS.md
+├── 18-FOUNDATION-GOALS-AND-DEFINITION-OF-DONE.md # Bitiş kriterleri ve kabul kapıları
+├── 19-APPLICATION-FLOW-AND-USER-JOURNEY.md  # Mobil oturum durum makinesi
+├── 20-UI-UX-DESIGN-SYSTEM-AND-WIREFRAMES.md # Akıllı telefon dikey wireframeleri
+├── 21-TECH-STACK-AND-LANGUAGE-DECISIONS.md  # Bu doküman (Mobil teknoloji yığını)
 │
 ├── apps/
-│   └── web/                                 # Next.js 14 İstemci Uygulaması
-│       ├── app/                             # App Router sayfaları (teşhis, seans, atlas)
-│       ├── components/
-│       │   ├── scratchpad/                  # MathLive çözüm tahtası ve adım kartları
-│       │   ├── canvas/                      # Al-Harezmi SVG karoları ve dinamik parabol
-│       │   ├── brain-map/                   # React Flow Cebir Atlası
-│       │   └── circuit-breaker/             # Şefkatli Mola modalı
-│       └── lib/                             # API istemcisi, WebSocket köprüsü
+│   └── mobile/                              # Flutter Mobil Uygulaması (iOS & Android)
+│       ├── lib/
+│       │   ├── core/                        # Tema, renkler, haptik servis, ağ istemcisi
+│       │   ├── features/
+│       │   │   ├── diagnostic/              # 2PL-IRT CAT seviye tespit ekranı
+│       │   │   ├── session/                 # 20 dakikalık günlük seans FSM
+│       │   │   ├── scratchpad/              # Karalama defteri & kanvas çizici
+│       │   │   ├── keypad/                  # Çift modlu giriş (Touchpad / Serbest klavye)
+│       │   │   ├── visual_models/           # Al-Harezmi alan karoları & dinamik parabol
+│       │   │   └── summary/                 # Gün sonu bilişsel özet ve sirkadiyen kilit
+│       │   └── main.dart                    # Uygulama giriş noktası
+│       └── test/                            # Flutter widget ve unit testleri
 │
 └── services/
     └── core-engine/                         # Python 3.11 FastAPI Backend
         ├── app/
         │   ├── api/                         # FastAPI router endpointleri
         │   ├── cas/                         # SymPy AST eşdeğerlik ve sandbox
-        │   ├── misconceptions/              # 5 Buggy Rule dedektörleri (BUG-QUAD-01..05)
+        │   ├── misconceptions/              # 5 Bozuk Kural dedektörü (BUG-QUAD-01..05)
         │   ├── psychometrics/               # iBKT, CT-BKT, Ratcliff DDM, Wald SPRT
         │   ├── adaptive/                    # FSM, ZPD Termostatı, Kapur PF motoru
-        │   ├── tutor/                       # 4 Katmanlı Sokratik AI ve Zero-Leak Regex
-        │   └── models/                      # Pydantic v2 veri şemaları ve DDL
-        └── tests/
-            ├── cas/                         # 500 Sentetik cebirsel doğrulama testleri
-            ├── misconceptions/              # Bozuk kural yakalama testleri
-            ├── psychometrics/               # Monte Carlo CAT ve BKT testleri
-            └── security/                    # 100 Adversarial jailbreak testleri
+        │   ├── tutor/                       # 4 Katmanlı Sokratik AI ve Sıfır-Sızıntı denetimi
+        │   └── models/                      # Pydantic v2 veri şemaları
+        └── tests/                           # PyTest test paketi (17 test %100 yeşil)
 ```
 
 ---
 
-## 5. API İLETİŞİM PROTOKOLÜ VE VERİ KONTRATI (CONTRACTS)
+## 6. MOBİL VERİ VE ETKİLEŞİM KONTRATI
 
-### Adım Doğrulama İsteği (`POST /api/v1/session/step/verify`)
+### Mobil Adım Gönderme İsteği (`POST /api/v1/session/step/verify`)
 ```json
 {
   "session_id": "550e8400-e29b-41d4-a716-446655440000",
   "node_id": "N15",
   "step_number": 3,
-  "raw_latex": "(x + 3)^2 = 11",
+  "user_expression": "(x + 3)^2 = 11",
+  "target_equation": "x^2 + 6*x - 2 = 0",
+  "previous_step": "x^2 + 6*x + 9 = 11",
+  "input_mode": "TOUCHPAD",
   "elapsed_ms": 14200,
-  "keystroke_entropy": 0.42,
   "confidence_rating": 0.75
 }
 ```
 
-### Adım Doğrulama Yanıtı (Gecikme $\le 120\text{ ms}$)
+### Mobil Yanıt ve Dokunsal Tetikleyici (Gecikme $\le 120\text{ ms}$)
 ```json
 {
   "is_valid": true,
   "is_target_reached": false,
   "detected_bug": null,
-  "canonical_form": "(x + 3)**2 - 11",
-  "bkt_p_learned": 0.68,
-  "ddm_drift_rate": 1.45,
-  "scaffold_directive": {
-    "current_level": 1,
-    "next_prompt": "Şimdi her iki tarafın karekökünü alabilir misin?",
-    "highlight_token": "ROOT_EXTRACTION"
+  "canonical_expression": "(x + 3)**2 - 11",
+  "haptic_feedback": "LIGHT_IMPACT",
+  "analysis_latency_ms": 8.4,
+  "socratic_scaffold": {
+    "scaffold_level": 1,
+    "hint_text": "Harika bir tam kare oluşturdun. Şimdi her iki tarafın karekökünü almayı deneyebilir misin?"
   }
 }
 ```

@@ -92,11 +92,11 @@ MVP'nin "TAMAMLANDI" statüsü alabilmesi için aşağıdaki 6 kapının **tamam
 | Alan | MVP'de Kesinlikle VAR (In-Scope) | MVP'de Kesinlikle YOK (Out-of-Scope / Non-Goals) |
 | :--- | :--- | :--- |
 | **Matematik Konusu** | İkinci Dereceden Denklemler (20 Çekirdek Düğüm) | Trigonometri, Türev, Çok Değişkenli Sistemler |
-| **Girdi Yöntemi** | MathLive Klavye + Akıllı Sembol Tuşları | Serbest El Yazısı OCR, Sesli Konuşma |
+| **Girdi Yöntemi** | Çift Modlu Mobil Giriş (Özel Touchpad + Serbest Klavye) | Serbest El Yazısı OCR, Sesli Konuşma |
 | **Doğrulama** | Deterministik SymPy AST (Sunucu Tarafı) | LLM'in tek başına matematiği puanlaması |
-| **Öğretici** | Sokratik Metin Diyaloğu + Çözüm Tahtası | Sesli Konuşan 3D Avatar, Video Anlatımı |
-| **Platform** | Responsive Web (Mobile PWA & Desktop) | Native iOS / Android Uygulamaları |
-| **Motivasyon** | Beyin Haritası, Kalibrasyon Skoru, ZPD | Konfeti patlaması, XP, Lig/Liderlik Tablosu |
+| **Öğretici** | Sokratik Metin Diyaloğu + Mobil Scratchpad | Sesli Konuşan 3D Avatar, Video Anlatımı |
+| **Platform** | Akıllı Telefon Mobil Uygulaması (Flutter - iOS & Android) | Masaüstü Web Portalı, Akıllı Saat |
+| **Motivasyon** | Cebir Atlası, Kalibrasyon Skoru, ZPD, Haptikler | Konfeti patlaması, XP, Lig/Liderlik Tablosu |
 
 ---
 
@@ -106,7 +106,7 @@ Geliştirme tamamlandığında aşağıdaki onay kutularının tamamı işaretle
 
 ### 1. Kodlama ve Mimari Tamamlanma:
 - [ ] Python 3.11 FastAPI backend servisi ayakta ve OpenAPI dokümantasyonu erişilebilir.
-- [ ] Next.js 14 frontend arayüzü hatasız derleniyor (TypeScript strict mode, 0 lint error).
+- [ ] Flutter mobil arayüzü hatasız derleniyor (`dart analyze` 0 issue, sound null-safety, 60 FPS).
 - [ ] PostgreSQL 15 Event Store şeması ve Redis 7.2 ZPD önbellek katmanı çalışıyor.
 - [ ] SymPy AST doğrulayıcı sandbox kısıtlamaları (500ms timeout, memory limit) devrede.
 
@@ -121,4 +121,5 @@ Geliştirme tamamlandığında aşağıdaki onay kutularının tamamı işaretle
 - [ ] Birim test kapsama oranı (Code Coverage) $\ge \%85$.
 - [ ] 500 sentetik cebir test senaryosunun tamamı yeşil.
 - [ ] 100 adversarial jailbreak güvenlik testinin tamamı yeşil.
-- [ ] Uçtan uca Playwright E2E testleri (Teşhis $\to$ Seans $\to$ Kapanış) yeşil.
+- [ ] Uçtan uca Flutter Mobil Entegrasyon Testleri (Teşhis $\to$ Seans $\to$ Kapanış) yeşil.
+
