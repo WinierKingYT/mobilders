@@ -11,6 +11,11 @@ from .analytic_geometry import (
     triangle_area,
     solve_analytic_geometry,
 )
+from .synthetic_geometry import (
+    Triangle2D,
+    EuclideanRelations,
+    AuxiliaryConstructionAdvisor,
+)
 
 __all__ = [
     "Point2D",
@@ -20,4 +25,7 @@ __all__ = [
     "triangle_centroid",
     "triangle_area",
     "solve_analytic_geometry",
+    "Triangle2D",
+    "EuclideanRelations",
+    "AuxiliaryConstructionAdvisor",
 ]

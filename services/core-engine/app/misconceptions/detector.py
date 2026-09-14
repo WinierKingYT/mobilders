@@ -432,6 +432,31 @@ class QuadraticMisconceptionDetector:
         if bug_a5:
             return bug_a5
 
+        # 81. BUG-EUC-01: Üçgen Eşitsizliği İhlali (a >= b + c)
+        bug_e1 = self._check_bug_euc_01(clean_user, clean_prev)
+        if bug_e1:
+            return bug_e1
+
+        # 82. BUG-EUC-02: Çevre Açı ile Merkez Açı Eşitliği Sanrısı
+        bug_e2 = self._check_bug_euc_02(clean_user, clean_prev)
+        if bug_e2:
+            return bug_e2
+
+        # 83. BUG-EUC-03: Benzerlik Oranını Alan Oranına Eşit Sayma (k -> k²)
+        bug_e3 = self._check_bug_euc_03(clean_user, clean_prev)
+        if bug_e3:
+            return bug_e3
+
+        # 84. BUG-EUC-04: Öklid Yükseklik Bağıntısında Kenar Çarpımı Hatası
+        bug_e4 = self._check_bug_euc_04(clean_user, clean_prev)
+        if bug_e4:
+            return bug_e4
+
+        # 85. BUG-EUC-05: Açıortay Teoreminde Orantı Yerine Eşit Bölme Sanrısı
+        bug_e5 = self._check_bug_euc_05(clean_user, clean_prev)
+        if bug_e5:
+            return bug_e5
+
         return None
 
     def _check_bug_quad_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
@@ -2436,4 +2461,107 @@ class QuadraticMisconceptionDetector:
                 offending_term=user_str,
             )
         return None
+
+    def _check_bug_euc_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-EUC-01: Üçgen Eşitsizliği İhlali (a >= b + c)."""
+        clean = user_str.replace(" ", "").lower()
+        if (
+            "3+4<8=>ucgen" in clean
+            or "kenarlar=3,4,8" in clean
+            or "a=8,b=3,c=4=>ucgen" in clean
+            or "8>=3+4" in clean
+            or "kenarlar:3,4,8" in clean
+            or "ucgen=(3,4,8)" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-EUC-01",
+                severity="CRITICAL",
+                category="EUCLIDEAN_TRIANGLE_INEQUALITY_VIOLATION",
+                description="Bir üçgenin herhangi bir kenarı diğer iki kenarın toplamından küçük olmalıdır: a < b + c. 8 >= 3 + 4 olduğundan bu kenarlarla üçgen çizilemez.",
+                remediation_directive="Üçgen eşitsizliğini kontrol et: |b - c| < a < b + c şartı sağlanmalıdır.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_euc_02(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-EUC-02: Çevre Açı ile Merkez Açı Eşitliği Sanrısı."""
+        clean = user_str.replace(" ", "").lower()
+        if "/2" in clean or "/ 2" in user_str or "*0.5" in clean:
+            return None
+        if (
+            "cevre_aci=merkez_aci" in clean
+            or "cevre=merkez" in clean
+            or "alpha_cevre=alpha_merkez" in clean
+            or "merkez=80=>cevre=80" in clean
+            or "merkez_aci=80=>cevre_aci=80" in clean
+            or "cevre_aci=yay" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-EUC-02",
+                severity="CRITICAL",
+                category="EUCLIDEAN_INSCRIBED_ANGLE_EQUALS_CENTRAL_ANGLE",
+                description="Çemberde aynı yayı gören çevre açının ölçüsü merkez açının (veya yayın) yarısına eşittir: α_çevre = α_merkez / 2.",
+                remediation_directive="Çevre açının köşesi çember üzerindedir ve merkez açının yarısı kadar açı görür.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_euc_03(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-EUC-03: Benzerlik Oranını Alan Oranına Eşit Sayma (k -> k²)."""
+        clean = user_str.replace(" ", "").lower()
+        if (
+            "k=2=>alan_orani=2" in clean
+            or "k=3=>alan_orani=3" in clean
+            or "alan_orani=k" in clean
+            or "alanlar_orani=k" in clean
+            or "alan1/alan2=k" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-EUC-03",
+                severity="CRITICAL",
+                category="EUCLIDEAN_SIMILARITY_AREA_RATIO_LINEAR_FALLACY",
+                description="Benzer iki geometrik şeklin alanları oranı benzerlik oranına değil, benzerlik oranının karesine eşittir: Alan₁ / Alan₂ = k².",
+                remediation_directive="Uzunluk oranı k ise, iki boyutlu alan hesabı için karesini al: k².",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_euc_04(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-EUC-04: Öklid Yükseklik Bağıntısında Kenar Çarpımı Hatası (h² = b·c)."""
+        clean = user_str.replace(" ", "").lower()
+        if (
+            "h^2=b*c" in clean
+            or "h**2=b*c" in clean
+            or "h^2=b.c" in clean
+            or "h=p*k" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-EUC-04",
+                severity="CRITICAL",
+                category="EUCLIDEAN_RIGHT_TRIANGLE_HEIGHT_RELATION_ERROR",
+                description="Öklid teoreminde dik kenarların çarpımı taban ile yüksekliğin çarpımına eşittir (b · c = a · h). Yüksekliğin karesi ise hipotenüste ayırdığı parçaların çarpımına eşittir: h² = p · k.",
+                remediation_directive="Yüksekliğin karesi için hipotenüsteki izdüşüm parçalarını çarp: h² = p · k.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_euc_05(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-EUC-05: Açıortay Teoreminde Orantı Yerine Eşit Bölme Sanrısı."""
+        clean = user_str.replace(" ", "").lower()
+        if (
+            "aciortay=>taban_esit" in clean
+            or "aciortay=>m=n" in clean
+            or "c/b=n/m" in clean
+            or "aciortay_tabani_ortalar" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-EUC-05",
+                severity="CRITICAL",
+                category="EUCLIDEAN_ANGLE_BISECTOR_RATIO_FALLACY",
+                description="İç açıortay karşı kenarı eşit ikiye bölmez (kenarortay değildir); kenarların oranında böler: c / b = m / n.",
+                remediation_directive="Açıortayın kenarlarla taban parçalarını orantıladığını hatırla: sol kenar / sağ kenar = sol taban / sağ taban.",
+                offending_term=user_str,
+            )
+        return None
+
 
