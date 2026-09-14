@@ -158,9 +158,64 @@ class CATEngine:
                 prompt="ax² + bx + c = 0 denkleminde b² - 4ac < 0 durumunda reel kök sayısını yazınız.",
                 canonical_answer="0",
             ),
+            CATItem(
+                item_id="CAT-ITEM-17",
+                target_node_id="N21",
+                difficulty_b=1.00,
+                discrimination_a=2.85,
+                prompt="x² - 4x + 3 > 0 eşitsizliğini çarpanlarına ayırarak standart formda yazınız.",
+                canonical_answer="(x - 1)(x - 3) > 0",
+            ),
+            CATItem(
+                item_id="CAT-ITEM-18",
+                target_node_id="N22",
+                difficulty_b=1.30,
+                discrimination_a=2.90,
+                prompt="x² - 9 ≤ 0 eşitsizliğinin işaret tablosunda negatif olan bölgeyi aralık olarak yazınız.",
+                canonical_answer="[-3, 3]",
+            ),
+            CATItem(
+                item_id="CAT-ITEM-19",
+                target_node_id="N23",
+                difficulty_b=1.55,
+                discrimination_a=2.80,
+                prompt="(x - 2)(x + 5) < 0 eşitsizliğinin çözüm kümesini açık aralık olarak yazınız.",
+                canonical_answer="(-5, 2)",
+            ),
+            CATItem(
+                item_id="CAT-ITEM-20",
+                target_node_id="N24",
+                difficulty_b=1.15,
+                discrimination_a=2.75,
+                prompt="f(x) = x² - 6x + 5 parabolünün tepe noktasının apsisini (r = -b/(2a)) bulunuz.",
+                canonical_answer="3",
+            ),
+            CATItem(
+                item_id="CAT-ITEM-21",
+                target_node_id="N25",
+                difficulty_b=1.45,
+                discrimination_a=2.85,
+                prompt="f(x) = (x - 4)² + 2 parabolünün tepe noktası koordinatını (r, k) biçiminde yazınız.",
+                canonical_answer="(4, 2)",
+            ),
+            CATItem(
+                item_id="CAT-ITEM-22",
+                target_node_id="N26",
+                difficulty_b=1.65,
+                discrimination_a=2.70,
+                prompt="f(x) = x² - 4x parabolünün x eksenini kestiği pozitif apsis değerini bulunuz.",
+                canonical_answer="4",
+            ),
         ]
         for it in items:
             self.item_pool[it.item_id] = it
+
+    def update_item_pool(self, calibrated_params: Dict[str, Tuple[float, float]]) -> None:
+        """MMLE-EM veya harici kalibrasyondan gelen (a_i, b_i) parametrelerini madde havuzuna uygular."""
+        for item_id, (cal_a, cal_b) in calibrated_params.items():
+            if item_id in self.item_pool:
+                self.item_pool[item_id].discrimination_a = cal_a
+                self.item_pool[item_id].difficulty_b = cal_b
 
     def probability_correct(self, theta: float, a: float, b: float) -> float:
         """2PL-IRT başarı olasılığı: P(Y=1|theta) = 1 / (1 + exp(-1.7*a*(theta - b)))."""

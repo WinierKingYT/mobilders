@@ -57,6 +57,31 @@ class QuadraticMisconceptionDetector:
         if bug5:
             return bug5
 
+        # 6. BUG-QUAD-06: Eşitsizlikte Negatif Sayıyla Bölmede Yön Değiştirmeme
+        bug6 = self._check_bug_quad_06(clean_user, clean_prev)
+        if bug6:
+            return bug6
+
+        # 7. BUG-QUAD-07: Çift Katlı Kökte İşaret Değiştirme
+        bug7 = self._check_bug_quad_07(clean_user, clean_prev)
+        if bug7:
+            return bug7
+
+        # 8. BUG-QUAD-08: Parabol Tepe Noktasında Eksi İşaretini Unutma
+        bug8 = self._check_bug_quad_08(clean_user, clean_prev)
+        if bug8:
+            return bug8
+
+        # 9. BUG-QUAD-09: Yatay Fonksiyon Ötelemesinde Yönü Ters Anlama
+        bug9 = self._check_bug_quad_09(clean_user, clean_prev)
+        if bug9:
+            return bug9
+
+        # 10. BUG-QUAD-10: Eşitsizlik Çözümünde Kök Bölgesini Ters Seçme
+        bug10 = self._check_bug_quad_10(clean_user, clean_prev)
+        if bug10:
+            return bug10
+
         return None
 
     def _check_bug_quad_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
@@ -180,6 +205,128 @@ class QuadraticMisconceptionDetector:
                             remediation_directive="-(-b) çarpım kuralını hatırlatan Sokratik bir işaret kontrolü sor.",
                             offending_term=user_str,
                         )
+        except Exception:
+            pass
+        return None
+
+    def _check_bug_quad_06(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-QUAD-06: Eşitsizlikte Negatif Sayıyla Bölmede Yön Değiştirmeme (-2x < 6 => x < -3)."""
+        for op in ["<=", ">=", "<", ">"]:
+            if op in prev_str and op in user_str:
+                prev_parts = prev_str.split(op)
+                user_parts = user_str.split(op)
+                lhs_prev, rhs_prev = prev_parts[0].strip(), prev_parts[1].strip()
+                lhs_user, rhs_user = user_parts[0].strip(), user_parts[1].strip()
+
+                match_neg = re.match(r"^-\s*(\d*)\s*\*?\s*x$", lhs_prev)
+                if match_neg and lhs_user in {"x", "+x"}:
+                    coeff_val = -float(match_neg.group(1)) if match_neg.group(1) else -1.0
+                    try:
+                        rhs_prev_val = float(sp.sympify(rhs_prev))
+                        expected_flipped_rhs = rhs_prev_val / coeff_val
+                        rhs_user_val = float(sp.sympify(rhs_user))
+                        if abs(rhs_user_val - expected_flipped_rhs) < 1e-4:
+                            return DiagnosticPayload(
+                                bug_id="BUG-QUAD-06",
+                                severity="CRITICAL",
+                                category="INEQUALITY_SIGN_REVERSAL",
+                                description="Eşitsizliğin her iki tarafı negatif bir sayıya bölündüğünde eşitsizlik yön değiştirmelidir; aynı yön korundu.",
+                                remediation_directive="-2 < 4 iken her iki tarafı -1'e böldüğümüzde sıralamanın nasıl değiştiğini inceleten Sokratik bir soru sor.",
+                                offending_term=user_str,
+                            )
+                    except Exception:
+                        pass
+        return None
+
+    def _check_bug_quad_07(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-QUAD-07: Çift Katlı Kökte İşaret Değiştirme ((x-2)^2 <= 0 => x <= 2)."""
+        if ("**2" in prev_str or "^2" in prev_str) and any(op in prev_str for op in ["<=", "<"]):
+            if "0" in prev_str and any(op in user_str for op in ["<=", "<", ">=", ">"]) and "veya" not in user_str:
+                return DiagnosticPayload(
+                    bug_id="BUG-QUAD-07",
+                    severity="CRITICAL",
+                    category="SIGN_TABLE_DOUBLE_ROOT",
+                    description="Çift katlı köklerde (tam kare ifadelerde) kökün sağında ve solunda işaret değişmez; bir reel sayının karesi asla negatif olamaz.",
+                    remediation_directive="Tam kare bir ifadenin işaret tablosunda işaretin çift katlı kökten geçerken neden değişmediğini sorgula.",
+                    offending_term=user_str,
+                )
+        return None
+
+    def _check_bug_quad_08(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-QUAD-08: Parabol Tepe Noktasında Eksi İşaretini Unutma (r = b/(2a))."""
+        try:
+            if "r" in user_str and "=" in user_str:
+                prev_e = self.cas.parse_to_sympy(prev_str.split("=")[0])
+                poly = sp.Poly(prev_e, self.x)
+                if poly.degree() == 2:
+                    coeffs = poly.all_coeffs()
+                    a_val, b_val = float(coeffs[0]), float(coeffs[1])
+                    true_r = -b_val / (2.0 * a_val)
+                    buggy_r = b_val / (2.0 * a_val)
+
+                    user_val_str = user_str.split("=")[1].strip()
+                    user_val = float(sp.sympify(user_val_str))
+                    if abs(user_val - buggy_r) < 1e-4 and abs(true_r - buggy_r) > 1e-4:
+                        return DiagnosticPayload(
+                            bug_id="BUG-QUAD-08",
+                            severity="CRITICAL",
+                            category="PARABOLA_VERTEX_SIGN",
+                            description="Parabolün tepe noktası apsisi r = -b/(2a) formülüyle bulunur; formülün başındaki eksi işareti ihmal edildi.",
+                            remediation_directive="Simetri ekseninin köklerin aritmetik ortalaması ((x1+x2)/2 = -b/(2a)) olduğunu hatırlatan Sokratik bir soru sor.",
+                            offending_term=user_str,
+                        )
+        except Exception:
+            pass
+        return None
+
+    def _check_bug_quad_09(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-QUAD-09: Yatay Fonksiyon Ötelemesinde Yönü Ters Anlama."""
+        clean_u = user_str.lower()
+        if "sola" in clean_u and ("-" in prev_str or "-" in clean_u):
+            if any(term in prev_str for term in ["(x -", "(x-", "(x - "]):
+                return DiagnosticPayload(
+                    bug_id="BUG-QUAD-09",
+                    severity="WARNING",
+                    category="FUNCTION_TRANSFORMATION_DIRECTION",
+                    description="Fonksiyonlarda f(x - h) dönüşümü grafiği h birim SAĞA öteler; parantez içi eksi işareti sola değil sağa kaydırır.",
+                    remediation_directive="Yeni tepe noktasının x=h için sıfırlandığını göstererek neden sağa kaydığını Sokratik olarak sorgula.",
+                    offending_term=user_str,
+                )
+        if "sağa" in clean_u and ("+" in prev_str or "+" in clean_u):
+            if any(term in user_str for term in ["(x +", "(x+", "(x + "]):
+                return DiagnosticPayload(
+                    bug_id="BUG-QUAD-09",
+                    severity="WARNING",
+                    category="FUNCTION_TRANSFORMATION_DIRECTION",
+                    description="Sağa öteleme yaparken x yerine (x - h) yazılmalıdır; (x + h) yazıldığında grafik sola ötelenir.",
+                    remediation_directive="x=0 noktasının yeni değerini nereye taşıdığını test ettiren bir değer denemesi yaptır.",
+                    offending_term=user_str,
+                )
+        return None
+
+    def _check_bug_quad_10(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-QUAD-10: Eşitsizlik Çözümünde Kök Bölgesini Ters Seçme."""
+        try:
+            if any(op in prev_str for op in [">", ">="]):
+                if ("(" in user_str or "[" in user_str) and "∪" not in user_str and "veya" not in user_str:
+                    prev_lhs = prev_str.split(">")[0].strip()
+                    lhs_expr = self.cas.parse_to_sympy(prev_lhs)
+                    poly = sp.Poly(lhs_expr, self.x)
+                    if poly.degree() == 2 and poly.all_coeffs()[0] > 0:
+                        roots = sorted([float(r) for r in sp.solve(lhs_expr, self.x)])
+                        if len(roots) == 2:
+                            match_interval = re.findall(r"[-+]?\d*\.?\d+", user_str)
+                            if len(match_interval) >= 2:
+                                u_r1, u_r2 = float(match_interval[0]), float(match_interval[1])
+                                if abs(u_r1 - roots[0]) < 1e-4 and abs(u_r2 - roots[1]) < 1e-4:
+                                    return DiagnosticPayload(
+                                        bug_id="BUG-QUAD-10",
+                                        severity="CRITICAL",
+                                        category="INEQUALITY_REGION_INVERSION",
+                                        description="İkinci dereceden eşitsizlikte başkatsayı pozitif iken > 0 eşitsizliği köklerin dışını ister; köklerin arası seçildi.",
+                                        remediation_directive="Köklerin arasından bir test noktası seçtirip (ör. x=2) ifadenin işaretini kontrol ettir.",
+                                        offending_term=user_str,
+                                    )
         except Exception:
             pass
         return None

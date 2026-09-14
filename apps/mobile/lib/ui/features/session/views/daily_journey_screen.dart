@@ -5,6 +5,7 @@ import '../../diagnostic/view_models/diagnostic_view_model.dart';
 import 'session_screen.dart';
 import 'scratchpad_overlay.dart';
 import 'al_khwarizmi_canvas.dart';
+import '../../analytics/views/cognitive_health_atlas_screen.dart';
 
 enum DailyPhase {
   warmup,      // Phase 1: 3 min (Spaced Retrieval)
@@ -101,6 +102,21 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                   tooltip: "El-Harezmi Karoları",
                   onPressed: () => setState(() => _showGeometricCanvas = !_showGeometricCanvas),
                 ),
+              // Cognitive Health & Atlas Button
+              IconButton(
+                icon: const Icon(
+                  Icons.account_tree_outlined,
+                  color: Color(0xFF10B981),
+                ),
+                tooltip: "Bilişsel Sağlık & Cebir Atlası",
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const CognitiveHealthAtlasScreen(),
+                    ),
+                  );
+                },
+              ),
             ],
           ),
           const SizedBox(height: 10),

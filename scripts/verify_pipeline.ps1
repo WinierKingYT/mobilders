@@ -31,7 +31,7 @@ if (Test-Path $FlutterBin) {
         Write-Host "`n[2/4] Flutter Mobil Birim ve Widget Testleri..." -ForegroundColor Yellow
         & $FlutterBin test test/
         if ($LASTEXITCODE -ne 0) { throw "Flutter testleri basarisiz oldu!" }
-        Write-Host "Flutter mobil testleri: 25/25 Yesil [PASS OK]" -ForegroundColor Green
+        Write-Host "Flutter mobil testleri: Tamami Yesil [PASS OK]" -ForegroundColor Green
     } finally {
         Pop-Location
     }
@@ -47,7 +47,7 @@ Push-Location $EngineDir
 try {
     & $VenvPython -m pytest -v
     if ($LASTEXITCODE -ne 0) { throw "Pytest testleri basarisiz oldu!" }
-    Write-Host "Pytest cekirdek motor testleri: 69/69 Yesil [PASS OK]" -ForegroundColor Green
+    Write-Host "Pytest cekirdek motor testleri: 84/84 Yesil [PASS OK]" -ForegroundColor Green
 
     # --------------------------------------------------------------------
     # 3. ADIM: Kod Kapsamı Denetimi (Coverage >= 85%)

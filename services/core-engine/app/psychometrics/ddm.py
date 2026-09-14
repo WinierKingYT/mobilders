@@ -38,6 +38,7 @@ class EZDiffusionSolver:
         pc: float,
         n_trials: Optional[int] = None,
         s: float = DEFAULT_SCALE_S,
+        custom_thresholds: Optional[Dict[str, float]] = None,
     ) -> DDMParameters:
         """
         Solves DDM parameters analytically using closed-form equations.
@@ -116,6 +117,7 @@ class EZDiffusionSolver:
             mrt=mrt,
             pc=pc_corrected,
             s=s,
+            custom_thresholds=custom_thresholds,
         )
 
         return DDMParameters(
@@ -135,6 +137,7 @@ class EZDiffusionSolver:
         mrt: float,
         pc: float,
         s: float,
+        custom_thresholds: Optional[Dict[str, float]] = None,
     ) -> str:
         """
         Classifies cognitive profile based on DDM parameters:
@@ -146,12 +149,18 @@ class EZDiffusionSolver:
         """
         # Relative thresholds scaled by s (default s=0.1)
         scale_ratio = s / 0.1
-        v_high = 0.12 * scale_ratio
-        v_low = 0.03 * scale_ratio
-        a_low = 0.07 * scale_ratio
-        a_high = 0.14 * scale_ratio
+        if custom_thresholds:
+            v_high = custom_thresholds.get("v_high", 0.12) * scale_ratio
+            v_low = custom_thresholds.get("v_low", 0.03) * scale_ratio
+            a_low = custom_thresholds.get("a_low", 0.07) * scale_ratio
+            a_high = custom_thresholds.get("a_high", 0.14) * scale_ratio
+        else:
+            v_high = 0.12 * scale_ratio
+            v_low = 0.03 * scale_ratio
+            a_low = 0.07 * scale_ratio
+            a_high = 0.14 * scale_ratio
 
-        if (mrt < 2.5 and pc < 0.65) or (mrt < 3.5 and boundary_separation <= 0.09 and pc < 0.65):
+        if (mrt < 2.5 and pc < 0.65) or (mrt < 3.5 and boundary_separation <= (a_low + 0.02) and pc < 0.65):
             return "rapid_guessing"
         if drift_rate >= v_high and boundary_separation <= a_high:
             return "fluent_mastery"
@@ -168,6 +177,7 @@ class EZDiffusionSolver:
         correctness: List[bool],
         filter_outliers: bool = True,
         s: float = DEFAULT_SCALE_S,
+        custom_thresholds: Optional[Dict[str, float]] = None,
     ) -> DDMParameters:
         """
         Filters outliers and computes MRT, VRT, and Pc from raw trials list.
@@ -191,4 +201,11 @@ class EZDiffusionSolver:
         variance = sum((rt - mrt) ** 2 for rt in rts) / (len(rts) - 1)
         pc = sum(1 for c in corrects if c) / len(corrects)
 
-        return cls.solve(mrt=mrt, vrt=variance, pc=pc, n_trials=len(corrects), s=s)
+        return cls.solve(
+            mrt=mrt,
+            vrt=variance,
+            pc=pc,
+            n_trials=len(corrects),
+            s=s,
+            custom_thresholds=custom_thresholds,
+        )

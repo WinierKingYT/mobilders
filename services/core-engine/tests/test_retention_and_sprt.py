@@ -145,11 +145,12 @@ def test_part_whole_propagation_nilpotent_matrix():
     dag = KnowledgeDAG()
     propagator = PartWholePropagator(dag=dag, gamma=0.80)
 
-    # Matrix shape must be 20x20
-    assert propagator.p_matrix.shape == (20, 20)
+    # Matrix shape must be NxN where N is total nodes (26)
+    n_nodes = len(dag.nodes)
+    assert propagator.p_matrix.shape == (n_nodes, n_nodes)
 
     # Diagonal elements must all be 1.0 (direct node receives full 100% of impulse)
-    for i in range(20):
+    for i in range(n_nodes):
         assert np.isclose(propagator.p_matrix[i, i], 1.0)
 
     # Root node N01 has no prerequisites: its column must have 1.0 at N01 and 0 elsewhere

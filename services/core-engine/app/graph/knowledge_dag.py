@@ -245,6 +245,70 @@ class KnowledgeDAG:
                 discrimination_a=2.2,
                 description="Δ > 0 (iki farklı reel kök), Δ = 0 (çakışık tek kök), Δ < 0 (reel kök yok).",
             ),
+
+            # SEVİYE 5 - DÜĞÜM GRUBU A: İkinci Dereceden Eşitsizlikler
+            KnowledgeNode(
+                id="N21",
+                canonical_code="math.alg.inequalities.standard_form",
+                title="İkinci Dereceden Eşitsizlik Standart Formu",
+                level=5,
+                strict_prereqs=["N10", "N12"],
+                default_difficulty_b=1.0,
+                discrimination_a=2.0,
+                description="ax² + bx + c ≶ 0 eşitsizliklerinin standart çarpan formunda incelenmesi.",
+            ),
+            KnowledgeNode(
+                id="N22",
+                canonical_code="math.alg.inequalities.sign_table",
+                title="İkinci Dereceden İşaret Tablosu",
+                level=5,
+                strict_prereqs=["N20", "N21"],
+                default_difficulty_b=1.3,
+                discrimination_a=2.2,
+                description="Köklerin sıralanması, başkatsayı a'nın işareti ile başlama ve tek/çift katlı kök kuralı.",
+            ),
+            KnowledgeNode(
+                id="N23",
+                canonical_code="math.alg.inequalities.solution_sets",
+                title="Eşitsizlik Çözüm Kümeleri ve Aralıklar",
+                level=5,
+                strict_prereqs=["N22"],
+                default_difficulty_b=1.5,
+                discrimination_a=2.1,
+                description="İşaret tablosuna göre çözüm kümesini açık/kapalı aralık veya birleşim olarak ifade etme.",
+            ),
+
+            # SEVİYE 5 - DÜĞÜM GRUBU B: Parabol ve Fonksiyon Dönüşümleri
+            KnowledgeNode(
+                id="N24",
+                canonical_code="math.fun.parabola.vertex_and_axis",
+                title="Parabol Tepe Noktası ve Simetri Ekseni",
+                level=5,
+                strict_prereqs=["N10", "N18"],
+                default_difficulty_b=1.1,
+                discrimination_a=2.1,
+                description="T(r, k) tepe noktası apsisi r = -b/(2a), ordinatı k = f(r) ve simetri ekseni x = r.",
+            ),
+            KnowledgeNode(
+                id="N25",
+                canonical_code="math.fun.parabola.transformations",
+                title="Tepe Noktası Formu ve Fonksiyon Ötelemeleri",
+                level=5,
+                strict_prereqs=["N16", "N24"],
+                default_difficulty_b=1.4,
+                discrimination_a=2.3,
+                description="f(x) = a(x - r)² + k formunda düşey ve yatay ötelemelerin geometrik dinamikleri.",
+            ),
+            KnowledgeNode(
+                id="N26",
+                canonical_code="math.fun.parabola.intercepts_and_geometry",
+                title="Parabol Eksen Kesimleri ve Diskriminant Geometrisi",
+                level=5,
+                strict_prereqs=["N20", "N24"],
+                default_difficulty_b=1.6,
+                discrimination_a=2.2,
+                description="Parabolün x ve y eksenlerini kestiği noktalar ile diskriminantın geometrik görselleşmesi.",
+            ),
         ]
 
         for node in raw_nodes:

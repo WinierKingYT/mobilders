@@ -18,6 +18,8 @@ from app.psychometrics.bkt import IndividualizedBKT
 from app.psychometrics.ddm import EZDiffusionSolver
 from app.affect.detector import AffectiveStateDetector, BehaviorObservation
 from app.socratic.pipeline import SocraticPipeline, SocraticRequest, InnerMonologueLog
+from app.retention.fsrs import FSRSEngine
+from app.analytics.local_reporter import LocalAnalyticsReporter
 from app.core.logging_config import telemetry_logger
 
 router = APIRouter(tags=["Session, Verification, Diagnostic & WebSocket"])
@@ -27,8 +29,10 @@ cas_engine = SymbolicEquivalenceEngine()
 misconception_detector = QuadraticMisconceptionDetector(cas_engine)
 knowledge_dag = KnowledgeDAG()
 cat_engine = CATEngine(dag=knowledge_dag)
+fsrs_engine = FSRSEngine()
 affective_detector = AffectiveStateDetector()
 socratic_pipeline = SocraticPipeline()
+local_analytics = LocalAnalyticsReporter(dag=knowledge_dag, fsrs=fsrs_engine)
 
 
 # ==========================================
@@ -290,6 +294,15 @@ async def conclude_session(payload: Optional[Dict[str, Any]] = None) -> Dict[str
         "circadian_lock_until": lock_until,
         "message": "Harika bir 20 dakikalık derin odak seansı tamamlandı. Sirkadiyen uyku konsolidasyonu için seans kilitlendi.",
     }
+
+
+@router.get("/api/v1/analytics/student/{student_id}")
+async def get_student_analytics(student_id: str) -> Dict[str, Any]:
+    """
+    Öğrencinin metabilişsel kalibrasyon, Paas bilişsel verimlilik (E),
+    14 günlük FSRS kalıcılık projeksiyonu ve 26 düğümlü Cebir Atlası analitiği.
+    """
+    return local_analytics.generate_student_report(student_id)
 
 
 # ==========================================
