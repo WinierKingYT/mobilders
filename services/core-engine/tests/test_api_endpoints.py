@@ -206,3 +206,51 @@ def test_websocket_session_lifecycle():
         assert pong_msg["type"] == "PONG"
 
 
+def test_protocol_22_rest_aliases():
+    # 1. /api/v1/cat/start
+    r1 = client.post("/api/v1/cat/start", json={"session_id": "test_cat_001"})
+    assert r1.status_code == 200
+    d1 = r1.json()
+    assert d1["cat_session_id"] == "test_cat_001"
+    assert d1["first_item"] is not None
+
+    # 2. /api/v1/cat/submit-item
+    r2 = client.post("/api/v1/cat/submit-item", json={
+        "session_id": "test_cat_001",
+        "item_id": "CAT-ITEM-01",
+        "is_correct": True,
+        "administered_history": [],
+    })
+    assert r2.status_code == 200
+    assert r2.json()["theta_hat"] > 0.0
+
+    # 3. /api/v1/cat/result/{cat_session_id}
+    r3 = client.get("/api/v1/cat/result/test_cat_001?theta=1.2")
+    assert r3.status_code == 200
+    d3 = r3.json()
+    assert len(d3["atlas_mastery"]) == 20
+    assert "N15" in d3["atlas_mastery"]
+
+    # 4. /api/v1/session/start-daily
+    r4 = client.post("/api/v1/session/start-daily")
+    assert r4.status_code == 200
+    d4 = r4.json()
+    assert d4["duration_limit_minutes"] == 20
+    assert d4["circadian_lock_hours"] == 14
+
+    # 5. /api/v1/atlas/state
+    r5 = client.get("/api/v1/atlas/state")
+    assert r5.status_code == 200
+    d5 = r5.json()
+    assert d5["total_nodes"] == 20
+
+    # 6. /api/v1/session/conclude
+    r6 = client.post("/api/v1/session/conclude")
+    assert r6.status_code == 200
+    d6 = r6.json()
+    assert d6["status"] == "CONCLUDED"
+    assert d6["circadian_lock_active"] is True
+    assert d6["lock_duration_seconds"] == 14 * 3600
+
+
+

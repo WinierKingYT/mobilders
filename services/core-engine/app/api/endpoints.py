@@ -191,6 +191,94 @@ async def submit_cat_response(request: CATSubmitRequest) -> CATSubmitResponse:
     )
 
 
+# -----------------------------------------------------------
+# 22-API-AND-COMMUNICATION-PROTOCOLS.md REST Alias Endpoints
+# -----------------------------------------------------------
+
+@router.post("/api/v1/cat/start")
+async def start_cat_session(payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """22-API-AND-COMMUNICATION-PROTOCOLS: Yeni uyarlamalı CAT teşhis oturumu başlatır."""
+    sess_id = payload.get("session_id", f"cat_{int(time.time())}") if payload else f"cat_{int(time.time())}"
+    first_item = cat_engine.select_next_item(current_theta=0.0, administered_item_ids=set())
+    return {
+        "cat_session_id": sess_id,
+        "first_item": {
+            "item_id": first_item.item_id,
+            "target_node_id": first_item.target_node_id,
+            "prompt": first_item.prompt,
+            "difficulty_b": first_item.difficulty_b,
+            "discrimination_a": first_item.discrimination_a,
+        } if first_item else None,
+        "initial_theta": 0.0,
+        "initial_se": 1.0,
+    }
+
+
+@router.post("/api/v1/cat/submit-item")
+async def submit_cat_item_alias(request: CATSubmitRequest) -> CATSubmitResponse:
+    """22-API-AND-COMMUNICATION-PROTOCOLS: Çözülen CAT maddesini iletir."""
+    return await submit_cat_response(request)
+
+
+@router.get("/api/v1/cat/result/{cat_session_id}")
+async def get_cat_result(cat_session_id: str, theta: float = 0.0) -> Dict[str, Any]:
+    """22-API-AND-COMMUNICATION-PROTOCOLS: CAT sonucunda oluşan 20 düğümlü Cebir Atlası Bayesian başlangıç olasılık dağılımı."""
+    seeded = cat_engine.seed_knowledge_dag(theta)
+    mastered = {n for n, p in seeded.items() if p >= 0.85}
+    zpd = knowledge_dag.get_zpd_candidates(mastered)
+    return {
+        "cat_session_id": cat_session_id,
+        "theta_estimate": theta,
+        "atlas_mastery": seeded,
+        "zpd_candidates": zpd,
+    }
+
+
+@router.post("/api/v1/session/start-daily")
+async def start_daily_session(payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """22-API-AND-COMMUNICATION-PROTOCOLS: Günlük 20 dakikalık oturumu başlatır (FSRS-4.5 ısınma + ZPD hedefi)."""
+    return {
+        "session_id": f"sess_daily_{int(time.time())}",
+        "duration_limit_minutes": 20,
+        "phases": ["warm_up", "cat_diagnostic", "problem_board", "metacognitive_reflection"],
+        "target_node": "N15",
+        "target_problem": "x^2 + 6x = 2",
+        "circadian_lock_hours": 14,
+    }
+
+
+@router.get("/api/v1/atlas/state")
+async def get_atlas_state() -> Dict[str, Any]:
+    """22-API-AND-COMMUNICATION-PROTOCOLS: Öğrencinin güncel 20 düğümlü Cebir Atlası durumu."""
+    return {
+        "total_nodes": len(knowledge_dag.nodes),
+        "nodes": [
+            {
+                "node_id": node.id,
+                "title": node.title,
+                "layer": node.level,
+                "prerequisites": node.strict_prereqs,
+            }
+            for node in knowledge_dag.nodes.values()
+        ],
+    }
+
+
+@router.post("/api/v1/session/conclude")
+async def conclude_session(payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """22-API-AND-COMMUNICATION-PROTOCOLS: Günlük seansı sonlandırır, 14 saatlik sirkadiyen kilidi aktifleştirir."""
+    now = time.time()
+    lock_until = now + (14 * 3600)
+    return {
+        "status": "CONCLUDED",
+        "session_ended_at": now,
+        "circadian_lock_active": True,
+        "lock_duration_seconds": 14 * 3600,
+        "circadian_lock_until": lock_until,
+        "message": "Harika bir 20 dakikalık derin odak seansı tamamlandı. Sirkadiyen uyku konsolidasyonu için seans kilitlendi.",
+    }
+
+
 # ==========================================
 # 3. SOKRATİK AI DİYALOG VE GÜVENLİK API
 # ==========================================

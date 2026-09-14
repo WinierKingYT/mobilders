@@ -152,3 +152,18 @@ Sistemin çalışan bir yazılıma dönüştürülme süreci, katı Definition o
   - **Faz 5:** Flutter Mobil İstemci (iOS/Android), Çift Modlu Giriş ve Scratchpad
   - **Faz 6:** Olay Kaynağı Backend (FastAPI/Postgres/Redis) ve 50 Kişilik Kohort Pilotu
 
+---
+
+## 8. ÜRETİM VE BAĞIMSIZ DENETİM DOKÜMANTASYONU (`docs/`)
+
+Kişisel Öğrenme Motoru'nun kod tabanı, bilişsel modelleri ve dağıtım mimarisi bağımsız denetim raporları ve operasyonel kılavuzlarla belgelenmiştir:
+
+| Doküman | Yol | Kapsam ve Açıklama |
+| :--- | :--- | :--- |
+| **Kapsamlı Sistem Denetimi** | [COMPREHENSIVE-SYSTEM-AUDIT-REPORT.md](docs/audit/COMPREHENSIVE-SYSTEM-AUDIT-REPORT.md) | Statik analiz, bellek güvenliği, Nöro-Sembolik sınır ayrımı, 100 jailbreak red-team testi ve SLA metrikleri. |
+| **Bilişsel & Psikometrik Doğrulama** | [COGNITIVE-AND-PSYCHOMETRIC-VERIFICATION.md](docs/audit/COGNITIVE-AND-PSYCHOMETRIC-VERIFICATION.md) | 7 Bilişsel Eksenin matematiksel tutarlılığı, 20.000 simülasyonluk Monte Carlo kanıtları ve parametre sınırları. |
+| **Sistem Mimarisi ve Veri Akışı** | [SYSTEM-ARCHITECTURE-AND-DATAFLOW.md](docs/architecture/SYSTEM-ARCHITECTURE-AND-DATAFLOW.md) | C4 Seviye 1-2 mimari şemaları, ER veri modelleri, WebSocket canlı akış ve çevrimdışı senkronizasyon sekansları. |
+| **Kurulum, Dağıtım ve Bakım Kılavuzu** | [DEPLOYMENT-AND-MAINTENANCE-GUIDE.md](docs/manuals/DEPLOYMENT-AND-MAINTENANCE-GUIDE.md) | FastAPI/Gunicorn/Nginx üretim kurulumu, Flutter mobil release paketleme, CI/CD ve hata sözlüğü izleme. |
+| **Ampirik Pilot Deney Protokolü** | [EMPIRICAL-VALIDATION-PROTOCOL.md](docs/research/EMPIRICAL-VALIDATION-PROTOCOL.md) | 50 kişilik lise kohortu, R-LGpM birincil etki ölçümü, ANCOVA güç analizi ve OSF ön-kayıtlı araştırma tasarımı. |
+
+
