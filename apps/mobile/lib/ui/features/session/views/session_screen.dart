@@ -107,7 +107,7 @@ class _SessionScreenState extends State<SessionScreen> {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                color: AppColors.accentCorrect.withOpacity(0.15),
+                color: AppColors.accentCorrect.withValues(alpha: 0.15),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -183,7 +183,7 @@ class _SessionScreenState extends State<SessionScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.edit_note_rounded, size: 56, color: AppColors.textMuted.withOpacity(0.5)),
+            Icon(Icons.edit_note_rounded, size: 56, color: AppColors.textMuted.withValues(alpha: 0.5)),
             const SizedBox(height: 12),
             const Text(
               'Çözüm Tahtası Hazır',
@@ -211,10 +211,10 @@ class _SessionScreenState extends State<SessionScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: step.isValid
-              ? AppColors.accentCorrect.withOpacity(0.6)
+              ? AppColors.accentCorrect.withValues(alpha: 0.6)
               : isBug
-                  ? AppColors.accentWarning.withOpacity(0.6)
-                  : AppColors.accentError.withOpacity(0.4),
+                  ? AppColors.accentWarning.withValues(alpha: 0.6)
+                  : AppColors.accentError.withValues(alpha: 0.4),
           width: 1.5,
         ),
       ),
@@ -276,7 +276,7 @@ class _SessionScreenState extends State<SessionScreen> {
               margin: const EdgeInsets.fromLTRB(10, 8, 10, 10),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppColors.accentWarning.withOpacity(0.12),
+                color: AppColors.accentWarning.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(

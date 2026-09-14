@@ -156,7 +156,7 @@ class MathTouchpad extends StatelessWidget {
             _key('x²', () => _insertText('x^2'), flex: 1),
             _key('√', () => _insertText('sqrt('), flex: 1),
             _key('±', () => _insertText('+-'), flex: 1),
-            _actionKey('C', _clear, color: AppColors.accentError.withOpacity(0.2), textColor: AppColors.accentError),
+            _actionKey('C', _clear, color: AppColors.accentError.withValues(alpha: 0.2), textColor: AppColors.accentError),
           ]),
           const SizedBox(height: 6),
 

@@ -40,6 +40,12 @@ htmlcov/
 .tox/
 artemis/
 
+# Flutter & Dart
+.dart_tool/
+.packages
+**/build/
+*.lock.bak
+
 # Node.js
 node_modules/
 .next/
