@@ -1,18 +1,19 @@
 import ast
 import time
-from typing import Tuple, Optional, Any, Set
+from typing import Tuple, Optional, Set
 import sympy as sp
+from app.cas.preprocessor import ImplicitMultiplicationPreprocessor
 
 
 class SecurityViolationError(Exception):
-    """AST güvenlik ihlali hatası (yasaklı düğüm veya aşırı derinlik)."""
+    """AST güvenlik ihlali durumunda fırlatılır."""
     pass
 
 
 class SymbolicEquivalenceEngine:
     """
-    Deterministik Sembolik Eşdeğerlik Motoru (CAS Core).
-    SymPy kullanarak cebirsel adımların matematiksel doğruluğunu doğrular.
+    Kuadratik denklemlerde öğrencinin yazdığı adımları
+    SymPy kullanarak cebirsel olarak doğrular.
     eval() ve exec() kullanmaz; katı AST beyaz liste denetimi uygular.
     """
 
@@ -39,8 +40,9 @@ class SymbolicEquivalenceEngine:
         Girdi metnini Python AST seviyesinde inceler.
         Yasaklı fonksiyon çağrılarını, modül yüklemelerini ve derinlik aşımlarını engeller.
         """
-        # LaTeX / standart notasyon temizliği
-        normalized = raw_str.replace("^", "**").replace("±", "+")
+        # Örtük çarpma ve mobil doğal sözdizimi ön-işlemesi
+        normalized = ImplicitMultiplicationPreprocessor.preprocess(raw_str)
+
         # Eşittir işaretini geçici olarak kaldırıp iki tarafı ayrı parse et
         parts = normalized.split("=")
         for part in parts:
@@ -97,7 +99,7 @@ class SymbolicEquivalenceEngine:
         Metin halindeki ifadeyi güvenli bir şekilde SymPy ifadesine dönüştürür.
         Denklem ise (LHS = RHS) -> LHS - (RHS) formuna indirger.
         """
-        expr_str = expr_str.strip().replace("^", "**")
+        expr_str = ImplicitMultiplicationPreprocessor.preprocess(expr_str)
         self.sanitize_and_validate_ast(expr_str)
 
         if "=" in expr_str:

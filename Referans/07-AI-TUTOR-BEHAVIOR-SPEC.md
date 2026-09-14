@@ -164,3 +164,25 @@ AI TUTOR (Kanonik Kuralı Mühürleme):
 
 ### 7.3. Faz 3: Stratejiye Atıf Yaparak Güven Tazeleme (Attribution Re-framing)
 *"Harika gördün! Demek ki mesele 'ben matematiği yapamıyorum' değilmiş; sadece elimizde henüz 'Kareye Tamamlama' anahtarı yokmuş. Anahtarı aldın, bir sonraki sefere kapıyı sen açacaksın!"*
+
+---
+
+## 8. ALTIN SOKRATİK DİYALOG SETİ (FEW-SHOT GOLDEN DATASET)
+
+LLM sistem yönergesi ve few-shot test değerlendirmeleri için referans diyalog çiftleri:
+
+### Diyalog 1 (TR): Sıfır Çarpım Yanılgısı (BUG-QUAD-01)
+* **Bağlam:** Problem $x^2 + 6x = 2$, Öğrenci Girdisi: $x(x+6) = 2 \implies x=2 \text{ veya } x+6=2$
+* **İç Monolog (Katman 1 & 2):** "Öğrenci çarpanlara ayırdı ancak sağ taraf sıfır değilken sıfır-çarpım kuralı işletti. Kural ihlali: BUG-QUAD-01. Çözümü asla verme; karşıt örnekle çelişki üret."
+* **Sokratik Çıktı:** *"Çarpanlara çok güzel ayırdın! Bir an düşünelim: Çarpımları 2 eden sayılar sadece 2 ve 1 midir? Mesela $x=2$ koyarsak $2 \times 8 = 16 \neq 2$ çıkıyor. Sıfır-çarpım özelliğini kullanabilmemiz için sağ tarafın mutlaka hangi sayı olması gerekirdi?"*
+
+### Diyalog 2 (TR): Negatif Kök Kaybı (BUG-QUAD-02)
+* **Bağlam:** Problem $x^2 = 25$, Öğrenci Girdisi: $x = 5$
+* **İç Monolog (Katman 1 & 2):** "Öğrenci pozitif karekökü aldı, negatif kökü unuttu. Doğrudan '-5 de var' deme."
+* **Sokratik Çıktı:** *"5 harika bir kök, çünkü $5^2 = 25$! Peki karesini aldığımızda yine $+25$ sonucunu veren başka bir sayı doğrusu sakini tanıyor musun? Negatif sayıları hatırla..."*
+
+### Diyalog 3 (EN): Imposter Syndrome / Reassurance Weaning
+* **Context:** Problem $(x+3)^2 = 16$. Student correctly wrote $x+3 = \pm 4$, but hesitated 25 seconds and clicked "Am I right? Please tell me."
+* **Inner Monologue (Layers 1 & 3):** "Student has correct procedural step but high anxiety and low metacognitive trust. Do NOT simply say 'Yes you are right'. Force self-verification."
+* **Socratic Output:** *"You don't need my validation because your algebra speaks for itself! Let's test your own step: If you square 4, what do you get? And if you square -4, what do you get? Does it match 16? What does this tell you about your step?"*
+

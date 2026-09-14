@@ -96,3 +96,58 @@ def test_api_diagnose_misconception_bug_02():
     assert data["detected_bug"] is not None
     assert data["detected_bug"]["bug_id"] == "BUG-QUAD-02"
     assert data["detected_bug"]["severity"] == "CRITICAL"
+
+
+def test_api_cat_next_item():
+    payload = {
+        "session_id": "cat-session-001",
+        "current_theta": 0.0,
+        "administered_item_ids": [],
+    }
+    response = client.post("/api/v1/diagnostic/next-item", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["item_id"] == "CAT-ITEM-01"
+    assert data["target_node_id"] == "N12"
+
+
+def test_api_cat_submit_progression_and_completion():
+    # 1. Adım: İlk soruyu doğru yanıtla
+    payload1 = {
+        "session_id": "cat-session-002",
+        "item_id": "CAT-ITEM-01",
+        "is_correct": True,
+        "administered_history": [],
+    }
+    response1 = client.post("/api/v1/diagnostic/submit", json=payload1)
+    assert response1.status_code == 200
+    data1 = response1.json()
+    assert data1["theta_hat"] > 0.0
+    assert data1["is_complete"] is False
+    assert data1["next_item"] is not None
+
+    # 2. Adım: 8 soru tamamlayıp testi bitir
+    history = [
+        ("CAT-ITEM-01", True),
+        ("CAT-ITEM-02", True),
+        ("CAT-ITEM-08", True),
+        ("CAT-ITEM-07", True),
+        ("CAT-ITEM-06", True),
+        ("CAT-ITEM-05", True),
+        ("CAT-ITEM-03", True),
+    ]
+    payload_final = {
+        "session_id": "cat-session-002",
+        "item_id": "CAT-ITEM-04",
+        "is_correct": True,
+        "administered_history": history,
+    }
+    response_final = client.post("/api/v1/diagnostic/submit", json=payload_final)
+    assert response_final.status_code == 200
+    data_final = response_final.json()
+    assert data_final["is_complete"] is True
+    assert data_final["next_item"] is None
+    assert data_final["seeded_mastery"] is not None
+    assert len(data_final["seeded_mastery"]) == 20
+    assert data_final["zpd_candidates"] is not None
+

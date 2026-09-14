@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 from pydantic import BaseModel, Field
 
 
@@ -29,3 +29,35 @@ class StepVerificationResponse(BaseModel):
     canonical_expression: Optional[str] = Field(None, description="Sembolik standart form")
     error_message: Optional[str] = Field(None, description="Sözdizimi veya ayrıştırma hatası")
     analysis_latency_ms: float = Field(..., description="CAS analiz süresi")
+
+
+class CATItemResponse(BaseModel):
+    item_id: str = Field(..., description="Madde ID'si (örn: CAT-ITEM-01)")
+    target_node_id: str = Field(..., description="Hedef bilgi grafı düğümü (örn: N12)")
+    prompt: str = Field(..., description="Öğrenciye sunulan soru metni")
+    difficulty_b: float = Field(..., description="2PL-IRT zorluk parametresi")
+    discrimination_a: float = Field(..., description="2PL-IRT ayırt edicilik parametresi")
+
+
+class CATNextItemRequest(BaseModel):
+    session_id: str = Field(..., description="Oturum UUID")
+    current_theta: float = Field(0.0, description="Anlık kestirilen latent yetenek")
+    administered_item_ids: List[str] = Field(default_factory=list, description="Daha önce çözülmüş maddeler")
+
+
+class CATSubmitRequest(BaseModel):
+    session_id: str = Field(..., description="Oturum UUID")
+    item_id: str = Field(..., description="Cevaplanan madde")
+    is_correct: bool = Field(..., description="Cevap doğruluğu")
+    administered_history: List[Tuple[str, bool]] = Field(
+        default_factory=list, description="Önceki madde yanıt geçmişi [(item_id, is_correct), ...]"
+    )
+
+
+class CATSubmitResponse(BaseModel):
+    theta_hat: float = Field(..., description="Güncellenmiş yetenek puanı")
+    standard_error: float = Field(..., description="Kestirimin standart hatası SE(theta)")
+    is_complete: bool = Field(..., description="Teşhis testi tamamlandı mı?")
+    next_item: Optional[CATItemResponse] = Field(None, description="Test bitmediyse sıradaki en bilgilendirici madde")
+    seeded_mastery: Optional[Dict[str, float]] = Field(None, description="Test bittiğinde 20 düğümün başlangıç olasılıkları")
+    zpd_candidates: Optional[List[str]] = Field(None, description="Öğrencinin çalışmaya başlaması gereken ZPD düğümleri")

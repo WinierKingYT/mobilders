@@ -10,12 +10,13 @@ Sistem mimarisi, deterministik matematiksel doğrulama ile üretken yapay zekay�
 
 ```text
 +─────────────────────────────────────────────────────────────────────────────+
-|                         İSTEMCİ KATMANI (FRONTEND)                          |
-|  - Modern Web / PWA (Next.js 14 / React 18 / TypeScript / Tailwind)         |
-|  - MathLive (Sanal Matematik Klavyesi & LaTeX Ayrıştırıcı)                  |
-|  - KaTeX (Ultra Hızlı Sembolik Render Motoru)                               |
-|  - Canlı Beyin Haritası Görselleştirici (React Flow / D3.js)                |
-|  - Tier-1 İstemci Tarafı Hızlı Doğrulama (Syntax & Local AST Sanity)        |
+|                         İSTEMCİ KATMANI (CLIENT LAYER)                      |
+|  - BİRİNCİL (PRIMARY): Mobil İstemci (Flutter 3.19+ / Dart 3.3+ / Impeller)  |
+|    * Dikey Başparmak Ergonomisi ($390 \times 844$), Çift Modlu Tuş Takımı   |
+|    * CustomPainter Donanım Hızlandırmalı Karo & Dinamik Parabol             |
+|    * Isar / SQLite Çevrimdışı Adım Önbelleği & Yerel AST Sanity             |
+|  - İKİNCİL / B PLANI: Masaüstü Web & PWA (Next.js 14 / React 18 / MathLive) |
+|    * Geniş ekran analiz panelleri ve masaüstü araştırmacı erişimi           |
 +─────────────────────────────────────────────────────────────────────────────+
                                        │  HTTPS / WebSocket / SSE
                                        ▼

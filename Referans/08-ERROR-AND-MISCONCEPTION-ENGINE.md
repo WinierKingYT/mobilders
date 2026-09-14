@@ -278,6 +278,58 @@ $$(-4)^2 = (-4) \cdot (-4) = +16$$
 
 ---
 
+### 3.6. BUG-QUAD-06: Terim Taşırken İşaret Değiştirmeme (Sign Invariance Across Equality)
+
+#### 1. Biçimsel Matematiksel Gösterim:
+$$x^2 + 5x = 6 \implies x^2 + 5x + 6 = 0 \quad (\text{Eşitliğin karşısına geçen terimin işaretinin korunması})$$
+$$x^2 = 3x - 2 \implies x^2 + 3x - 2 = 0$$
+
+#### 2. Bilişsel Kök Neden (VanLehn Tıkanma Analizi):
+Öğrenci, "terimi diğer tarafa atma" eylemini uzamsal bir hareket olarak algılar; eşitliğin her iki tarafına ters eleman ekleme ($+6 \to -6$) aksiyomunu değil, terimi sadece fiziksel olarak kaydırma mekanik alışkanlığını çalıştırır.
+
+#### 3. Bilişsel Çelişki / Karşıt Örnek Motoru (*Reductio ad Absurdum*):
+*"Eğer $x^2 + 5x = 6$ ise ve sen her iki taraftan 6 çıkarırsan sağ taraf ne olur? $6 - 6 = 0$. Peki sol taraftan 6 çıkardığında neden $+6$ yazdın? Bir terazinin bir kefesinden 6 kilo alırken diğer kefesine 6 kilo eklemiş oldun mu?"*
+
+#### 4. Pedagojik İyileştirme Yönergesi:
+- **Hedef Önkoşul Düğümü:** `[N02]` Doğrusal Denklemler ve Eşitliğin Korunumu.
+- **Eylem:** Terazili çift taraflı işlem zorunluluğu iskelelemesi.
+
+---
+
+### 3.7. BUG-QUAD-07: Eşitliğin Tek Tarafına İşlem Uygulama (Unilateral Operations)
+
+#### 1. Biçimsel Matematiksel Gösterim:
+$$x^2 + 6x = 2 \implies x^2 + 6x + 9 = 2 \quad (\text{Sola 9 ekleyip sağa eklemeyi unutma})$$
+$$2x^2 + 4x = 8 \implies x^2 + 2x = 8 \quad (\text{Sol tarafı 2'ye bölüp sağı bölmeme})$$
+
+#### 2. Bilişsel Kök Neden (VanLehn Tıkanma Analizi):
+Çalışma belleği aşırı yüklenmesi (CLT). Öğrenci tam kareye tamamlama veya katsayı sadeleştirme hedefine o kadar odaklanır ki, denklemin sağ tarafını dikkat penceresinden düşürür (Focal Blindness).
+
+#### 3. Bilişsel Çelişki / Karşıt Örnek Motoru (*Reductio ad Absurdum*):
+*"Sol tarafa 9 ekleyerek onu $(x+3)^2$ yaptın. Ama sağ taraf hâlâ 2 kaldı. İki taraf birbirine eşitken sadece bir tarafa 9 eklersen eşitlik bozulmaz mı? $10 = 10$ iken $10 + 9 = 10$ diyebilir miyiz?"*
+
+#### 4. Pedagojik İyileştirme Yönergesi:
+- **Hedef Önkoşul Düğümü:** `[N02]` Eşitlik Korunumu ve İki Taraflı Simetri İlkesi.
+
+---
+
+### 3.8. BUG-QUAD-08: Negatif Diskriminantta Sahte Reel Kök Üretme (Negative Discriminant Hallucination)
+
+#### 1. Biçimsel Matematiksel Gösterim:
+$$\Delta = b^2 - 4ac = -16 \implies \sqrt{\Delta} = 4 \quad \text{veya} \quad \sqrt{\Delta} = -4$$
+$$x^2 + 2x + 5 = 0 \implies \Delta = 4 - 20 = -16 \implies x = \frac{-2 \pm 4}{2}$$
+
+#### 2. Bilişsel Kök Neden (VanLehn Tıkanma Analizi):
+Öğrenci, reel sayılarda karekök içinin negatif olamayacağı kuralını bildiği halde problemde ilerleme baskısıyla eksi işaretini görmezden gelir ($\sqrt{-16} = \sqrt{16} = 4$ yansıması).
+
+#### 3. Bilişsel Çelişki / Karşıt Örnek Motoru (*Reductio ad Absurdum*):
+*"Kök içinde $-16$ buldun ve buna $4$ dedin. Peki $4 \times 4$ kaç eder? $16$. Peki $(-4) \times (-4)$ kaç eder? O da $16$. Karesi $-16$ eden herhangi bir gerçel sayı var mıdır? Gerçel sayılar dünyasında bu denklemin grafiği x-eksenini kesebilir mi?"*
+
+#### 4. Pedagojik İyileştirme Yönergesi:
+- **Hedef Önkoşul Düğümü:** `[N19]` Diskriminant Analizi ve Parabolün Reel Kök Durumları.
+
+---
+
 ## 4. DETERMINİSTİK SYMPY AST ZİYARETÇİSİ (AST VISITOR PATTERN)
 
 ### 4.1. Neden Yalnızca Sembolik Sadeleştirme Yetmez?

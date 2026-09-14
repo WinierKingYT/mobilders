@@ -18,7 +18,7 @@ $$\text{R-LGpM} = \frac{\Delta \text{Gain} \times \text{Retention}(14 \text{ gü
 
 ## 2. DÖKÜMANTASYON HARİTASI VE ŞARTNAME REHBERİ
 
-Depo, birbirini tamamlayan ve katı bağımlılık ilişkileriyle birbirine bağlı 18 ana şartname dosyasından oluşur:
+Depo, birbirini tamamlayan ve katı bağımlılık ilişkileriyle birbirine bağlı 28 ana şartname dosyasından oluşur:
 
 | No | Doküman Adı | Odak Alanı ve Bilişsel Temel | Temel Modeller / Formüller |
 | :---: | :--- | :--- | :--- |
@@ -30,7 +30,7 @@ Depo, birbirini tamamlayan ve katı bağımlılık ilişkileriyle birbirine bağ
 | **05** | [05-DIAGNOSTIC-ENGINE.md](05-DIAGNOSTIC-ENGINE.md) | Dinamik Teşhis ve Seviye Belirleme | 2PL-IRT Bilgisayarlı Uyarlamalı Test (CAT), Madde Havuzu Parametreleri, DAG Seeding |
 | **06** | [06-ADAPTIVE-TEACHING-ENGINE.md](06-ADAPTIVE-TEACHING-ENGINE.md) | Adaptif Öğretim & Pedagojik FSM | Paas $E$ İndeksi, ZPD Termostatı, Manu Kapur PF, HMM |
 | **07** | [07-AI-TUTOR-BEHAVIOR-SPEC.md](07-AI-TUTOR-BEHAVIOR-SPEC.md) | Sokratik Yapay Zeka Öğretici Şartnamesi | 4 Katmanlı İç Monolog, Paul-Elder, Zero-Leak Regex |
-| **08** | [08-ERROR-AND-MISCONCEPTION-ENGINE.md](08-ERROR-AND-MISCONCEPTION-ENGINE.md) | Hata ve Yanılgı Teşhis Motoru | VanLehn Buggy Rules, SymPy AST Eşleme, 5 Temel Hata Kataloğu |
+| **08** | [08-ERROR-AND-MISCONCEPTION-ENGINE.md](08-ERROR-AND-MISCONCEPTION-ENGINE.md) | Hata ve Yanılgı Teşhis Motoru | VanLehn Buggy Rules, SymPy AST Eşleme, 8 Temel Hata Kataloğu |
 | **09** | [09-MASTERY-AND-ASSESSMENT-MODEL.md](09-MASTERY-AND-ASSESSMENT-MODEL.md) | Yetkinlik ve Ölçme Modeli | 5 Boyutlu Kapı Denetimi, Stealth Assessment, Karantina |
 | **10** | [10-RETENTION-AND-SPACING-ENGINE.md](10-RETENTION-AND-SPACING-ENGINE.md) | Kalıcılık ve Aralıklı Tekrar Motoru | ACT-R Aktivasyonu, FSRS-4.5, Parça-Bütün, Uyku Konsolidasyonu |
 | **11** | [11-CONTENT-AND-REPRESENTATION-SYSTEM.md](11-CONTENT-AND-REPRESENTATION-SYSTEM.md) | Çoklu Temsil ve İçerik Sistemi | 4 Çeyrek Temsil, Al-Harezmi Geometrisi, Parabol Morf |
@@ -38,12 +38,18 @@ Depo, birbirini tamamlayan ve katı bağımlılık ilişkileriyle birbirine bağ
 | **13** | [13-MVP-SCOPE.md](13-MVP-SCOPE.md) | MVP Kapsamı ve Taviz Verilmez Sınırlar | Kuadratik Sandbox, SymPy Doğrulayıcı, Yerel SQLite/Postgres |
 | **14** | [14-METRICS-AND-EXPERIMENTATION.md](14-METRICS-AND-EXPERIMENTATION.md) | Metrikler ve A/B Test Mimarisi | R-LGpM, Öğrenme Verimliliği, Kaplan-Meier Kalıcılık Analizi |
 | **15** | [15-RISKS-FAILURE-MODES-AND-SAFETY.md](15-RISKS-FAILURE-MODES-AND-SAFETY.md) | Riskler, Güvenlik ve Hata Modları | Kırmızı Takım, LLM Halüsinasyon Gardiyanı, Afektif Güvenlik |
-| **16** | [16-TECHNICAL-ARCHITECTURE-OPTIONS.md](16-TECHNICAL-ARCHITECTURE-OPTIONS.md) | Teknik Mimari Seçenekleri | Nöro-Sembolik Ayrım, Fastify/Go Backend, Pyodide CAS |
+| **16** | [16-TECHNICAL-ARCHITECTURE-OPTIONS.md](16-TECHNICAL-ARCHITECTURE-OPTIONS.md) | Teknik Mimari Seçenekleri | Nöro-Sembolik Ayrım, Flutter Mobile + FastAPI, Event Sourcing |
 | **17** | [17-OPEN-QUESTIONS-AND-RESEARCH-GAPS.md](17-OPEN-QUESTIONS-AND-RESEARCH-GAPS.md) | Açık Sorular ve Araştırma Boşlukları | Ampirik Boşluklar, Tez/Deney Tasarımları, Hipotezler |
 | **18** | [18-FOUNDATION-GOALS-AND-DEFINITION-OF-DONE.md](18-FOUNDATION-GOALS-AND-DEFINITION-OF-DONE.md) | Temel Hedefler ve Bitiş Kriterleri | 6 Katı Kabul Kapısı (DoD), Hata Toleransı, Kabul Kontratları |
 | **19** | [19-APPLICATION-FLOW-AND-USER-JOURNEY.md](19-APPLICATION-FLOW-AND-USER-JOURNEY.md) | Uygulama Akışı ve Kullanıcı Yolculuğu | Makro FSM, 20 Dk Günlük Seans Evreleri, Çözüm Tahtası Mikro-Döngüsü |
 | **20** | [20-UI-UX-DESIGN-SYSTEM-AND-WIREFRAMES.md](20-UI-UX-DESIGN-SYSTEM-AND-WIREFRAMES.md) | UI/UX Tasarım Sistemi ve Ekran Şemaları | Minimalist Bilişsel Tasarım, Renk Belirteçleri, 7 Ekran ASCII Wireframe'i |
 | **21** | [21-TECH-STACK-AND-LANGUAGE-DECISIONS.md](21-TECH-STACK-AND-LANGUAGE-DECISIONS.md) | Teknoloji Yığını ve Dil Kararları | Python 3.11/FastAPI + Flutter Mobile, Çift Modlu Giriş, Isar/PostgreSQL |
+| **22** | [22-API-AND-COMMUNICATION-PROTOCOLS.md](22-API-AND-COMMUNICATION-PROTOCOLS.md) | Mobil-Backend API ve Protokol Şartnamesi | WebSocket (/ws/v1/session), REST Uç Noktaları, JSON Şemaları, Tier-1 Sanity |
+| **23** | [23-OFFLINE-STATE-AND-SYNC-SPECIFICATION.md](23-OFFLINE-STATE-AND-SYNC-SPECIFICATION.md) | Çevrimdışı Çalışma ve Yerel Durum Şartnamesi | Isar Yerel Veri Modeli, Çevrimdışı Adım Kuyruğu, Çatışmasız Olay Replay |
+| **24** | [24-SECURITY-PRIVACY-AND-DATA-GOVERNANCE.md](24-SECURITY-PRIVACY-AND-DATA-GOVERNANCE.md) | Güvenlik, Gizlilik ve Yönetişim Şartnamesi | Sıfır-PII (Anonim UUID), LLM İzolasyonu, Rate Limiting, KVKK/GDPR |
+| **25** | [25-PROBLEM-AND-ITEM-TEMPLATE-SCHEMA.md](25-PROBLEM-AND-ITEM-TEMPLATE-SCHEMA.md) | Problem ve Madde Şablonu Veri Şartnamesi | Parametrik Üretim, ProblemTemplate JSON, Çok Adımlı Çözüm Ağacı |
+| **26** | [26-CI-CD-AND-AUTOMATED-TESTING-PIPELINE.md](26-CI-CD-AND-AUTOMATED-TESTING-PIPELINE.md) | CI/CD ve Otomatik Doğrulama Hattı | GitHub Actions, 6 Katı Kabul Kapısı (DoD) Test Komutları ve Eşikler |
+| **27** | [27-TELEMETRY-LOGGING-AND-ERROR-TAXONOMY.md](27-TELEMETRY-LOGGING-AND-ERROR-TAXONOMY.md) | Hata Sözlüğü, Loglama ve Telemetri | Standart Hata Kodları (1000-4999), Bilişsel Telemetri, Yapılandırılmış JSON |
 
 ---
 
