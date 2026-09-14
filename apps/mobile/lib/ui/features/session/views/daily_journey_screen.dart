@@ -460,11 +460,12 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                       children: [
                         const Icon(Icons.tune_rounded, color: Color(0xFF38BDF8)),
                         const SizedBox(width: 8),
-                        const Text(
-                          "Erişilebilirlik & Müfredat Ayarları",
-                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        const Expanded(
+                          child: Text(
+                            "Erişilebilirlik & Müfredat Ayarları",
+                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
                         ),
-                        const Spacer(),
                         IconButton(
                           icon: const Icon(Icons.close, color: Colors.white60, size: 20),
                           onPressed: () => Navigator.pop(ctx),

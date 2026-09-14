@@ -134,7 +134,7 @@ void main() {
       expect(find.widgetWithText(ElevatedButton, 'x'), findsOneWidget);
 
       // Tap keyboard switch icon
-      await tester.tap(find.byIcon(Icons.keyboard_outlined));
+      await tester.tap(find.byIcon(Icons.keyboard_outlined).first);
       await tester.pumpAndSettle();
 
       // Keyboard mode active: TextField visible
