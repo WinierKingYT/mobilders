@@ -15,14 +15,7 @@ class EngineApiService {
         _client = client ?? http.Client();
 
   static String _defaultBaseUrl() {
-    // Android emulator routes host localhost to 10.0.2.2
-    try {
-      if (Platform.isAndroid) {
-        return 'http://10.0.2.2:8000';
-      }
-    } catch (_) {
-      // Non-io or web fallback
-    }
+    // 127.0.0.1 routes correctly via adb reverse on Android and localhost on desktop/web
     return 'http://127.0.0.1:8000';
   }
 
@@ -56,7 +49,7 @@ class EngineApiService {
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(payload),
-    );
+    ).timeout(const Duration(seconds: 4));
 
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -88,7 +81,7 @@ class EngineApiService {
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(payload),
-    );
+    ).timeout(const Duration(seconds: 4));
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -116,7 +109,7 @@ class EngineApiService {
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(payload),
-    );
+    ).timeout(const Duration(seconds: 4));
 
     if (response.statusCode == 200) {
       if (response.body.isEmpty || response.body == 'null') return null;
@@ -148,7 +141,7 @@ class EngineApiService {
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(payload),
-    );
+    ).timeout(const Duration(seconds: 4));
 
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body) as Map<String, dynamic>;

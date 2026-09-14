@@ -6,7 +6,14 @@ import '../../session/views/session_screen.dart';
 import '../view_models/diagnostic_view_model.dart';
 
 class DiagnosticScreen extends StatefulWidget {
-  const DiagnosticScreen({super.key});
+  final bool showAppBar;
+  final VoidCallback? onCompleted;
+
+  const DiagnosticScreen({
+    super.key,
+    this.showAppBar = true,
+    this.onCompleted,
+  });
 
   @override
   State<DiagnosticScreen> createState() => _DiagnosticScreenState();
@@ -22,6 +29,11 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
   }
 
   void _startLearningSession(BuildContext context, DiagnosticViewModel viewModel) {
+    if (widget.onCompleted != null) {
+      widget.onCompleted!();
+      return;
+    }
+
     // Select first ZPD candidate or fallback to N15
     final zpdNode = (viewModel.zpdCandidates != null && viewModel.zpdCandidates!.isNotEmpty)
         ? viewModel.zpdCandidates!.first
@@ -51,26 +63,42 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
     final viewModel = context.watch<DiagnosticViewModel>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Bilişsel Seviye Tespiti (2PL-IRT CAT)'),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(4),
-          child: LinearProgressIndicator(
-            value: viewModel.calibrationProgress,
-            backgroundColor: AppColors.bgSurface,
-            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accentPrimary),
-            minHeight: 4,
-          ),
-        ),
-      ),
+      backgroundColor: Colors.transparent,
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: const Text('Bilişsel Seviye Tespiti (2PL-IRT CAT)'),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(4),
+                child: LinearProgressIndicator(
+                  value: viewModel.calibrationProgress,
+                  backgroundColor: AppColors.bgSurface,
+                  valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accentPrimary),
+                  minHeight: 4,
+                ),
+              ),
+            )
+          : null,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: viewModel.isLoading && viewModel.currentItem == null
-              ? const Center(child: CircularProgressIndicator(color: AppColors.accentPrimary))
-              : viewModel.isComplete
-                  ? _buildCompletionView(context, viewModel)
-                  : _buildQuestionView(context, viewModel),
+        child: Column(
+          children: [
+            if (!widget.showAppBar)
+              LinearProgressIndicator(
+                value: viewModel.calibrationProgress,
+                backgroundColor: AppColors.bgSurface,
+                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accentPrimary),
+                minHeight: 4,
+              ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: viewModel.isLoading && viewModel.currentItem == null
+                    ? const Center(child: CircularProgressIndicator(color: AppColors.accentPrimary))
+                    : viewModel.isComplete
+                        ? _buildCompletionView(context, viewModel)
+                        : _buildQuestionView(context, viewModel),
+              ),
+            ),
+          ],
         ),
       ),
     );

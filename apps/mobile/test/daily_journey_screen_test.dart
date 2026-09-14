@@ -93,4 +93,43 @@ void main() {
     expect(find.text('Müfredat Standardı'), findsOneWidget);
     expect(find.textContaining('Türkiye MEB'), findsWidgets);
   });
+
+  testWidgets('DailyJourneyScreen interactive warmup options give instant feedback', (tester) async {
+    final apiService = EngineApiService();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<EngineApiService>.value(value: apiService),
+          ChangeNotifierProvider<SessionViewModel>(
+            create: (_) => SessionViewModel(
+              apiService: apiService,
+              sessionId: 'test-session-003',
+              targetEquation: 'x^2 + 6x - 2 = 0',
+            ),
+          ),
+          ChangeNotifierProvider<DiagnosticViewModel>(
+            create: (_) => DiagnosticViewModel(
+              apiService: apiService,
+              sessionId: 'test-cat-003',
+            ),
+          ),
+        ],
+        child: const MaterialApp(
+          home: DailyJourneyScreen(),
+        ),
+      ),
+    );
+
+    // Initial state: option chips visible
+    expect(find.text('x = 4'), findsOneWidget);
+    expect(find.text('x = 8'), findsOneWidget);
+
+    // Tap correct option x = 8
+    await tester.tap(find.text('x = 8'));
+    await tester.pumpAndSettle();
+
+    // Verify congratulatory feedback
+    expect(find.textContaining('Harika! 3(8 - 4) = 3(4) = 12'), findsOneWidget);
+  });
 }

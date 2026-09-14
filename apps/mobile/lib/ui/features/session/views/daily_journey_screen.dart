@@ -29,6 +29,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   bool _showScratchpad = false;
   bool _showGeometricCanvas = false;
   double _confidenceLevel = 0.85;
+  int? _selectedWarmupOption;
 
   @override
   Widget build(BuildContext context) {
@@ -194,12 +195,10 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
             if (vm.isComplete) {
               return _buildDiagnosticCompletedView();
             }
-            if (vm.currentItem == null && !vm.isLoading && vm.errorMessage == null) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                vm.loadFirstItem();
-              });
-            }
-            return const DiagnosticScreen();
+            return DiagnosticScreen(
+              showAppBar: false,
+              onCompleted: () => setState(() => _currentPhase = DailyPhase.problemBoard),
+            );
           },
         );
       case DailyPhase.problemBoard:
@@ -241,6 +240,9 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   }
 
   Widget _buildWarmupView() {
+    final options = [4, 6, 8, 10];
+    final isCorrect = _selectedWarmupOption == 8;
+
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -264,12 +266,13 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: const Color(0xFF1E293B),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF334155)),
             ),
             child: const Text(
               "Hatırlama Sorusu: 3(x - 4) = 12 ise x kaçtır?",
@@ -281,10 +284,90 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 16),
+
+          // 4 Interactive Options
+          Row(
+            children: options.map((opt) {
+              final isSelected = _selectedWarmupOption == opt;
+              Color bg = const Color(0xFF1E293B);
+              Color border = const Color(0xFF334155);
+              if (isSelected) {
+                if (opt == 8) {
+                  bg = const Color(0xFF065F46);
+                  border = const Color(0xFF10B981);
+                } else {
+                  bg = const Color(0xFF7F1D1D);
+                  border = const Color(0xFFEF4444);
+                }
+              }
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => setState(() => _selectedWarmupOption = opt),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: bg,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: border, width: isSelected ? 2 : 1),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        "x = $opt",
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : const Color(0xFFE2E8F0),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+
+          if (_selectedWarmupOption != null) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: isCorrect ? const Color(0xFF064E3B) : const Color(0xFF450A0A),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: isCorrect ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isCorrect ? Icons.check_circle : Icons.info_outline,
+                    color: isCorrect ? const Color(0xFF34D399) : const Color(0xFFF87171),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isCorrect
+                          ? "Harika! 3(8 - 4) = 3(4) = 12. Bilişsel hazırlık tamamlandı!"
+                          : "3(x - 4) = 12 ise x - 4 = 4 olmalı. Tekrar dene!",
+                      style: TextStyle(
+                        color: isCorrect ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 24),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2563EB),
+              backgroundColor: isCorrect ? const Color(0xFF10B981) : const Color(0xFF2563EB),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
