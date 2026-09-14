@@ -46,7 +46,22 @@ class ImplicitMultiplicationPreprocessor:
         s = re.sub(r"\)(\s*)\(", r")*\1(", s)
 
         # 5. Sayı veya değişken ile açılan parantez: 3(x+1) -> 3*(x+1), x(x+6) -> x*(x+6)
-        s = re.sub(r"(\d|[a-zA-Z])(\s*)\(", r"\1*\2(", s)
+        # Ancak bilinen fonksiyon çağrılarını (sin, cos, tan, log, ln, sqrt, Poly vb.) koru
+        known_functions = {
+            "sqrt", "Abs", "degree", "rem", "quo", "Poly",
+            "sin", "cos", "tan", "cot", "sec", "csc",
+            "asin", "acos", "atan",
+            "log", "ln", "exp"
+        }
+
+        def _paren_mult(match):
+            prefix = match.group(1)
+            ws = match.group(2)
+            if prefix in known_functions:
+                return f"{prefix}{ws}("
+            return f"{prefix}*{ws}("
+
+        s = re.sub(r"([a-zA-Z0-9_]+)(\s*)\(", _paren_mult, s)
 
         # 6. Kapanan parantez ile sayı veya değişken: (x+1)3 -> (x+1)*3, (x+1)x -> (x+1)*x
         s = re.sub(r"\)(\s*)(\d|[a-zA-Z])", r")*\1\2", s)

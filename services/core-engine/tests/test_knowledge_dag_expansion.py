@@ -6,8 +6,8 @@ def test_knowledge_dag_50_nodes_expansion():
     dag = KnowledgeDAG()
     all_nodes = dag.get_all_node_ids()
 
-    # 1. Total nodes count must be 50 (20 core + 3 inequalities + 15 parabolas + 12 polynomials)
-    assert len(all_nodes) == 50
+    # 1. Total nodes count must be 80
+    assert len(all_nodes) == 80
 
     # 2. Verify Group A (Inequalities: N21, N22, N23)
     assert "N21" in all_nodes
@@ -35,12 +35,28 @@ def test_knowledge_dag_50_nodes_expansion():
     assert "N41" in dag.get_node("N42").strict_prereqs
     assert "N42" in dag.get_node("N47").strict_prereqs
 
+    # 5. Verify Group D (Trigonometry: N51 - N65)
+    for n in range(51, 66):
+        assert f"N{n:02d}" in all_nodes
+    assert "N51" in dag.get_node("N52").strict_prereqs
+    assert "N52" in dag.get_node("N53").strict_prereqs
+    assert "N55" in dag.get_node("N60").strict_prereqs
+    assert "N60" in dag.get_node("N62").strict_prereqs
+
+    # 6. Verify Group E (Exponential and Logarithmic Functions: N66 - N80)
+    for n in range(66, 81):
+        assert f"N{n:02d}" in all_nodes
+    assert "N66" in dag.get_node("N69").strict_prereqs
+    assert "N69" in dag.get_node("N72").strict_prereqs
+    assert "N72" in dag.get_node("N73").strict_prereqs
+    assert "N71" in dag.get_node("N78").strict_prereqs
+
 
 def test_topological_sort_and_cycle_free():
     dag = KnowledgeDAG()
     dag.assert_cycle_free()
     sorted_nodes = dag.topological_sort()
-    assert len(sorted_nodes) == 50
+    assert len(sorted_nodes) == 80
 
     # Verify order constraint: prerequisites must precede dependent nodes
     idx_map = {n: i for i, n in enumerate(sorted_nodes)}

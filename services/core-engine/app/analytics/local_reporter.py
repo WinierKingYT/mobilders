@@ -111,7 +111,13 @@ class LocalAnalyticsReporter:
                         "PARABOLAS" if n_id in [f"N{i:02d}" for i in range(24, 39)]
                         else (
                             "POLYNOMIALS" if n_id in [f"N{i:02d}" for i in range(39, 51)]
-                            else "QUADRATICS_CORE"
+                            else (
+                                "TRIGONOMETRY" if n_id in [f"N{i:02d}" for i in range(51, 66)]
+                                else (
+                                    "EXPONENTIAL_LOGARITHMIC" if n_id in [f"N{i:02d}" for i in range(66, 81)]
+                                    else "QUADRATICS_CORE"
+                                )
+                            )
                         )
                     )
                 ),

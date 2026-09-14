@@ -132,6 +132,56 @@ class QuadraticMisconceptionDetector:
         if bug_poly5:
             return bug_poly5
 
+        # 21. BUG-TRIG-01: Trigonometrik Lineerlik Tuzağı
+        bug_t1 = self._check_bug_trig_01(clean_user, clean_prev)
+        if bug_t1:
+            return bug_t1
+
+        # 22. BUG-TRIG-02: Fonksiyon İsim ve Argüman Sadeleştirme Hatası
+        bug_t2 = self._check_bug_trig_02(clean_user, clean_prev)
+        if bug_t2:
+            return bug_t2
+
+        # 23. BUG-TRIG-03: Birim Çember Eksen Karışıklığı
+        bug_t3 = self._check_bug_trig_03(clean_user, clean_prev)
+        if bug_t3:
+            return bug_t3
+
+        # 24. BUG-TRIG-04: Trigonometrik Denklemde Kök/Periyot Kaybı
+        bug_t4 = self._check_bug_trig_04(clean_user, clean_prev)
+        if bug_t4:
+            return bug_t4
+
+        # 25. BUG-TRIG-05: Negatif Açı ve Parite Yanılgısı
+        bug_t5 = self._check_bug_trig_05(clean_user, clean_prev)
+        if bug_t5:
+            return bug_t5
+
+        # 26. BUG-LOG-01: Logaritma Toplam-Dağılma Tuzağı
+        bug_l1 = self._check_bug_log_01(clean_user, clean_prev)
+        if bug_l1:
+            return bug_l1
+
+        # 27. BUG-LOG-02: Logaritma Çarpım/Kuvvet Karışıklığı
+        bug_l2 = self._check_bug_log_02(clean_user, clean_prev)
+        if bug_l2:
+            return bug_l2
+
+        # 28. BUG-LOG-03: Negatif Tanım Kümesi İhmali / Sahte Kök
+        bug_l3 = self._check_bug_log_03(clean_user, clean_prev)
+        if bug_l3:
+            return bug_l3
+
+        # 29. BUG-LOG-04: Taban Değiştirme ve Bölme Hatası
+        bug_l4 = self._check_bug_log_04(clean_user, clean_prev)
+        if bug_l4:
+            return bug_l4
+
+        # 30. BUG-LOG-05: Üstel/Logaritma Taban ve Kuvvet Karışıklığı
+        bug_l5 = self._check_bug_log_05(clean_user, clean_prev)
+        if bug_l5:
+            return bug_l5
+
         return None
 
     def _check_bug_quad_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
@@ -217,6 +267,9 @@ class QuadraticMisconceptionDetector:
 
     def _check_bug_quad_04(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
         """BUG-QUAD-04: Sadeleştirme Yanılsaması / Kök Katli (x^2 = 6x => x = 6)."""
+        clean_p = prev_str.lower()
+        if any(trig in clean_p for trig in ("sin", "cos", "tan", "cot", "sec", "csc")):
+            return None
         try:
             prev_e = self.cas.parse_to_sympy(prev_str)
             user_e = self.cas.parse_to_sympy(user_str)
@@ -727,6 +780,304 @@ class QuadraticMisconceptionDetector:
                         remediation_directive="Bölme eşitliğinde x yerine kök yazıldığında kalan teriminin P(kök) değerine eşit olduğunu hatırlat.",
                         offending_term=user_str,
                     )
+        return None
+
+    def _check_bug_trig_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-TRIG-01: Trigonometrik Lineerlik Tuzağı (sin(a+b) = sin a + sin b sanma).
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+        clean_p = prev_str.lower().replace(" ", "").replace("**", "^")
+
+        if (
+            "sin(a+b)=sin(a)+sin(b)" in clean_u
+            or "sin(x+y)=sin(x)+sin(y)" in clean_u
+            or "cos(a+b)=cos(a)+cos(b)" in clean_u
+            or "cos(a-b)=cos(a)-cos(b)" in clean_u
+            or "cos(x+y)=cos(x)+cos(y)" in clean_u
+            or "cos(x-y)=cos(x)-cos(y)" in clean_u
+            or "tan(a+b)=tan(a)+tan(b)" in clean_u
+            or "tan(x+y)=tan(x)+tan(y)" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-TRIG-01",
+                severity="CRITICAL",
+                category="TRIG_LINEARITY_TRAP",
+                description="Trigonometrik fonksiyonlar parantez içine çarpma gibi dağıtılamaz: sin(a+b) != sin(a) + sin(b).",
+                remediation_directive="Toplam-fark formüllerini hatırlat: sin(a+b) = sin(a)cos(b) + cos(a)sin(b).",
+                offending_term=user_str,
+            )
+
+        m_sin = re.search(r"sin\(([a-zA-Z0-9]+)\+([a-zA-Z0-9]+)\)", clean_p)
+        if m_sin:
+            u_linear = f"sin({m_sin.group(1)})+sin({m_sin.group(2)})"
+            if u_linear in clean_u:
+                return DiagnosticPayload(
+                    bug_id="BUG-TRIG-01",
+                    severity="CRITICAL",
+                    category="TRIG_LINEARITY_TRAP",
+                    description=f"sin({m_sin.group(1)}+{m_sin.group(2)}) ifadesi sin({m_sin.group(1)}) + sin({m_sin.group(2)}) şeklinde açılamaz.",
+                    remediation_directive="Toplam formülünü açtır: sin(x+y) = sin(x)cos(y) + cos(x)sin(y).",
+                    offending_term=user_str,
+                )
+        return None
+
+    def _check_bug_trig_02(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-TRIG-02: Fonksiyon İsim ve Argüman Sadeleştirme Hatası (sin(2x) = 2sin(x) veya sin(2x)/sin(x) = 2).
+        """
+        clean_u = user_str.lower().replace(" ", "")
+        clean_p = prev_str.lower().replace(" ", "")
+
+        if (
+            (("sin(2x)=2sin(x)" in clean_u or "sin(2*x)=2*sin(x)" in clean_u) and "cos" not in clean_u)
+            or "sin(2x)/sin(x)=2" in clean_u
+            or "sin(2*x)/sin(x)=2" in clean_u
+            or "cos(2x)=2cos(x)" in clean_u
+            or "tan(2x)=2tan(x)" in clean_u
+            or "sin(x)/x=sin" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-TRIG-02",
+                severity="CRITICAL",
+                category="TRIG_ARGUMENT_CANCELLATION_ERROR",
+                description="Fonksiyonun içindeki açı katsayısı dışarı çarpan olarak çıkarılamaz veya fonksiyon adı sadeleştirilemez.",
+                remediation_directive="Yarım açı formülünü uygulat: sin(2x) = 2*sin(x)*cos(x).",
+                offending_term=user_str,
+            )
+
+        if ("sin(2x)" in clean_p or "sin(2*x)" in clean_p) and ("2*sin(x)" in clean_u or "2sin(x)" in clean_u) and "cos" not in clean_u:
+            return DiagnosticPayload(
+                bug_id="BUG-TRIG-02",
+                severity="CRITICAL",
+                category="TRIG_ARGUMENT_CANCELLATION_ERROR",
+                description="sin(2x) açılımında açı katsayısı 2 dışarı çıkarıldı; yarım açı formülündeki cos(x) çarpanı unutuldu.",
+                remediation_directive="İki kat açı özdeşliğini uygulat: sin(2x) = 2*sin(x)*cos(x).",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_trig_03(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-TRIG-03: Birim Çember Eksen Karışıklığı (x eksenini sin, y eksenini cos sanma veya tan = cos/sin).
+        """
+        clean_u = user_str.lower().replace(" ", "")
+
+        if (
+            "tan(x)=cos(x)/sin(x)" in clean_u
+            or "tan=cos/sin" in clean_u
+            or "cot(x)=sin(x)/cos(x)" in clean_u
+            or "cot=sin/cos" in clean_u
+            or "(sin,cos)" in clean_u
+            or "(sin(theta),cos(theta))" in clean_u
+            or "(sin(x),cos(x))" in clean_u
+            or ("x=sin" in clean_u and "y=cos" in clean_u)
+            or "apsissin" in clean_u
+            or "ordinatcos" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-TRIG-03",
+                severity="CRITICAL",
+                category="UNIT_CIRCLE_AXIS_CONFUSION",
+                description="Birim çemberde yatay eksen (apsis, x) kosinüs, düşey eksen (ordinat, y) sinüstür.",
+                remediation_directive="Birim çemberde P(theta) = (cos(theta), sin(theta)) ve tan = sin/cos olduğunu hatırlat.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_trig_04(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-TRIG-04: Trigonometrik Denklemde Kök/Periyot Kaybı.
+        """
+        clean_u = user_str.lower().replace(" ", "")
+        clean_p = prev_str.lower().replace(" ", "")
+
+        # Sadeleştirmede kök silme: sin(x)*cos(x) = sin(x) => cos(x) = 1 veya tan(x)*sin(x) = sin(x) => tan(x) = 1
+        if (
+            ("sin(x)*cos(x)=sin(x)" in clean_p or "sin(x)cos(x)=sin(x)" in clean_p
+             or "tan(x)*sin(x)=sin(x)" in clean_p or "tan(x)sin(x)=sin(x)" in clean_p)
+            and ("cos(x)=1" in clean_u or "tan(x)=1" in clean_u)
+            and ("sin(x)=0" not in clean_u and "sin=0" not in clean_u)
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-TRIG-04",
+                severity="CRITICAL",
+                category="TRIG_EQUATION_ROOT_PERIOD_LOSS",
+                description="Her iki tarafı sin(x)'e bölerken sin(x) = 0 yapan kök ailesi kaybedildi.",
+                remediation_directive="İfadeleri tek tarafa toplayıp ortak paranteze al: sin(x)(cos(x) - 1) = 0.",
+                offending_term=user_str,
+            )
+
+        # Tek açı çözümü verip ikinci bölgeyi veya periyodu yazmama: sin(x) = 1/2 => x = 30
+        if (
+            ("sin(x)=1/2" in clean_p or "sin(x)=0.5" in clean_p)
+            and ("x=30" in clean_u or "x=pi/6" in clean_u)
+            and ("150" not in clean_u and "5pi/6" not in clean_u and "2k" not in clean_u and "k*pi" not in clean_u)
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-TRIG-04",
+                severity="CRITICAL",
+                category="TRIG_EQUATION_ROOT_PERIOD_LOSS",
+                description="sin(x) = 1/2 denkleminin [0, 2pi) aralığında 150 derece (5pi/6) kökü ve genel çözüm periyodu unutuldu.",
+                remediation_directive="Sinüsün 2. bölgede de pozitif olduğunu ve x = pi - alpha kökünü hatırlat.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_trig_05(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-TRIG-05: Negatif Açı ve Parite Yanılgısı (cos(-x) = -cos(x) sanma).
+        """
+        clean_u = user_str.lower().replace(" ", "")
+
+        if (
+            "cos(-x)=-cos(x)" in clean_u
+            or "cos(-theta)=-cos(theta)" in clean_u
+            or "cos(-a)=-cos(a)" in clean_u
+            or "sin(-x)=sin(x)" in clean_u
+            or "sin(-theta)=sin(theta)" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-TRIG-05",
+                severity="CRITICAL",
+                category="TRIG_PARITY_AND_NEGATIVE_ANGLE_CONFUSION",
+                description="Kosinüs çift fonksiyondur (cos(-x) = cos(x)), eksiyi dışarı atmaz; sinüs ise tek fonksiyondur (sin(-x) = -sin(x)).",
+                remediation_directive="4. bölgede kosinüsün işaretini (+ olduğunu) birim çember üzerinde sorgulat.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_log_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-LOG-01: Logaritma Toplam-Dağılma Tuzağı (log(a+b) = log a + log b).
+        """
+        clean_u = user_str.lower().replace(" ", "")
+        clean_p = prev_str.lower().replace(" ", "")
+
+        if (
+            "log(a+b)=log(a)+log(b)" in clean_u
+            or "log(x+y)=log(x)+log(y)" in clean_u
+            or "ln(a+b)=ln(a)+ln(b)" in clean_u
+            or "ln(x+y)=ln(x)+ln(y)" in clean_u
+            or "log(a-b)=log(a)-log(b)" in clean_u
+            or "log(a-b)=log(a)/log(b)" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-LOG-01",
+                severity="CRITICAL",
+                category="LOG_ADDITION_DISTRIBUTION_TRAP",
+                description="Logaritma parantez içine dağıtılamaz: log(a+b) != log(a) + log(b).",
+                remediation_directive="Logaritmanın çarpımı toplama dönüştürdüğünü (log(ab) = log a + log b) hatırlat.",
+                offending_term=user_str,
+            )
+
+        if ("log(x+y)" in clean_p or "log(a+b)" in clean_p) and ("log(x)+log(y)" in clean_u or "log(a)+log(b)" in clean_u):
+            return DiagnosticPayload(
+                bug_id="BUG-LOG-01",
+                severity="CRITICAL",
+                category="LOG_ADDITION_DISTRIBUTION_TRAP",
+                description="İçerideki toplama işlemi logaritmaların toplamı olarak açılamaz.",
+                remediation_directive="log(a) + log(b) ifadesinin log(a*b) olduğunu göster.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_log_02(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-LOG-02: Logaritma Çarpım/Kuvvet Karışıklığı (log(ab) = log a * log b veya (log x)^2 = 2log x).
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+
+        if (
+            "log(a*b)=log(a)*log(b)" in clean_u
+            or "log(ab)=log(a)*log(b)" in clean_u
+            or "ln(ab)=ln(a)*ln(b)" in clean_u
+            or "log(a.b)=log(a).log(b)" in clean_u
+            or "(log(x))^2=2*log(x)" in clean_u
+            or "(log(x))^2=2log(x)" in clean_u
+            or "log(x^2)=(log(x))^2" in clean_u
+            or "(ln(x))^2=2ln(x)" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-LOG-02",
+                severity="CRITICAL",
+                category="LOG_MULTIPLICATION_POWER_CONFUSION",
+                description="Logaritmada çarpımın logaritması logaritmaların toplamıdır (çarpımı değil); kuvvet kuralı log(x^2) = 2*log(x)'tir, (log x)^2 değildir.",
+                remediation_directive="a^m * a^n = a^(m+n) üslü kuralı ile log(ab) = log a + log b ilişkisini kurdur.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_log_03(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-LOG-03: Negatif Tanım Kümesi İhmali / Sahte Kök (Extraneous Root).
+        """
+        clean_p = prev_str.lower()
+        if "log" in clean_p or "ln" in clean_p:
+            matches = re.findall(r"(?:x\s*=\s*|ç\s*=\s*\{|,\s*)([+-]?\d+(?:\.\d+)?)", user_str.lower())
+            for m in matches:
+                try:
+                    val = float(m)
+                    # Denklemin sol ve sağ tarafını kısıtlar açısından incele
+                    is_valid, reason = self.cas.evaluate_domain_constraints(prev_str, variable="x", candidate_val=val)
+                    if not is_valid:
+                        return DiagnosticPayload(
+                            bug_id="BUG-LOG-03",
+                            severity="CRITICAL",
+                            category="LOG_EXTRANEOUS_ROOT_DOMAIN_VIOLATION",
+                            description=f"Logaritma argümanı pozitif olmak zorundadır. Bulunan x = {val} kökü orijinal denklemi tanımsız/negatif yapmaktadır ({reason}).",
+                            remediation_directive="Bulunan köklerin logaritmanın tanım kümesi kısıtlarını sağlayıp sağlamadığını kontrol etmesini iste.",
+                            offending_term=user_str,
+                        )
+                except Exception:
+                    pass
+        return None
+
+    def _check_bug_log_04(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-LOG-04: Taban Değiştirme ve Bölme Hatası (log a / log b = log(a/b) sanma).
+        """
+        clean_u = user_str.lower().replace(" ", "")
+
+        if (
+            "log(a)/log(b)=log(a/b)" in clean_u
+            or "log(a)/log(b)=log(a-b)" in clean_u
+            or "ln(a)/ln(b)=ln(a/b)" in clean_u
+            or "ln(a)/ln(b)=ln(a-b)" in clean_u
+            or "log(x)/log(y)=log(x/y)" in clean_u
+            or "log(x)/log(y)=log(x-y)" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-LOG-04",
+                severity="CRITICAL",
+                category="LOG_CHANGE_OF_BASE_DIVISION_ERROR",
+                description="log(a)/log(b) oranı log(a/b) değil, taban değiştirme kuralı uyarınca log_b(a)'dır. log(a/b) ise log(a) - log(b)'ye eşittir.",
+                remediation_directive="Bölümün logaritması ile logaritmaların oranını birbirinden ayırt ettir.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_log_05(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-LOG-05: Üstel/Logaritma Taban ve Kuvvet Karışıklığı (log_a(b) = c => b = c^a sanma).
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+
+        if (
+            "8=3^2" in clean_u
+            or "b=c^a" in clean_u
+            or "a=b^c" in clean_u
+            or "b=c**a" in clean_u
+            or "a=b**c" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-LOG-05",
+                severity="CRITICAL",
+                category="LOG_BASE_EXPONENT_INVERSION_ERROR",
+                description="log_a(b) = c eşitliğinde taban a yerinde kalır ve b = a^c olur; taban ile üs yer değiştirilemez (b != c^a).",
+                remediation_directive="Logaritmanın üstel fonksiyonun tersi olduğunu ve tabanın daima altta kaldığını hatırlat.",
+                offending_term=user_str,
+            )
         return None
 
 

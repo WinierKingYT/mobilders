@@ -294,6 +294,10 @@ class _CognitiveHealthAtlasScreenState extends State<CognitiveHealthAtlasScreen>
       {'title': 'Seviye 6 (Grup A): Parabol Kesişimleri & Modelleme', 'nodes': ['N33', 'N34', 'N35', 'N36', 'N37', 'N38'], 'mastered': false, 'zpd': 'N33'},
       {'title': 'Seviye 6 (Grup B): Polinomlar & Kalan Teoremi', 'nodes': ['N39', 'N40', 'N41', 'N42', 'N43', 'N44', 'N45'], 'mastered': false, 'zpd': 'N39'},
       {'title': 'Seviye 7: İleri Polinom Bölmesi & Grafikler', 'nodes': ['N46', 'N47', 'N48', 'N49', 'N50'], 'mastered': false, 'zpd': 'N46'},
+      {'title': 'Seviye 8 (Grup A): Trigonometri & Birim Çember', 'nodes': ['N51', 'N52', 'N53', 'N54', 'N55', 'N56', 'N57'], 'mastered': false, 'zpd': 'N51'},
+      {'title': 'Seviye 8 (Grup B): Teoremler, Toplam-Fark & Denklemler', 'nodes': ['N58', 'N59', 'N60', 'N61', 'N62', 'N63', 'N64', 'N65'], 'mastered': false, 'zpd': 'N58'},
+      {'title': 'Seviye 9 (Grup A): Üstel Fonksiyonlar & Büyüme Modelleri', 'nodes': ['N66', 'N67', 'N68', 'N76', 'N77'], 'mastered': false, 'zpd': 'N66'},
+      {'title': 'Seviye 9 (Grup B): Logaritma Kuralları, Denklemler & Modelleme', 'nodes': ['N69', 'N70', 'N71', 'N72', 'N73', 'N74', 'N75', 'N78', 'N79', 'N80'], 'mastered': false, 'zpd': 'N69'},
     ];
 
     return ListView.builder(

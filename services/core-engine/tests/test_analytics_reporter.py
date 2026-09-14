@@ -40,8 +40,8 @@ def test_local_analytics_reporter():
 
     # 4. Algebra Atlas
     atlas = report["algebra_atlas"]
-    assert atlas["total_nodes"] == 50
-    assert len(atlas["nodes"]) == 50
+    assert atlas["total_nodes"] == 80
+    assert len(atlas["nodes"]) == 80
 
 
 def test_analytics_api_endpoint(client):
@@ -53,4 +53,4 @@ def test_analytics_api_endpoint(client):
     assert "cognitive_efficiency" in data
     assert "memory_retention_14d" in data
     assert "algebra_atlas" in data
-    assert data["algebra_atlas"]["total_nodes"] == 50
+    assert data["algebra_atlas"]["total_nodes"] == 80

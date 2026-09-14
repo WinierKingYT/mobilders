@@ -19,19 +19,39 @@ class SymbolicEquivalenceEngine:
 
     MAX_AST_DEPTH = 15
     ALLOWED_VARIABLES = {
-        "x", "y", "z", "a", "b", "c", "k", "n", "m", "r", "p", "q", "d", "Delta", "P", "Q", "R"
+        "x", "y", "z", "a", "b", "c", "k", "n", "m", "r", "p", "q", "d", "Delta", "P", "Q", "R",
+        "theta", "alpha", "beta", "pi", "e"
     }
-    ALLOWED_FUNCTIONS = {"sqrt", "Abs", "degree", "rem", "quo", "Poly"}
+    ALLOWED_FUNCTIONS = {
+        "sqrt", "Abs", "degree", "rem", "quo", "Poly",
+        "sin", "cos", "tan", "cot", "sec", "csc",
+        "asin", "acos", "atan",
+        "log", "ln", "exp"
+    }
 
     def __init__(self):
         # SymPy sembolleri
         self.symbols = {name: sp.Symbol(name) for name in self.ALLOWED_VARIABLES}
+        self.symbols["pi"] = sp.pi
+        self.symbols["e"] = sp.E
         self.symbols["sqrt"] = sp.sqrt
         self.symbols["Abs"] = sp.Abs
         self.symbols["degree"] = sp.degree
         self.symbols["rem"] = sp.rem
         self.symbols["quo"] = sp.quo
         self.symbols["Poly"] = sp.Poly
+        self.symbols["sin"] = sp.sin
+        self.symbols["cos"] = sp.cos
+        self.symbols["tan"] = sp.tan
+        self.symbols["cot"] = sp.cot
+        self.symbols["sec"] = sp.sec
+        self.symbols["csc"] = sp.csc
+        self.symbols["asin"] = sp.asin
+        self.symbols["acos"] = sp.acos
+        self.symbols["atan"] = sp.atan
+        self.symbols["log"] = sp.log
+        self.symbols["ln"] = sp.log
+        self.symbols["exp"] = sp.exp
 
         # Eşdeğerlik LRU önbelleği (Tekrar eden adımlarda <0.1ms hızlı yol)
         self._cache: dict = {}
@@ -208,4 +228,72 @@ class SymbolicEquivalenceEngine:
         r = -b_val / (2.0 * a_val)
         k = c_val - (b_val ** 2) / (4.0 * a_val)
         return r, k
+
+    def evaluate_domain_constraints(
+        self, expr_str: str, variable: str = "x", candidate_val: float = 0.0
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Verilen bir ifadenin aday kök (candidate_val) değerinde tanım kümesi kısıtlarını
+        sağlayıp sağlamadığını doğrular.
+        - Logaritma argümanları > 0 olmalı.
+        - Logaritma tabanları > 0 ve != 1 olmalı.
+        - Karekök içleri >= 0 olmalı.
+        - Paydalar != 0 olmalı (ifade sonlu ve gerçel olmalı).
+        """
+        expr = self.parse_to_sympy(expr_str)
+        var_sym = self.symbols.get(variable, sp.Symbol(variable))
+
+        # 1. Logaritma denetimi
+        for l in expr.atoms(sp.log):
+            arg_val = sp.sympify(l.args[0]).subs(var_sym, candidate_val).evalf()
+            if not arg_val.is_real or float(arg_val) <= 0:
+                return False, f"Logaritma argümanı pozitif olmalıdır: {l.args[0]} = {arg_val} <= 0"
+            if len(l.args) > 1:
+                base_val = sp.sympify(l.args[1]).subs(var_sym, candidate_val).evalf()
+                if not base_val.is_real or float(base_val) <= 0 or abs(float(base_val) - 1.0) < 1e-9:
+                    return False, f"Logaritma tabanı pozitif ve 1'den farklı olmalıdır: {l.args[1]} = {base_val}"
+
+        # 2. Karekök ve çift dereceli kök denetimi
+        for p in expr.atoms(sp.Pow):
+            base, exp = p.args
+            if hasattr(exp, "is_Rational") and exp.is_Rational and exp.q % 2 == 0:
+                arg_val = sp.sympify(base).subs(var_sym, candidate_val).evalf()
+                if not arg_val.is_real or float(arg_val) < 0:
+                    return False, f"Karekök içi negatif olamaz: {base} = {arg_val} < 0"
+
+        # 3. Payda, tanımsızlık ve dikey asimptot denetimi
+        evaluated = expr.subs(var_sym, candidate_val).evalf()
+        if (
+            evaluated in (sp.nan, sp.zoo)
+            or not evaluated.is_finite
+            or not evaluated.is_real
+            or abs(float(evaluated)) > 1e10
+        ):
+            return False, f"İfade {variable} = {candidate_val} için tanımsız veya gerçel değil."
+
+        return True, None
+
+    def verify_trig_identity(self, lhs_str: str, rhs_str: str) -> bool:
+        """İki trigonometrik ifadenin özdeşliğini doğrular."""
+        lhs = self.parse_to_sympy(lhs_str)
+        rhs = self.parse_to_sympy(rhs_str)
+        diff = sp.simplify(lhs - rhs)
+        if diff == 0:
+            return True
+        if sp.trigsimp(diff) == 0:
+            return True
+        # Tan/cot/sec/csc içeren ifadeleri sin/cos cinsinden yeniden yazarak sadeleştir
+        rewritten = diff.rewrite(sp.sin)
+        return sp.simplify(sp.trigsimp(rewritten)) == 0
+
+    def verify_log_equality(self, lhs_str: str, rhs_str: str) -> bool:
+        """İki logaritmik ifadenin denkliğini doğrular."""
+        lhs = self.parse_to_sympy(lhs_str)
+        rhs = self.parse_to_sympy(rhs_str)
+        diff = sp.simplify(lhs - rhs)
+        if diff == 0:
+            return True
+        expanded_diff = sp.expand_log(diff, force=True)
+        return sp.simplify(expanded_diff) == 0
+
 
