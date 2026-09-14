@@ -182,7 +182,8 @@ class SymbolicEquivalenceEngine:
                 return True, elapsed_ms, "0"
 
             # 2. Skaler kat denklem eşdeğerliği (c * target_expr == user_expr, c != 0)
-            if target_expr != 0 and user_expr != 0:
+            # Yalnızca denklemlerde (LHS = RHS) geçerlidir; türev veya fonksiyon değerlerinde skaler kat eşit kabul edilemez.
+            if ("=" in user_expr_str or "=" in target_expr_str) and target_expr != 0 and user_expr != 0:
                 try:
                     ratio = sp.simplify(user_expr / target_expr)
                     if ratio.is_number and ratio != 0:

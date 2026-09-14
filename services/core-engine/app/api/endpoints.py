@@ -49,6 +49,9 @@ from app.curriculum_generator.dag_synthesizer import AutonomousCurriculumSynthes
 from app.simulation.cohort_factory import VectorizedCohortSimulationFactory
 from app.research.dp_exporter import DifferentialPrivacyExporter
 from app.research.leaderboard import CognitiveModelBenchmark
+from app.ocr.models import MathScanRequest, MathScanResponse
+from app.ocr.vision_pipeline import MathVisionPipeline
+from app.ocr.socratic_diagnoser import SocraticNotebookDiagnoser
 from app.core.logging_config import telemetry_logger
 
 router = APIRouter(tags=["Session, Verification, Diagnostic, Multimodal, LTI, Voice, Autonomous Generator & Benchmark"])
@@ -71,6 +74,13 @@ curriculum_synthesizer = AutonomousCurriculumSynthesizer()
 simulation_factory = VectorizedCohortSimulationFactory()
 dp_exporter = DifferentialPrivacyExporter()
 model_benchmark = CognitiveModelBenchmark()
+math_vision_pipeline = MathVisionPipeline(dag=knowledge_dag)
+socratic_diagnoser = SocraticNotebookDiagnoser(
+    cas=cas_engine,
+    detector=misconception_detector,
+    dag=knowledge_dag,
+    vision_pipeline=math_vision_pipeline,
+)
 
 
 # Idempotency Cache for offline event replay and network duplicate protection
@@ -753,6 +763,30 @@ async def get_cognitive_models_leaderboard() -> LeaderboardResponse:
     küresel Öğrenme Bilimleri Liderlik Tablosunu döner.
     """
     return model_benchmark.get_leaderboard()
+
+
+# ==========================================
+# 13. DEFTERDEN / KİTAPTAN SORU FOTOĞRAFLAMA VE SOKRATİK HATA TEŞHİS KAMERASI API
+# ==========================================
+
+@router.post("/api/v1/scan/diagnose", response_model=MathScanResponse)
+async def scan_and_diagnose_notebook(request: MathScanRequest) -> MathScanResponse:
+    """
+    Hedef 5: Defterden/Kitaptan Soru Fotoğraflama ve Sokratik Hata Teşhis Kamerası API'si.
+    Anti-Photomath felsefesi: Doğrudan cevabı vermek KESİNLİKLE YASAKTIR.
+    Görüntüden veya metinden adımları ayırır, CAS ile doğrular, Buggy Rule tespit eder
+    ve Zero-Leakage kalkanıyla Sokratik geri bildirim üretir.
+    """
+    lines = math_vision_pipeline.process_image_or_text(
+        image_base64=request.image_base64,
+        raw_text_override=request.raw_text_override,
+    )
+    response = socratic_diagnoser.diagnose_notebook_solution(
+        segmented_lines=lines,
+        target_problem=request.target_problem,
+    )
+    return response
+
 
 
 
