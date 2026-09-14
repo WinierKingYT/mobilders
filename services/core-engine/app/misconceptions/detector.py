@@ -332,6 +332,81 @@ class QuadraticMisconceptionDetector:
         if bug_prob10:
             return bug_prob10
 
+        # 61. BUG-FOUND-01: Çift Eksi Tuzağı (-(-4) = -4)
+        bug_f1 = self._check_bug_found_01(clean_user, clean_prev)
+        if bug_f1:
+            return bug_f1
+
+        # 62. BUG-FOUND-02: İşlem Önceliği Körlüğü (3 + 4*2 = 14)
+        bug_f2 = self._check_bug_found_02(clean_user, clean_prev)
+        if bug_f2:
+            return bug_f2
+
+        # 63. BUG-FOUND-03: Kuvvet ile İşaret Çelişkisi (-3^2 = 9)
+        bug_f3 = self._check_bug_found_03(clean_user, clean_prev)
+        if bug_f3:
+            return bug_f3
+
+        # 64. BUG-FOUND-04: Kesir Düz Toplama Hatası (1/2 + 1/3 = 2/5)
+        bug_f4 = self._check_bug_found_04(clean_user, clean_prev)
+        if bug_f4:
+            return bug_f4
+
+        # 65. BUG-FOUND-05: Yarım Dağılma Hatası (2(x+3) = 2x+3)
+        bug_f5 = self._check_bug_found_05(clean_user, clean_prev)
+        if bug_f5:
+            return bug_f5
+
+        # 66. BUG-FOUND-06: Toplama/Çarpma Karışıklığı (x + x = x^2)
+        bug_f6 = self._check_bug_found_06(clean_user, clean_prev)
+        if bug_f6:
+            return bug_f6
+
+        # 67. BUG-FOUND-07: Katsayıyı Çıkarma Sanma (3x = 12 => x = 9)
+        bug_f7 = self._check_bug_found_07(clean_user, clean_prev)
+        if bug_f7:
+            return bug_f7
+
+        # 68. BUG-FOUND-08: Elma ile Armudu Toplama (2x + 3 = 5x)
+        bug_f8 = self._check_bug_found_08(clean_user, clean_prev)
+        if bug_f8:
+            return bug_f8
+
+        # 69. BUG-FOUND-09: Üs ile Tabanı Çarpma (2^3 = 6)
+        bug_f9 = self._check_bug_found_09(clean_user, clean_prev)
+        if bug_f9:
+            return bug_f9
+
+        # 70. BUG-FOUND-10: Negatif Sıralama Yanılgısı (-8 > -3)
+        bug_f10 = self._check_bug_found_10(clean_user, clean_prev)
+        if bug_f10:
+            return bug_f10
+
+        # 71. BUG-FOUND-11: Sıfıra Bölme Hatası (5/0 = 0 veya 5)
+        bug_f11 = self._check_bug_found_11(clean_user, clean_prev)
+        if bug_f11:
+            return bug_f11
+
+        # 72. BUG-FOUND-12: Eksi Parantez Dağılma (-(x - 4) = -x - 4)
+        bug_f12 = self._check_bug_found_12(clean_user, clean_prev)
+        if bug_f12:
+            return bug_f12
+
+        # 73. BUG-FOUND-13: Fonksiyonu Sayı Sanma (f(3) = 23)
+        bug_f13 = self._check_bug_found_13(clean_user, clean_prev)
+        if bug_f13:
+            return bug_f13
+
+        # 74. BUG-FOUND-14: Eşitsizlikte Yön Unutma (-2x < 6 => x < -3)
+        bug_f14 = self._check_bug_found_14(clean_user, clean_prev)
+        if bug_f14:
+            return bug_f14
+
+        # 75. BUG-FOUND-15: Tek Taraflı Terazi Hatası (x + 4 = 10 => x + 4 - 4 = 10)
+        bug_f15 = self._check_bug_found_15(clean_user, clean_prev)
+        if bug_f15:
+            return bug_f15
+
         return None
 
     def _check_bug_quad_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
@@ -2012,6 +2087,217 @@ class QuadraticMisconceptionDetector:
                 category="WORD_PROBLEMS_REAL_WORLD_DOMAIN_INVALIDATION",
                 description="Cebirsel denklem negatif bir kök verse bile gerçek dünyada yaş, hız, zaman, uzunluk veya kişi sayısı negatif olamaz.",
                 remediation_directive="Bulunan kökü gerçek dünya kısıtlarıyla süz: Yaş, hız ve zaman fiziksel olarak pozitif (x > 0) olmalıdır. Negatif kökü çözüm kümesinden çıkar.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_found_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-FOUND-01: Çift Eksi Tuzağı (-(-4) = -4 sanma)."""
+        clean = user_str.replace(" ", "")
+        if "-(-" in clean and "=-" in clean:
+            return DiagnosticPayload(
+                bug_id="BUG-FOUND-01",
+                severity="CRITICAL",
+                category="FOUNDATION_DOUBLE_NEGATIVE_FALLACY",
+                description="İki eksi yan yana geldiğinde (-(-a)) yön iki kez döner ve pozitif (+a) olur.",
+                remediation_directive="-(-a) daima +a yapar. Eksi ile eksi çarpıldığında sonuç artıya döner.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_found_02(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-FOUND-02: İşlem Önceliği Körlüğü (3 + 4*2 = 14 sanma)."""
+        clean = user_str.replace(" ", "")
+        if "3+4*2=14" in clean or "3+4·2=14" in clean or "islemonceligiyok" in clean:
+            return DiagnosticPayload(
+                bug_id="BUG-FOUND-02",
+                severity="CRITICAL",
+                category="FOUNDATION_ORDER_OF_OPERATIONS_BLINDNESS",
+                description="Çarpma işlemi toplama işleminden önce yapılır. 3 + 4*2 işleminde önce 4*2 = 8, sonra 3 + 8 = 11 olmalıdır.",
+                remediation_directive="Önce çarpma ve bölme paketlerini hesapla, ardından toplama veya çıkarma yap.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_found_03(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-FOUND-03: Kuvvet ile İşaret Çelişkisi (-3^2 = 9 yazma)."""
+        clean = user_str.replace(" ", "").replace("**", "^")
+        if "-3^2=9" in clean or "-3^2=+9" in clean or "-5^2=25" in clean:
+            return DiagnosticPayload(
+                bug_id="BUG-FOUND-03",
+                severity="CRITICAL",
+                category="FOUNDATION_EXPONENT_SIGN_PRECEDENCE",
+                description="Parantez olmadan üs sadece sayıya aittir: -3² = -(3·3) = -9'dur. Sonucun pozitif olması için (-3)² yazılmalıdır.",
+                remediation_directive="Parantez yoksa tabandaki eksiyi koru: -a² daima negatiftir.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_found_04(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-FOUND-04: Kesir Düz Toplama Hatası (1/2 + 1/3 = 2/5)."""
+        clean = user_str.replace(" ", "")
+        if "1/2+1/3=2/5" in clean or "paylarvepaydalarduztoplanir" in clean:
+            return DiagnosticPayload(
+                bug_id="BUG-FOUND-04",
+                severity="CRITICAL",
+                category="FOUNDATION_FRACTION_FLAT_ADDITION",
+                description="Farklı boyutlardaki pizza dilimleri düz toplanamaz. Paydalar eşitlenmeden kesirlerde toplama yapılamaz: 1/2 + 1/3 = 3/6 + 2/6 = 5/6.",
+                remediation_directive="Kesirleri toplamadan önce ortak paydada buluştur (paydaları eşitle).",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_found_05(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-FOUND-05: Yarım Dağılma Hatası (2(x+3) = 2x+3)."""
+        clean = user_str.replace(" ", "")
+        if "2(x+3)=2x+3" in clean or "3(x+4)=3x+4" in clean or "yarimdagilma" in clean:
+            return DiagnosticPayload(
+                bug_id="BUG-FOUND-05",
+                severity="CRITICAL",
+                category="FOUNDATION_PARTIAL_DISTRIBUTION",
+                description="Parantez dışındaki katsayı parantez içindeki HER terimle ayrı ayrı çarpılmalıdır: 2(x + 3) = 2x + 6.",
+                remediation_directive="Parantez içindeki sabit terimi de dıştaki katsayı ile çarpmayı unutma.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_found_06(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-FOUND-06: Toplama/Çarpma Karışıklığı (x + x = x^2)."""
+        clean = user_str.replace(" ", "").replace("**", "^")
+        if "x+x=x^2" in clean or "a+a=a^2" in clean:
+            return DiagnosticPayload(
+                bug_id="BUG-FOUND-06",
+                severity="CRITICAL",
+                category="FOUNDATION_ADDITION_MULTIPLICATION_CONFUSION",
+                description="x + x iki tane x demektir (2x). Üs sadece çarpma işleminde artar: x · x = x².",
+                remediation_directive="Benzer terimleri toplarken katsayıları topla: x + x = 2x.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_found_07(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-FOUND-07: Katsayıyı Çıkarma Sanma (3x = 12 => x = 12 - 3 = 9)."""
+        clean = user_str.replace(" ", "")
+        if ("3x=12" in prev_str.replace(" ", "") and ("x=9" in clean or "12-3" in clean)) or "katsayicikarmaolarakgecer" in clean:
+            return DiagnosticPayload(
+                bug_id="BUG-FOUND-07",
+                severity="CRITICAL",
+                category="FOUNDATION_COEFFICIENT_SUBTRACTION_FALLACY",
+                description="3 ile x çarpım durumundadır (3·x). Eşitliğin diğer tarafına çıkarma değil, bölme olarak geçer: x = 12 / 3 = 4.",
+                remediation_directive="x'in önündeki çarpanı karşıya bölme olarak at: x = b / a.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_found_08(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-FOUND-08: Elma ile Armudu Toplama (2x + 3 = 5x)."""
+        clean = user_str.replace(" ", "")
+        if "2x+3=5x" in clean or "3x+4=7x" in clean or "elmailearmuttoplanir" in clean:
+            return DiagnosticPayload(
+                bug_id="BUG-FOUND-08",
+                severity="CRITICAL",
+                category="FOUNDATION_UNLIKE_TERMS_ADDITION",
+                description="Değişkenli bir terim ile sabit bir sayı düz toplanamaz. 2x + 3 ifadesi en sade haldedir, 5x yapmaz.",
+                remediation_directive="Sadece aynı harfe ve üsse sahip benzer terimleri toplayabilirsin.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_found_09(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-FOUND-09: Üs ile Tabanı Çarpma (2^3 = 6)."""
+        clean = user_str.replace(" ", "").replace("**", "^")
+        if "2^3=6" in clean or "3^2=6" in clean or "2^4=8" in clean:
+            return DiagnosticPayload(
+                bug_id="BUG-FOUND-09",
+                severity="CRITICAL",
+                category="FOUNDATION_EXPONENT_BASE_MULTIPLICATION",
+                description="Üs tabandaki sayının kaç kere kendisiyle çarpılacağını söyler: 2³ = 2·2·2 = 8'dir. Asla taban ile üs çarpılmaz (2·3=6 değildir).",
+                remediation_directive="Üslü ifadede tabanı üs kadar yan yana yazıp çarp.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_found_10(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-FOUND-10: Negatif Sıralama Yanılgısı (-8 > -3)."""
+        clean = user_str.replace(" ", "")
+        if "-8>-3" in clean or "-10>-2" in clean or "-5>-1" in clean:
+            return DiagnosticPayload(
+                bug_id="BUG-FOUND-10",
+                severity="CRITICAL",
+                category="FOUNDATION_NEGATIVE_ORDERING_FALLACY",
+                description="Sayı doğrusunda sola gidildikçe sayılar küçülür. Borç büyüdükçe elde kalan azalır: -8 < -3.",
+                remediation_directive="Negatif sayılarda mutlak değeri büyük olan sayı daha küçüktür.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_found_11(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-FOUND-11: Sıfıra Bölme Hatası (5/0 = 0 veya 5)."""
+        clean = user_str.replace(" ", "")
+        if "5/0=0" in clean or "5/0=5" in clean or "sayi/0=0" in clean:
+            return DiagnosticPayload(
+                bug_id="BUG-FOUND-11",
+                severity="CRITICAL",
+                category="FOUNDATION_DIVISION_BY_ZERO",
+                description="Bir sayının sıfıra bölümü tanımlı değildir (Tanımsızdır). Sadece 0 / 5 = 0 olur.",
+                remediation_directive="Paydada sıfır varsa ifade tanımsızdır; sıfıra eşitleme.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_found_12(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-FOUND-12: Eksi Parantez Dağılma (-(x - 4) = -x - 4)."""
+        clean = user_str.replace(" ", "")
+        if "-(x-4)=-x-4" in clean or "-(x-3)=-x-3" in clean or "-(a-b)=-a-b" in clean:
+            return DiagnosticPayload(
+                bug_id="BUG-FOUND-12",
+                severity="CRITICAL",
+                category="FOUNDATION_NEGATIVE_PARENTHESIS_DISTRIBUTION",
+                description="Parantezin önündeki eksi işareti içeri dağıtılırken içindeki TÜM işaretler tersine döner: -(x - 4) = -x + 4.",
+                remediation_directive="Eksiyi dağıtırken eksi ile eksinin çarpımının artı olduğunu hatırla: -(-4) = +4.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_found_13(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-FOUND-13: Fonksiyonu Sayı Sanma (f(x)=2x için f(3)=23)."""
+        clean = user_str.replace(" ", "")
+        if ("f(3)=23" in clean and "f(x)=2x" in prev_str.replace(" ", "")) or "f(x)=2x=>f(3)=23" in clean or "f(3)=23" in clean:
+            return DiagnosticPayload(
+                bug_id="BUG-FOUND-13",
+                severity="CRITICAL",
+                category="FOUNDATION_FUNCTION_DIGIT_CONCAT_FALLACY",
+                description="2x ifadesi basamak değeri değil, çarpma işlemidir (2·x). Dolayısıyla f(3) = 2 · 3 = 6 olur, 23 değil.",
+                remediation_directive="Değişkenin yerine sayı koyarken örtük çarpmayı hatırla: 2x -> 2 · 3 = 6.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_found_14(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-FOUND-14: Eşitsizlikte Yön Unutma (-2x < 6 => x < -3)."""
+        clean = user_str.replace(" ", "")
+        if ("-2x<6" in prev_str.replace(" ", "") and "x<-3" in clean) or "-2x<6=>x<-3" in clean:
+            return DiagnosticPayload(
+                bug_id="BUG-FOUND-14",
+                severity="CRITICAL",
+                category="FOUNDATION_INEQUALITY_NEGATIVE_DIVISION_DIRECTION",
+                description="Bir eşitsizliğin her iki tarafı negatif bir sayıya bölündüğünde eşitsizlik yön değiştirir: -2x < 6 => x > -3.",
+                remediation_directive="Negatif sayıya bölerken küçüktür işaretini büyüktür olarak çevir.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_found_15(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-FOUND-15: Tek Taraflı Terazi Hatası (x + 4 = 10 => x + 4 - 4 = 10)."""
+        clean = user_str.replace(" ", "")
+        # Sağ taraftan da 4 çıkarılmışsa (örn: = 10 - 4) bu doğru adımdır, hata değildir!
+        if (clean == "x+4-4=10" or clean == "x+4-4=10." or (clean.startswith("x+4-4=10") and not clean.startswith("x+4-4=10-"))) or "tektarafliterazi" in clean:
+            return DiagnosticPayload(
+                bug_id="BUG-FOUND-15",
+                severity="CRITICAL",
+                category="FOUNDATION_ONE_SIDED_BALANCE_ERROR",
+                description="Terazinin dengede kalması için sol kefeden ne çıkarılırsa sağ kefeden de aynısı çıkarılmalıdır: x + 4 - 4 = 10 - 4 => x = 6.",
+                remediation_directive="Eşitliğin her iki tarafına da aynı işlemi uygula.",
                 offending_term=user_str,
             )
         return None

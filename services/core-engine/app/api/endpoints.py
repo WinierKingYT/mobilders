@@ -58,6 +58,21 @@ from app.modeling.models import (
     ModelingProblemSpec,
 )
 from app.modeling.scaffold_engine import SocraticModelingScaffoldEngine
+from app.root_pedagogy.models import (
+    ZeroBaselineEvaluationRequest,
+    ZeroBaselineEvaluationResponse,
+    CoSolveRequest,
+    CoSolveResponse,
+    SandboxSessionRequest,
+    SandboxSessionResponse,
+    WeaknessEntry,
+    RootNode,
+)
+from app.root_pedagogy.root_dag import RootPrerequisiteDAG
+from app.root_pedagogy.diagnostic import ZeroBaselineDiagnostic
+from app.root_pedagogy.weakness_ledger import CognitiveWeaknessLedger
+from app.root_pedagogy.co_solver import ActiveCoSolverEngine
+from app.root_pedagogy.sandbox import InSituRemediationSandbox
 from app.core.logging_config import telemetry_logger
 
 router = APIRouter(tags=["Session, Verification, Diagnostic, Multimodal, LTI, Voice, Autonomous Generator & Benchmark"])
@@ -91,6 +106,11 @@ modeling_scaffold_engine = SocraticModelingScaffoldEngine(
     cas_engine=cas_engine,
     detector=misconception_detector,
 )
+root_dag = RootPrerequisiteDAG()
+zero_baseline_diagnostic = ZeroBaselineDiagnostic()
+weakness_ledger = CognitiveWeaknessLedger(root_dag)
+active_cosolver = ActiveCoSolverEngine(cas_engine)
+insitu_sandbox = InSituRemediationSandbox()
 
 
 # Idempotency Cache for offline event replay and network duplicate protection
@@ -827,3 +847,55 @@ async def get_modeling_problem(problem_id: str) -> ModelingProblemSpec:
     if not prob:
         raise HTTPException(status_code=404, detail=f"Problem {problem_id} bulunamadı.")
     return prob
+
+
+# ==========================================
+# 15. KÖK PEDAGOJİ VE AKTİF BİRLİKTE ÇÖZME API (HEDEF 2 & HEDEF 3)
+# ==========================================
+
+@router.post("/api/v1/root/diagnostic/evaluate", response_model=ZeroBaselineEvaluationResponse)
+async def evaluate_zero_baseline(request: ZeroBaselineEvaluationRequest) -> ZeroBaselineEvaluationResponse:
+    """
+    Hedef 2: Sıfır Tabanlı Bilişsel Sezgi Testi Değerlendirme API'si.
+    Öğrencinin 3 temel soruya verdiği cevaplara göre kök patika gereksinimini tespit eder.
+    """
+    return zero_baseline_diagnostic.evaluate(request)
+
+
+@router.post("/api/v1/root/cosolve/subgoal", response_model=CoSolveResponse)
+async def process_cosolve_subgoal(request: CoSolveRequest) -> CoSolveResponse:
+    """
+    Hedef 3: Aktif Birlikte Çözme Motoru (Faded Worked Examples & Subgoal Labeling).
+    Öğrencinin mikro alt hedefteki cevabını denetler, 8s üzerinde hareketsizlikte fısıltı ve kaynak açıcı sunar.
+    """
+    resp = active_cosolver.process_subgoal_step(request)
+    # Hatalıysa zaaf defterine kaydet
+    if not resp.is_valid:
+        weakness_ledger.log_error(
+            student_id=request.session_id,
+            node_id="N_ROOT_SUBGOAL",
+            user_step=request.student_answer,
+            elapsed_seconds=request.elapsed_seconds,
+        )
+    return resp
+
+
+@router.post("/api/v1/root/sandbox/session", response_model=SandboxSessionResponse)
+async def create_sandbox_session(request: SandboxSessionRequest) -> SandboxSessionResponse:
+    """
+    Hedef 3: In-Situ Mikro-Kum Havuzu Başlatma API'si.
+    Lise sorusunda kök hata yapıldığında ana soruyu dondurur ve 45 saniyelik görsel aracı açar.
+    """
+    return insitu_sandbox.create_sandbox(request)
+
+
+@router.get("/api/v1/root/weaknesses/{student_id}", response_model=List[WeaknessEntry])
+async def get_student_weaknesses(student_id: str) -> List[WeaknessEntry]:
+    """Hedef 3: Bilişsel Zaaf Defteri kayıtlarını döndürür."""
+    return weakness_ledger.get_student_weaknesses(student_id)
+
+
+@router.get("/api/v1/root/dag/nodes", response_model=List[RootNode])
+async def list_root_dag_nodes() -> List[RootNode]:
+    """Hedef 2: Kök Bilgi Grafı'ndaki (N_ROOT_01 - N_ROOT_16) tüm düğümleri döner."""
+    return list(root_dag.nodes.values())
