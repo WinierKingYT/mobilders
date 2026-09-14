@@ -135,6 +135,15 @@ Sistem, akıllı telefon form faktöründe ($390 \times 844$ dikey yönelim) ü�
   * Parser: `^` işaretini otomatik `**` üs işlemine, `x2` yazımını `x^2`ye tamamlar.
 ```
 
+### 4.1 Örtük Çarpma ve Mobil Ayrıştırma Motoru (Implicit Multiplication Engine)
+Mobil cihazda çarpı (`*`) işaretine sürekli basmak yüksek arayüz sürtünmesi yarattığından, Flutter istemcisi ve FastAPI sunucusu giriş metnini AST'ye sokmadan önce şu regex/token kurallarını deterministik uygular:
+1. **Katsayı ve Değişken Eşlemesi:** `([0-9]+)([a-zA-Z])` $\implies$ `$1*$2` (Ör: `2x` $\to$ `2*x`, `6x` $\to$ `6*x`).
+2. **Parantez Çarpımları:** `(\))(\()|([0-9a-zA-Z])(\()|(\))([0-9a-zA-Z])` $\implies$ `$1*$2` (Ör: `(x+3)(x-2)` $\to$ `(x+3)*(x-2)`, `3(x+1)` $\to$ `3*(x+1)`).
+3. **Çoklu Değişken Terimleri:** `4ac` $\implies$ `4*a*c` (Kuadratik formül diskriminant girdilerinde).
+4. **Boşluksuz Üs Dönüşümü:** `x2` veya `x^2` $\implies$ `x**2`.
+Bu sayede öğrenci telefonda kağıda yazar gibi doğal cebirsel notasyon kullanır; sistem hiçbir sembolik anlam kaybı olmadan adımı SymPy uyumlu kanonik hale getirir.
+
+
 ---
 
 ## 5. PROJE DİZİN VE MODÜL MİMARİSİ (FLUTTER + FASTAPI)

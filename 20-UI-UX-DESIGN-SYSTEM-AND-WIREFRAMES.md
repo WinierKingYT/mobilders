@@ -116,12 +116,13 @@ Arayüz varsayılan olarak **Koyu Mod (Dark / Slate)** odaklıdır; OLED ekranla
 │ 🎯 DÜĞÜM: Tam Kareye Tamamlama (N15) │
 ├───────────────────────────────────────┤
 │ HEDEF DENKLEM:                        │
-│   x² + 6x - 2 = 0                     │
+│   x² + 6x - 2 = 0     [📝 MÜSVEDDE ◄] │
 │                                       │
 │ [ADIM 1]  x² + 6x = 2         [✓ Doğru│
 │ [ADIM 2]  x² + 6x + 9 = 11    [✓ Doğru│
 │ [ADIM 3]  (x + 3)² = 11       [✓ Doğru│
-│ [ADIM 4]  x + 3 = √11         [✕ Hata!│
+│ [ADIM 4]  ~~x + 3 = √11~~     [✕ Hata!│
+│  (Kırmızı üzeri çizili - silinmez)    │
 │                                       │
 │ 💡 SOKRATİK KOÇ (AI TUTOR):           │
 │ ┌───────────────────────────────────┐ │
@@ -146,6 +147,7 @@ Arayüz varsayılan olarak **Koyu Mod (Dark / Slate)** odaklıdır; OLED ekranla
 │     0     │  ,  │   ADIMI DOĞRULA 🚀  │
 └───────────┴─────┴─────────────────────┘
 ```
+
 
 ---
 

@@ -145,3 +145,15 @@ Seans dikey ekranda 4 senkronize fazdan oluşur ve ekranda geri sayım sayacı i
      > *"🧠 Nöral konsolidasyon tamamlandı. Dün çalıştığın 'Tam Kare' kavramı zihninde hazır. 20 dakikalık odak seansı için dokun."*
 4. **Öfke Tıklaması ve Afektif Şalter:**
    - Ekranda peş peşe 3 hatalı adım veya aşırı hızlı dokunma (thrashing) tespit edildiğinde arayüz kilitlenir; nefes alma animasyonu ile öğrenilmiş çaresizlik önlenir.
+5. **Adım Düzenleme ve Geçmişe Dönüş Kuralları (Step Rollback):**
+   - Öğrenci önceki bir adıma (örn. Adım 2) dokunup onu değiştirdiğinde veya sildiğinde, o adımdan türetilen sonraki tüm adımlar (Adım 3, 4...) otomatik olarak iptal edilir (Rollback).
+   - Ekranda *"Önceki adım güncellendiği için sonraki adımlar sıfırlandı"* uyarısı verilir; mantıksal süreklilik korunur.
+6. **Odaklanma ve Uygulama Terk Telemetrisi (DDM Outlier Guard):**
+   - Seans sırasında başka bir uygulamaya geçilirse veya bildirim açılırsa adım sayacı dondurulur.
+   - 15 saniyeden uzun süren arka plan kesintilerinde o adımın tepki süresi ($RT$), Ratcliff Drift-Diffusion (DDM) zihinsel çaba hesabından hariç tutulur (*Outlier Truncation*).
+7. **Kenar Müsveddesi (Floating Scratch Canvas):**
+   - Ekranın sağ kenarından çekilebilen yarı saydam serbest çizim kanvası.
+   - Öğrenci ara aritmetik işlemlerini (ör. $\Delta = 36 + 8 = 44$) parmağıyla burada karalar; tek dokunuşla temizler. Bu karalamalar resmi CAS değerlendirmesine girmez.
+8. **Örtük Çarpma ve Mobil Sözdizimi Hoşgörüsü:**
+   - Öğrencinin `2x`, `(x+1)(x+3)`, `4ac` yazımları istemcide otomatik olarak `2*x`, `(x+1)*(x+3)`, `4*a*c` biçimine dönüştürülür. Öğrenci mobilde sürekli `*` tuşuna basmaya zorlanmaz.
+
