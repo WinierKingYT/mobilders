@@ -52,6 +52,12 @@ from app.research.leaderboard import CognitiveModelBenchmark
 from app.ocr.models import MathScanRequest, MathScanResponse
 from app.ocr.vision_pipeline import MathVisionPipeline
 from app.ocr.socratic_diagnoser import SocraticNotebookDiagnoser
+from app.modeling.models import (
+    ScaffoldStepRequest,
+    ScaffoldStepResponse,
+    ModelingProblemSpec,
+)
+from app.modeling.scaffold_engine import SocraticModelingScaffoldEngine
 from app.core.logging_config import telemetry_logger
 
 router = APIRouter(tags=["Session, Verification, Diagnostic, Multimodal, LTI, Voice, Autonomous Generator & Benchmark"])
@@ -80,6 +86,10 @@ socratic_diagnoser = SocraticNotebookDiagnoser(
     detector=misconception_detector,
     dag=knowledge_dag,
     vision_pipeline=math_vision_pipeline,
+)
+modeling_scaffold_engine = SocraticModelingScaffoldEngine(
+    cas_engine=cas_engine,
+    detector=misconception_detector,
 )
 
 
@@ -788,5 +798,32 @@ async def scan_and_diagnose_notebook(request: MathScanRequest) -> MathScanRespon
     return response
 
 
+# ==========================================
+# 14. HİKAYELİ PROBLEMLER VE SOKRATİK MODELLEME İSKELESİ API
+# ==========================================
+
+@router.post("/api/v1/modeling/scaffold/step", response_model=ScaffoldStepResponse)
+async def evaluate_modeling_scaffold_step(request: ScaffoldStepRequest) -> ScaffoldStepResponse:
+    """
+    Hedef 8: Yeni Nesil Hikayeli Problemler ve Modelleme Motoru (Word Problems & Modeling).
+    3 Aşamalı Modelleme İskelesi:
+    1. Değişken Tanımla (Variable Identification)
+    2. Eşitliği Kur (Equation Formulation & Buggy Rule Check)
+    3. Adım Adım Çöz & Gerçek Dünya Kısıtları (CAS Solution & Domain Guard)
+    """
+    return modeling_scaffold_engine.evaluate_step(request)
 
 
+@router.get("/api/v1/modeling/problems", response_model=List[ModelingProblemSpec])
+async def list_modeling_problems() -> List[ModelingProblemSpec]:
+    """Sistemdeki tüm standart modelleme problemlerini listeler."""
+    return list(modeling_scaffold_engine.problem_bank.values())
+
+
+@router.get("/api/v1/modeling/problem/{problem_id}", response_model=ModelingProblemSpec)
+async def get_modeling_problem(problem_id: str) -> ModelingProblemSpec:
+    """Belirli bir modelleme probleminin tanımını ve şematik verilerini döner."""
+    prob = modeling_scaffold_engine.problem_bank.get(problem_id)
+    if not prob:
+        raise HTTPException(status_code=404, detail=f"Problem {problem_id} bulunamadı.")
+    return prob

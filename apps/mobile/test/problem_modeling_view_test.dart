@@ -1,0 +1,94 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:personal_learning_engine/ui/features/modeling/problem_modeling_view.dart';
+import 'package:personal_learning_engine/ui/features/modeling/widgets/motion_diagram_widget.dart';
+import 'package:personal_learning_engine/ui/features/modeling/widgets/mixture_vessel_widget.dart';
+
+void main() {
+  testWidgets('ProblemModelingView renders story, initial stage, and advances through 3 stages', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ProblemModelingView(
+          problemId: 'PROB_AGE_01',
+          category: 'Yaş Problemleri',
+          title: 'Babanın ve Oğlunun Yaşları',
+          storyText: 'Bir babanın bugünkü yaşı oğlunun yaşının 3 katıdır. 5 yıl sonra toplam 50.',
+          targetUnknown: 'Oğlun yaşı',
+          schematicType: 'NONE',
+        ),
+      ),
+    );
+
+    // Initial check
+    expect(find.text('Babanın ve Oğlunun Yaşları'), findsOneWidget);
+    expect(find.text('Aşama 1: Bilinmeyeni Tanımla'), findsOneWidget);
+    expect(find.text('Hangi büyüklüğe "x" demeliyiz?'), findsOneWidget);
+
+    // Stage 1 -> Input 'x'
+    await tester.enterText(find.byKey(const Key('modeling_input_field')), 'x = oğlun yaşı');
+    await tester.tap(find.byKey(const Key('modeling_submit_button')));
+    await tester.pump();
+
+    // Now in Stage 2
+    expect(find.text('Aşama 2: Eşitliği Kur'), findsOneWidget);
+
+    // Buggy rule test: input 'x + 5 = 2y'
+    await tester.enterText(find.byKey(const Key('modeling_input_field')), 'x + 5 = 2y');
+    await tester.tap(find.byKey(const Key('modeling_submit_button')));
+    await tester.pump();
+
+    expect(find.text('Bilişsel Yanılgı: BUG-PROB-01'), findsOneWidget);
+
+    // Valid equation: input '(x + 5) + (3*x + 5) = 50'
+    await tester.enterText(find.byKey(const Key('modeling_input_field')), '(x + 5) + (3*x + 5) = 50');
+    await tester.tap(find.byKey(const Key('modeling_submit_button')));
+    await tester.pump();
+
+    // Now in Stage 3
+    expect(find.text('Aşama 3: Çöz ve Doğrula'), findsOneWidget);
+
+    // Real-world domain check: negative root '-5'
+    await tester.enterText(find.byKey(const Key('modeling_input_field')), 'x = -5');
+    await tester.tap(find.byKey(const Key('modeling_submit_button')));
+    await tester.pump();
+
+    expect(find.text('Bilişsel Yanılgı: BUG-PROB-10'), findsOneWidget);
+
+    // Correct root: '10'
+    await tester.enterText(find.byKey(const Key('modeling_input_field')), '10');
+    await tester.tap(find.byKey(const Key('modeling_submit_button')));
+    await tester.pump();
+
+    expect(find.text('Modelleme Başarıyla Tamamlandı!'), findsOneWidget);
+  });
+
+  testWidgets('ProblemModelingView renders MotionDiagramWidget when MOTION_TIMELINE requested', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ProblemModelingView(
+          schematicType: 'MOTION_TIMELINE',
+        ),
+      ),
+    );
+
+    expect(find.byType(MotionDiagramWidget), findsOneWidget);
+    expect(find.text('Karşıt Yönlü Hareket Şeması'), findsOneWidget);
+    expect(find.text('Karşılaşma'), findsOneWidget);
+  });
+
+  testWidgets('ProblemModelingView renders MixtureVesselWidget when MIXTURE_VESSEL requested', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ProblemModelingView(
+          schematicType: 'MIXTURE_VESSEL',
+        ),
+      ),
+    );
+
+    expect(find.byType(MixtureVesselWidget), findsOneWidget);
+    expect(find.text('Karışım ve Kap Denge Şeması (Tuz)'), findsOneWidget);
+    expect(find.text('1. Kap'), findsOneWidget);
+    expect(find.text('2. Kap'), findsOneWidget);
+    expect(find.text('Karışım'), findsOneWidget);
+  });
+}

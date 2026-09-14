@@ -282,6 +282,56 @@ class QuadraticMisconceptionDetector:
         if bug_i10:
             return bug_i10
 
+        # 51. BUG-PROB-01: Yaş Problemlerinde Zaman Kayması Hatası
+        bug_prob1 = self._check_bug_prob_01(clean_user, clean_prev)
+        if bug_prob1:
+            return bug_prob1
+
+        # 52. BUG-PROB-02: Hız-Zaman Ters Orantı / Doğru Orantı Çelişkisi
+        bug_prob2 = self._check_bug_prob_02(clean_user, clean_prev)
+        if bug_prob2:
+            return bug_prob2
+
+        # 53. BUG-PROB-03: Ortalama Hızda Aritmetik Ortalama Tuzağı
+        bug_prob3 = self._check_bug_prob_03(clean_user, clean_prev)
+        if bug_prob3:
+            return bug_prob3
+
+        # 54. BUG-PROB-04: Yüzde Artış ve Azalışın Birbirini Sıfırladığı Sanrısı
+        bug_prob4 = self._check_bug_prob_04(clean_user, clean_prev)
+        if bug_prob4:
+            return bug_prob4
+
+        # 55. BUG-PROB-05: Karışımda Saf Madde vs Toplam Karışım Kargaşası
+        bug_prob5 = self._check_bug_prob_05(clean_user, clean_prev)
+        if bug_prob5:
+            return bug_prob5
+
+        # 56. BUG-PROB-06: İşçi Probleminde Süreleri Düz Toplama
+        bug_prob6 = self._check_bug_prob_06(clean_user, clean_prev)
+        if bug_prob6:
+            return bug_prob6
+
+        # 57. BUG-PROB-07: Bağıl Hızda Yön / İşaret Hatası
+        bug_prob7 = self._check_bug_prob_07(clean_user, clean_prev)
+        if bug_prob7:
+            return bug_prob7
+
+        # 58. BUG-PROB-08: Kâr Marjı Tabanı (Maliyet vs Satış Fiyatı) Karışıklığı
+        bug_prob8 = self._check_bug_prob_08(clean_user, clean_prev)
+        if bug_prob8:
+            return bug_prob8
+
+        # 59. BUG-PROB-09: Birim Uyuşmazlığı (km/saat vs dakika)
+        bug_prob9 = self._check_bug_prob_09(clean_user, clean_prev)
+        if bug_prob9:
+            return bug_prob9
+
+        # 60. BUG-PROB-10: Gerçek Dünya Kısıtını Göz Ardı Etme
+        bug_prob10 = self._check_bug_prob_10(clean_user, clean_prev)
+        if bug_prob10:
+            return bug_prob10
+
         return None
 
     def _check_bug_quad_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
@@ -1730,5 +1780,238 @@ class QuadraticMisconceptionDetector:
             )
         return None
 
+    def _check_bug_prob_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-PROB-01: Zaman Kayması Hatası (Yaş Problemleri).
+        Geçen yılı sadece tek bir kişiye ekleyip diğer kişiyi sabit tutma.
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+        clean_p = prev_str.lower().replace(" ", "").replace("**", "^")
+        if (
+            re.search(r"x\s*\+\s*(\d+)\s*=\s*(\d+)\s*\*?\s*y(?!\s*\+)", clean_u)
+            or ("x+5=2y" in clean_u or "x+5=2*y" in clean_u or "x+4=3y" in clean_u)
+            or "tekbirkisiyeyasartisi" in clean_u
+            or ("x+5=2*y" in clean_u and ("yas" in clean_p or "age" in clean_p))
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-PROB-01",
+                severity="CRITICAL",
+                category="WORD_PROBLEMS_AGE_SHIFT_ASYMMETRY",
+                description="Yaş problemlerinde geçen zaman herkes için eşit akar. Yıllar eklendiğinde sadece bir kişiye değil, denklemdeki tüm kişilerin yaşlarına aynı miktar eklenmelidir.",
+                remediation_directive="t yıl sonra her iki kişinin de yaşı t kadar artar: x + t = k * (y + t) şeklinde parantez kullanarak her iki tarafa da zamanı ekle.",
+                offending_term=user_str,
+            )
+        return None
 
+    def _check_bug_prob_02(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-PROB-02: Hız-Zaman Ters Orantı / Doğru Orantı Çelişkisi.
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+        clean_p = prev_str.lower().replace(" ", "").replace("**", "^")
+        if (
+            "v1/v2=t1/t2" in clean_u
+            or "t=v*x" in clean_u
+            or "t=v*d" in clean_u
+            or "hizartarsasureartar" in clean_u
+            or "v/t=x" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-PROB-02",
+                severity="CRITICAL",
+                category="WORD_PROBLEMS_SPEED_TIME_INVERSE_RATIO",
+                description="Yol sabitken hız ile zaman doğru orantılı değil, ters orantılıdır: v * t = x. Hız 2 katına çıkarsa, varış süresi yarıya iner.",
+                remediation_directive="Hız ile süre çarpım durumundadır (x = v * t). Hızlar oranı ile süreler oranı birbirinin tersidir: v1 / v2 = t2 / t1.",
+                offending_term=user_str,
+            )
+        return None
 
+    def _check_bug_prob_03(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-PROB-03: Ortalama Hızda Aritmetik Ortalama Tuzağı.
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+        clean_p = prev_str.lower().replace(" ", "").replace("**", "^")
+        if (
+            "vort=(v1+v2)/2" in clean_u
+            or "v_ort=(v1+v2)/2" in clean_u
+            or "(v1+v2)/2" in clean_u and ("ortalamahiz" in clean_p or "gidisdonus" in clean_p or "ortalama" in clean_u)
+            or "vort=(60+40)/2=50" in clean_u
+            or "vort=50" in clean_u and ("60" in clean_p and "40" in clean_p)
+            or "ortalamahizaritmetikortalamadir" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-PROB-03",
+                severity="CRITICAL",
+                category="WORD_PROBLEMS_AVERAGE_SPEED_ARITHMETIC_FALLACY",
+                description="Ortalama hız hızların aritmetik ortalaması değildir. Ortalama hız daima Toplam Yol / Toplam Zaman bağıntısıyla (eşit mesafede Harmonik Ortalama: 2*v1*v2 / (v1+v2)) hesaplanır.",
+                remediation_directive="Ortalama hız için v_ort = Toplam Yol / Toplam Zaman formülünü kur veya eşit yollarda 2*v1*v2 / (v1 + v2) harmonik ortalamasını kullan.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_prob_04(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-PROB-04: Yüzde Artış ve Azalışın Birbirini Sıfırladığı Sanrısı.
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+        clean_p = prev_str.lower().replace(" ", "").replace("**", "^")
+        if (
+            "%20zam+%20indirim=0" in clean_u
+            or "100+20-20=100" in clean_u
+            or "fiyatdegismez" in clean_u
+            or "zamveindirimbirbirinisifirlar" in clean_u
+            or "1.20*0.80=1" in clean_u
+            or "1.2*0.8=1" in clean_u
+            or "degisim=%0" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-PROB-04",
+                severity="CRITICAL",
+                category="WORD_PROBLEMS_PERCENTAGE_REVERSAL_FALLACY",
+                description="Yüzde artış ve azalış birbirini nötrlemez. Yapılan indirim zam görmüş yeni fiyat üzerinden hesaplandığı için nihai fiyat başlangıç fiyatından daha düşüktür (Örn: 100 * 1.20 * 0.80 = 96 != 100).",
+                remediation_directive="Ardışık yüzdeleri toplamak yerine çarpan olarak modelle: P_son = P_0 * (1 + zam) * (1 - indirim).",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_prob_05(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-PROB-05: Karışımda Saf Madde vs Toplam Karışım Kargaşası.
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+        clean_p = prev_str.lower().replace(" ", "").replace("**", "^")
+        if (
+            "yuzde=tuz/su" in clean_u
+            or "yuzde=seker/su" in clean_u
+            or "madde/cozucu" in clean_u
+            or ("tuz/su" in clean_u and ("karisim" in clean_p or "yuzde" in clean_p))
+            or "20/80=%25" in clean_u
+            or "karisimorani=safmadde/su" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-PROB-05",
+                severity="CRITICAL",
+                category="WORD_PROBLEMS_MIXTURE_SOLVENT_VS_TOTAL_CONFUSION",
+                description="Karışım yüzdesi saf maddenin çözücüye (suya) oranı değil, saf maddenin TOPLAM KARIŞIMA (madde + çözücü) oranıdır.",
+                remediation_directive="Yüzde formülünü kurarken paydaya daima toplam kütleyi yaz: Yüzde = (Saf Madde) / (Saf Madde + Su) * 100.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_prob_06(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-PROB-06: İşçi Probleminde Süreleri Düz Toplama.
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+        clean_p = prev_str.lower().replace(" ", "").replace("**", "^")
+        if (
+            "t_birlikte=t1+t2" in clean_u
+            or "tbirlikte=t1+t2" in clean_u
+            or "6+3=9gun" in clean_u
+            or "birlikte=6+3=9" in clean_u
+            or "surelertoplanir" in clean_u
+            or ("ikisi=9" in clean_u and "6" in clean_p and "3" in clean_p)
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-PROB-06",
+                severity="CRITICAL",
+                category="WORD_PROBLEMS_WORK_TIME_LINEAR_ADDITION",
+                description="İki işçi birlikte çalıştığında iş daha uzun sürmez, daha kısa sürer. Süreler doğrudan toplanamaz; birim zamanda yapılan iş hızları (kapasiteler) toplanır.",
+                remediation_directive="Birim zamanda yapılan iş üzerinden denklem kur: 1/t1 + 1/t2 = 1/T_birlikte.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_prob_07(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-PROB-07: Bağıl Hızda Yön / İşaret Hatası.
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+        clean_p = prev_str.lower().replace(" ", "").replace("**", "^")
+        if (
+            "karsilasma=(v1-v2)*t" in clean_u
+            or ("(v1-v2)*t=x" in clean_u and ("zit" in clean_p or "karsit" in clean_p or "birbirinedogru" in clean_p))
+            or "yetisme=(v1+v2)*t" in clean_u
+            or ("(v1+v2)*t=x" in clean_u and ("ayniyonde" in clean_p or "yetisme" in clean_p or "kovalama" in clean_p))
+            or "bagilhizyontutarsizligi" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-PROB-07",
+                severity="CRITICAL",
+                category="WORD_PROBLEMS_RELATIVE_VELOCITY_SIGN_INVERSION",
+                description="Bağıl hareket yönüne dikkat edilmelidir: Birbirine doğru gelen araçlar mesafeyi daha hızlı kapatır (bağıl hız v1 + v2). Aynı yönde giden araçlarda yetişme hızı farklarıdır (v1 - v2).",
+                remediation_directive="Karşıt yönlü karşılaşmalarda hızları topla: (v1 + v2)*t = d. Aynı yönlü yakalamalarda hızları çıkar: (v1 - v2)*t = d.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_prob_08(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-PROB-08: Kâr Marjı Tabanı (Maliyet vs Satış Fiyatı) Karışıklığı.
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+        clean_p = prev_str.lower().replace(" ", "").replace("**", "^")
+        if (
+            "kar=satis*yuzde" in clean_u
+            or "maliyet=satis*(1-kar)" in clean_u
+            or ("satis=maliyet/(1-kar)" in clean_u and "karoranimaliyet" in clean_p)
+            or "maliyettenkarcarpimi" in clean_u
+            or "karhesabindasatisfiyati" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-PROB-08",
+                severity="CRITICAL",
+                category="WORD_PROBLEMS_PROFIT_BASE_COST_VS_SELLING",
+                description="Belirtilmediği sürece kâr oranı daima MALİYET fiyatı üzerinden hesaplanır. Satış fiyatı üzerinden kâr hesaplamak marjı yanlış saptar.",
+                remediation_directive="Satış fiyatı denklemini maliyet tabanlı kur: Satış Fiyatı = Maliyet * (1 + Kâr_Yüzdesi / 100).",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_prob_09(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-PROB-09: Birim Uyuşmazlığı (km/saat vs dakika).
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+        clean_p = prev_str.lower().replace(" ", "").replace("**", "^")
+        if (
+            ("x=60*20" in clean_u and "dakika" in clean_p)
+            or "yol=hiz*dakika" in clean_u
+            or "dakikayisaatecevirmeden" in clean_u
+            or "birimuyusmazligi" in clean_u
+            or "x=v*dakika" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-PROB-09",
+                severity="CRITICAL",
+                category="WORD_PROBLEMS_UNIT_INCONSISTENCY",
+                description="Hız formülünde birimler uyumlu olmalıdır. Hız km/saat olarak verilmişse, süre de saat birimine çevrilmelidir (Örn: 20 dakika = 20/60 = 1/3 saat).",
+                remediation_directive="Verilen süreyi önce saate çevir (dakika / 60), ardından yol formülünde yerine koy: x = v * (t_dk / 60).",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_prob_10(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-PROB-10: Gerçek Dünya Kısıtını Göz Ardı Etme.
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+        clean_p = prev_str.lower().replace(" ", "").replace("**", "^")
+        if (
+            ("x=-" in clean_u and any(w in clean_p for w in ["yas", "hiz", "sure", "isci", "metre", "km", "fiyat"]))
+            or "yas=-" in clean_u
+            or "hiz=-" in clean_u
+            or "sure=-" in clean_u
+            or "negatifkokgecerlidir" in clean_u
+            or "gercekdunyakisitiihmali" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-PROB-10",
+                severity="CRITICAL",
+                category="WORD_PROBLEMS_REAL_WORLD_DOMAIN_INVALIDATION",
+                description="Cebirsel denklem negatif bir kök verse bile gerçek dünyada yaş, hız, zaman, uzunluk veya kişi sayısı negatif olamaz.",
+                remediation_directive="Bulunan kökü gerçek dünya kısıtlarıyla süz: Yaş, hız ve zaman fiziksel olarak pozitif (x > 0) olmalıdır. Negatif kökü çözüm kümesinden çıkar.",
+                offending_term=user_str,
+            )
+        return None
