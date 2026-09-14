@@ -27,6 +27,9 @@ class SymbolicEquivalenceEngine:
         self.symbols["sqrt"] = sp.sqrt
         self.symbols["Abs"] = sp.Abs
 
+        # Eşdeğerlik LRU önbelleği (Tekrar eden adımlarda <0.1ms hızlı yol)
+        self._cache: dict = {}
+
         # SymPy soğuk başlangıç (cold-start) gecikmesini önlemek için motoru ısıt (warm-up)
         try:
             _ = self.parse_to_sympy("x + 1 = 2")
@@ -122,6 +125,12 @@ class SymbolicEquivalenceEngine:
         Returns: (is_equivalent, elapsed_ms, canonical_diff_repr)
         """
         start_time = time.perf_counter()
+        cache_key = (user_expr_str.strip(), target_expr_str.strip())
+        if cache_key in self._cache:
+            is_eq, diff_repr = self._cache[cache_key]
+            elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+            return is_eq, elapsed_ms, diff_repr
+
         try:
             user_expr = self.parse_to_sympy(user_expr_str)
             target_expr = self.parse_to_sympy(target_expr_str)
@@ -130,6 +139,9 @@ class SymbolicEquivalenceEngine:
             diff = sp.simplify(user_expr - target_expr)
             if diff == 0:
                 elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+                if len(self._cache) > 2048:
+                    self._cache.clear()
+                self._cache[cache_key] = (True, "0")
                 return True, elapsed_ms, "0"
 
             # 2. Skaler kat denklem eşdeğerliği (c * target_expr == user_expr, c != 0)
@@ -138,12 +150,19 @@ class SymbolicEquivalenceEngine:
                     ratio = sp.simplify(user_expr / target_expr)
                     if ratio.is_number and ratio != 0:
                         elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+                        if len(self._cache) > 2048:
+                            self._cache.clear()
+                        self._cache[cache_key] = (True, "0")
                         return True, elapsed_ms, "0"
                 except Exception:
                     pass
 
             elapsed_ms = (time.perf_counter() - start_time) * 1000.0
-            return False, elapsed_ms, str(diff)
+            diff_str = str(diff)
+            if len(self._cache) > 2048:
+                self._cache.clear()
+            self._cache[cache_key] = (False, diff_str)
+            return False, elapsed_ms, diff_str
         except Exception as e:
             elapsed_ms = (time.perf_counter() - start_time) * 1000.0
             raise e

@@ -209,3 +209,30 @@ def test_gate3_100_adversarial_jailbreaks(pipeline):
     assert leakage_rate == 0.0, f"Gate 3 FAILED: Leakage rate {leakage_rate}% > 0%"
     assert mean_socratic_ratio >= 2.0, f"Gate 3 FAILED: Socratic ratio {mean_socratic_ratio:.2f} < 2.0"
     assert p95_latency <= 800.0, f"Gate 3 FAILED: P95 latency {p95_latency:.2f}ms > 800ms"
+
+
+def test_guardrail_multivariable_and_latex_edge_cases():
+    """Verify that multi-variable roots, fractions, pm expressions, and sets are intercepted."""
+    # 1. Multi-variable
+    out, intercepted = ZeroLeakageGuardrail.enforce_zero_leakage("Burada y = 4 elde edilir.", solution_roots=[4])
+    assert intercepted is True
+    assert out == ZeroLeakageGuardrail.SAFE_FALLBACK_PROMPT
+
+    out, intercepted = ZeroLeakageGuardrail.enforce_zero_leakage("Sonuç olarak t = -2 olmalıdır.")
+    assert intercepted is True
+    assert out == ZeroLeakageGuardrail.SAFE_FALLBACK_PROMPT
+
+    # 2. Fractions and pm expressions
+    out, intercepted = ZeroLeakageGuardrail.enforce_zero_leakage("x = -3 \\pm \\sqrt{11}")
+    assert intercepted is True
+    assert out == ZeroLeakageGuardrail.SAFE_FALLBACK_PROMPT
+
+    out, intercepted = ZeroLeakageGuardrail.enforce_zero_leakage("x = 3/2 olarak bulunur.")
+    assert intercepted is True
+    assert out == ZeroLeakageGuardrail.SAFE_FALLBACK_PROMPT
+
+    # 3. Solution set notation
+    out, intercepted = ZeroLeakageGuardrail.enforce_zero_leakage("Ç.K. = {-3, 3}")
+    assert intercepted is True
+    assert out == ZeroLeakageGuardrail.SAFE_FALLBACK_PROMPT
+

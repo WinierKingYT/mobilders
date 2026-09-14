@@ -18,6 +18,7 @@ from app.psychometrics.bkt import IndividualizedBKT
 from app.psychometrics.ddm import EZDiffusionSolver
 from app.affect.detector import AffectiveStateDetector, BehaviorObservation
 from app.socratic.pipeline import SocraticPipeline, SocraticRequest, InnerMonologueLog
+from app.core.logging_config import telemetry_logger
 
 router = APIRouter(tags=["Session, Verification, Diagnostic & WebSocket"])
 
@@ -88,6 +89,18 @@ async def verify_step(request: StepVerificationRequest) -> StepVerificationRespo
             ddm_drift_rate=ddm_v,
             ddm_boundary_separation=ddm_a,
             ddm_cognitive_state=ddm_state,
+        )
+
+        telemetry_logger.record_step_event(
+            session_id=request.session_id,
+            step_index=request.step_number,
+            is_correct=is_equiv,
+            latency_ms=float(request.elapsed_ms) if request.elapsed_ms is not None else total_latency_ms,
+            ddm_v=ddm_v,
+            ddm_a=ddm_a,
+            affective_state=ddm_state or ("FLOW" if is_equiv else "CONFUSION"),
+            circuit_breaker_tripped=False,
+            detected_bug_id=detected_bug.bug_id if detected_bug else None,
         )
 
         return StepVerificationResponse(
@@ -366,6 +379,16 @@ async def session_websocket_endpoint(websocket: WebSocket):
                             "support_message": affective_assessment.intervention_message,
                         }
                     })
+
+                telemetry_logger.record_step_event(
+                    session_id=data.get("session_id", "ws_sess"),
+                    step_index=payload.get("step_index", 1),
+                    is_correct=is_valid,
+                    latency_ms=float(latency_ms),
+                    affective_state=affective_assessment.primary_state.value,
+                    circuit_breaker_tripped=affective_assessment.is_circuit_breaker_tripped,
+                    detected_bug_id=detected_bug.bug_id if detected_bug else None,
+                )
 
                 # Send STEP_VALIDATED
                 await websocket.send_json({

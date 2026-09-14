@@ -1,0 +1,19 @@
+{
+  "total_steps_recorded": 103,
+  "overall_accuracy_percent": 85.44,
+  "mean_latency_ms": 646.58,
+  "p95_latency_ms": 2200.0,
+  "mean_ddm_drift_v": 0.1787,
+  "mean_ddm_boundary_a": 0.1196,
+  "circuit_breaker_trips_count": 0,
+  "circuit_breaker_trip_rate_percent": 0.0,
+  "affective_state_distribution": {
+    "FLOW": 84,
+    "CONFUSION": 15,
+    "fluent_mastery": 4
+  },
+  "top_misconceptions": {
+    "BUG-QUAD-01": 5,
+    "BUG-QUAD-02": 5
+  }
+}

@@ -20,12 +20,15 @@ class ZeroLeakageGuardrail:
 
     # General solution disclosure patterns
     LEAK_PATTERNS = [
-        r"(cevap|sonuç|kökler?|roots?|answer)\s*(?:=|:|\s+ise|\s+olur|\s+çıkar|\s+dir|\s+dır)?\s*[-+]?\d+(?:\.\d+)?",
-        r"\bx\s*=\s*[-+]?\d+(?:\.\d+)?",
-        r"\bx_\{?[12]\}?\s*=\s*[-+]?\d+(?:\.\d+)?",
+        r"(cevap|sonuç|kökler?|roots?|answer)\s*(?:=|:|\s+ise|\s+olur|\s+çıkar|\s+dir|\s+dır)?\s*[-+]?\d+(?:[./]\d+)?",
+        r"\b[xyztXYZT]\s*=\s*[-+]?\d+(?:[./]\d+)?",
+        r"\b[xyztXYZT]_\{?[12]\}?\s*=\s*[-+]?\d+(?:[./]\d+)?",
+        r"\b[xyztXYZT]_\{?1\s*,\s*2\}?\s*=",
+        r"\b[xyztXYZT]\s*=\s*[-+]?\d*\s*(?:\\pm|\+/-|\+-)\s*\\?sqrt",
         r"\b(Ç|C)\.?\s*(K|k)\.?\s*=\s*\{[^}]*\}",
         r"çözüm\s*kümesi\s*\{[^}]*\}",
-        r"x\s*=\s*\(.*?\)\s*/\s*\d+",
+        r"[xyztXYZT]\s*=\s*\(.*?\)\s*/\s*\d+",
+        r"\\frac\{[-+]?\d+\}\{[-+]?\d+\}",
     ]
 
     @classmethod
@@ -55,12 +58,12 @@ class ZeroLeakageGuardrail:
                 escaped = re.escape(root_str)
                 # Specific root leakage patterns
                 root_patterns = [
-                    r"\bx\s*=\s*[-+]?" + escaped + r"\b",
-                    r"\bx_\{?[12]\}?\s*=\s*[-+]?" + escaped + r"\b",
-                    r"\bkök[a-z]*\s*[-+]?" + escaped + r"\b",
-                    r"\bcevap\s*[-+]?" + escaped + r"\b",
-                    r"\bsonu(ç|c)\s*[-+]?" + escaped + r"\b",
-                    r"\bde(ğ|g)er\s*[-+]?" + escaped + r"\b",
+                    r"\b[xyztXYZT]\s*=\s*[-+]?" + escaped + r"\b",
+                    r"\b[xyztXYZT]_\{?[12]\}?\s*=\s*[-+]?" + escaped + r"\b",
+                    r"\bkök[a-z]*\s*(?:[=:]|\s+)?[-+]?" + escaped + r"\b",
+                    r"\bcevap\s*(?:[=:]|\s+)?[-+]?" + escaped + r"\b",
+                    r"\bsonu(ç|c)\s*(?:[=:]|\s+)?[-+]?" + escaped + r"\b",
+                    r"\bde(ğ|g)er\s*(?:[=:]|\s+)?[-+]?" + escaped + r"\b",
                 ]
 
                 for pat in root_patterns:
