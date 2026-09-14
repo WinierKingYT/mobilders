@@ -156,4 +156,17 @@ Seans dikey ekranda 4 senkronize fazdan oluşur ve ekranda geri sayım sayacı i
    - Öğrenci ara aritmetik işlemlerini (ör. $\Delta = 36 + 8 = 44$) parmağıyla burada karalar; tek dokunuşla temizler. Bu karalamalar resmi CAS değerlendirmesine girmez.
 8. **Örtük Çarpma ve Mobil Sözdizimi Hoşgörüsü:**
    - Öğrencinin `2x`, `(x+1)(x+3)`, `4ac` yazımları istemcide otomatik olarak `2*x`, `(x+1)*(x+3)`, `4*a*c` biçimine dönüştürülür. Öğrenci mobilde sürekli `*` tuşuna basmaya zorlanmaz.
+9. **Hatalı Adımın Silinmemesi ve Zihinsel Kontrast (Mental Contrast):**
+   - Hatalı bir adım atıldığında o satır silinmez veya gizlenmez. Kırmızı zemin ve üzeri çizili biçimde (`~~x + 3 = √11~~`) adım listesinde kalır.
+   - Hemen altına Sokratik yönlendirme kartı açılır. Öğrenci doğru adımı onun altına yazarak eski bozuk kural ile doğru kuralı yan yana karşılaştırır (VanLehn 1990; Siegler 2002).
+10. **Proaktif Sokratik İskele ("Takıldım" Butonu):**
+    - Öğrenci bir adımda tıkandığında rastgele sallamak yerine dilediği an `[ 💡 Takıldım ]` butonuna basabilir.
+    - Sisteme sıfır ceza puanı ile ZPD seviye-1'deki en hafif yönlendirici Sokratik soruyu tetikletir; öğrenilmiş çaresizliği önler.
+11. **Sessiz / Kütüphane Modu (Library Mode):**
+    - Sistemde zaten dikkat dağıtıcı zil, alkış veya ses efekti yoktur.
+    - Kütüphane modunda dokunsal geri bildirim ultra-hafif mikro titreşime (`selectionClick`) indirgenir; masayı titretmeden sadece tutan parmaklara fiziksel onay hissi verir.
+12. **Çevrimdışı Yumuşak Geçiş (Offline Grace Mode):**
+    - Metroda veya internet kesildiğinde Flutter Tier-1 yerel AST motoru parantez ve temel sözdizimini cihazda doğrular.
+    - Adım yerel Isar kuyruğuna yazılır; seans bölünmeden devam eder, ağ bağlantısı kurulduğunda derin CAS doğrulaması senkronize edilir.
+
 

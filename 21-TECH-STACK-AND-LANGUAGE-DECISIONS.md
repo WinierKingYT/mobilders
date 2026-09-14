@@ -65,9 +65,11 @@ Sistem, akıllı telefon form faktöründe ($390 \times 844$ dikey yönelim) ü�
 |     * Mod A: Özel Dokunmatik Tuş Takımı (Math Touchpad - Grid Layout)       |
 |     * Mod B: Serbest Sistem Klavyesi (ASCII / LaTeX Sözdizim Dönüştürücü)   |
 | - Vektör & Kanvas Çizim: CustomPainter + RepaintBoundary (Alan Karoları)   |
-| - Yerel Önbellek & Olay Kuyruğu: Isar Database / SQLite (Çevrimdışı adım)   |
-| - Dokunsal Geri Bildirim: HapticFeedback (Doğru adımda hafif, hatada tok)   |
+| - Yerel Önbellek & Olay Kuyruğu: Isar Database / SQLite (Çevrimdışı Adım Kuyruğu) |
+| - Dokunsal Geri Bildirim: HapticFeedback (Normal & Kütüphane/Sessiz Mikro Modu) |
+| - Çevrimdışı Çalışma: Tier-1 Yerel Sözdizim Kontrolü + Grace Sync          |
 +─────────────────────────────────────────────────────────────────────────────+
+
                                        │ (REST API & WebSockets / JSON)
                                        ▼
 +─────────────────────────────────────────────────────────────────────────────+

@@ -112,7 +112,7 @@ Arayüz varsayılan olarak **Koyu Mod (Dark / Slate)** odaklıdır; OLED ekranla
 
 ```text
 ┌───────────────────────────────────────┐
-│ 9:41 📶 🔋       ⏱️ 14:22 Kalan       │
+│ 9:41 📶 🔋 🤫[Sessiz] ⏱️ 14:22 Kalan  │
 │ 🎯 DÜĞÜM: Tam Kareye Tamamlama (N15) │
 ├───────────────────────────────────────┤
 │ HEDEF DENKLEM:                        │
@@ -130,11 +130,12 @@ Arayüz varsayılan olarak **Koyu Mod (Dark / Slate)** odaklıdır; OLED ekranla
 │ │  midir? Negatif ikizini hatırla." │ │
 │ └───────────────────────────────────┘ │
 ├───────────────────────────────────────┤
-│ AKTİF ADIM GİRİŞİ:                    │
+│ AKTİF GİRDİ:          [ 💡 TAKILDIM ] │
 │ ┌───────────────────────────────────┐ │
 │ │ x + 3 = ±√11                      │ │
 │ └───────────────────────────────────┘ │
 │ [ 🧮 TUŞ TAKIMI ● ]  [ ⌨️ SERBEST KLAVYE]│
+
 ├─────┬─────┬─────┬─────┬───────────────┤
 │  x  │ x²  │  √  │  ±  │      DEL      │
 ├─────┼─────┼─────┼─────┼───────────────┤
