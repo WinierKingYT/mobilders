@@ -18,14 +18,20 @@ class SymbolicEquivalenceEngine:
     """
 
     MAX_AST_DEPTH = 15
-    ALLOWED_VARIABLES = {"x", "y", "z", "a", "b", "c", "k", "n", "m", "Delta"}
-    ALLOWED_FUNCTIONS = {"sqrt", "Abs"}
+    ALLOWED_VARIABLES = {
+        "x", "y", "z", "a", "b", "c", "k", "n", "m", "r", "p", "q", "d", "Delta", "P", "Q", "R"
+    }
+    ALLOWED_FUNCTIONS = {"sqrt", "Abs", "degree", "rem", "quo", "Poly"}
 
     def __init__(self):
         # SymPy sembolleri
         self.symbols = {name: sp.Symbol(name) for name in self.ALLOWED_VARIABLES}
         self.symbols["sqrt"] = sp.sqrt
         self.symbols["Abs"] = sp.Abs
+        self.symbols["degree"] = sp.degree
+        self.symbols["rem"] = sp.rem
+        self.symbols["quo"] = sp.quo
+        self.symbols["Poly"] = sp.Poly
 
         # Eşdeğerlik LRU önbelleği (Tekrar eden adımlarda <0.1ms hızlı yol)
         self._cache: dict = {}
@@ -166,3 +172,40 @@ class SymbolicEquivalenceEngine:
         except Exception as e:
             elapsed_ms = (time.perf_counter() - start_time) * 1000.0
             raise e
+
+    def polynomial_divide(self, p_str: str, b_str: str) -> Tuple[sp.Expr, sp.Expr]:
+        """
+        Polinom bölmesini hesaplar: P(x) / B(x) -> (Q(x), K(x))
+        P(x) = B(x) * Q(x) + K(x)
+        """
+        p_expr = self.parse_to_sympy(p_str)
+        b_expr = self.parse_to_sympy(b_str)
+        x = self.symbols["x"]
+        quo, rem = sp.div(p_expr, b_expr, x)
+        return quo, rem
+
+    def polynomial_remainder(self, p_str: str, b_str: str) -> sp.Expr:
+        """P(x)'in B(x)'e bölümünden kalanı (rem) döndürür."""
+        _, rem = self.polynomial_divide(p_str, b_str)
+        return rem
+
+    def polynomial_coeffs_sum(self, p_str: str) -> sp.Expr:
+        """P(x) için katsayılar toplamını hesaplar: P(1)."""
+        p_expr = self.parse_to_sympy(p_str)
+        x = self.symbols["x"]
+        return sp.simplify(p_expr.subs(x, 1))
+
+    def polynomial_constant_term(self, p_str: str) -> sp.Expr:
+        """P(x) için sabit terimi hesaplar: P(0)."""
+        p_expr = self.parse_to_sympy(p_str)
+        x = self.symbols["x"]
+        return sp.simplify(p_expr.subs(x, 0))
+
+    def verify_parabola_vertex(self, a_val: float, b_val: float, c_val: float) -> Tuple[float, float]:
+        """Parabol tepe noktası T(r, k) koordinatlarını hesaplar: r = -b/(2a), k = c - b²/(4a)."""
+        if a_val == 0:
+            raise ValueError("İkinci dereceden fonksiyonda a katsayısı 0 olamaz.")
+        r = -b_val / (2.0 * a_val)
+        k = c_val - (b_val ** 2) / (4.0 * a_val)
+        return r, k
+

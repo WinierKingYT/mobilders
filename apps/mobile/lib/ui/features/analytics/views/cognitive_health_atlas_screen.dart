@@ -290,7 +290,10 @@ class _CognitiveHealthAtlasScreenState extends State<CognitiveHealthAtlasScreen>
       {'title': 'Seviye 3: Tam Kare & Alan Modeli', 'nodes': ['N14', 'N15', 'N16'], 'mastered': true},
       {'title': 'Seviye 4: Formül & Diskriminant', 'nodes': ['N17', 'N18', 'N19', 'N20'], 'mastered': true},
       {'title': 'Seviye 5 (Grup A): İkinci Dereceden Eşitsizlikler', 'nodes': ['N21', 'N22', 'N23'], 'mastered': false, 'zpd': 'N23'},
-      {'title': 'Seviye 5 (Grup B): Parabol & Dönüşümler', 'nodes': ['N24', 'N25', 'N26'], 'mastered': false, 'zpd': 'N25'},
+      {'title': 'Seviye 5 (Grup B): Parabol & Fonksiyon Geometrisi', 'nodes': ['N24', 'N25', 'N26', 'N27', 'N28', 'N29', 'N30', 'N31', 'N32'], 'mastered': false, 'zpd': 'N27'},
+      {'title': 'Seviye 6 (Grup A): Parabol Kesişimleri & Modelleme', 'nodes': ['N33', 'N34', 'N35', 'N36', 'N37', 'N38'], 'mastered': false, 'zpd': 'N33'},
+      {'title': 'Seviye 6 (Grup B): Polinomlar & Kalan Teoremi', 'nodes': ['N39', 'N40', 'N41', 'N42', 'N43', 'N44', 'N45'], 'mastered': false, 'zpd': 'N39'},
+      {'title': 'Seviye 7: İleri Polinom Bölmesi & Grafikler', 'nodes': ['N46', 'N47', 'N48', 'N49', 'N50'], 'mastered': false, 'zpd': 'N46'},
     ];
 
     return ListView.builder(

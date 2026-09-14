@@ -105,7 +105,16 @@ class LocalAnalyticsReporter:
                 "mastery_probability": round(mastery, 3),
                 "status": status,
                 "strict_prereqs": node.strict_prereqs,
-                "curriculum_group": "INEQUALITIES" if n_id in ["N21", "N22", "N23"] else ("PARABOLAS" if n_id in ["N24", "N25", "N26"] else "QUADRATICS_CORE"),
+                "curriculum_group": (
+                    "INEQUALITIES" if n_id in ["N21", "N22", "N23"]
+                    else (
+                        "PARABOLAS" if n_id in [f"N{i:02d}" for i in range(24, 39)]
+                        else (
+                            "POLYNOMIALS" if n_id in [f"N{i:02d}" for i in range(39, 51)]
+                            else "QUADRATICS_CORE"
+                        )
+                    )
+                ),
             })
 
         return {

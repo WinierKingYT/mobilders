@@ -148,7 +148,7 @@ def test_api_cat_submit_progression_and_completion():
     assert data_final["is_complete"] is True
     assert data_final["next_item"] is None
     assert data_final["seeded_mastery"] is not None
-    assert len(data_final["seeded_mastery"]) == 26
+    assert len(data_final["seeded_mastery"]) == 50
     assert data_final["zpd_candidates"] is not None
 
 
@@ -228,7 +228,7 @@ def test_protocol_22_rest_aliases():
     r3 = client.get("/api/v1/cat/result/test_cat_001?theta=1.2")
     assert r3.status_code == 200
     d3 = r3.json()
-    assert len(d3["atlas_mastery"]) == 26
+    assert len(d3["atlas_mastery"]) == 50
     assert "N15" in d3["atlas_mastery"]
 
     # 4. /api/v1/session/start-daily
@@ -242,7 +242,7 @@ def test_protocol_22_rest_aliases():
     r5 = client.get("/api/v1/atlas/state")
     assert r5.status_code == 200
     d5 = r5.json()
-    assert d5["total_nodes"] == 26
+    assert d5["total_nodes"] == 50
 
     # 6. /api/v1/session/conclude
     r6 = client.post("/api/v1/session/conclude")

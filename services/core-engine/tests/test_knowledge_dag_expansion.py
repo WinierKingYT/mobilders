@@ -2,12 +2,12 @@ import pytest
 from app.graph.knowledge_dag import KnowledgeDAG, CycleDetectedError
 
 
-def test_knowledge_dag_26_nodes_expansion():
+def test_knowledge_dag_50_nodes_expansion():
     dag = KnowledgeDAG()
     all_nodes = dag.get_all_node_ids()
 
-    # 1. Total nodes count must be 26 (20 core + 3 inequalities + 3 parabolas)
-    assert len(all_nodes) == 26
+    # 1. Total nodes count must be 50 (20 core + 3 inequalities + 15 parabolas + 12 polynomials)
+    assert len(all_nodes) == 50
 
     # 2. Verify Group A (Inequalities: N21, N22, N23)
     assert "N21" in all_nodes
@@ -18,21 +18,29 @@ def test_knowledge_dag_26_nodes_expansion():
     assert "N21" in dag.get_node("N22").strict_prereqs
     assert "N22" in dag.get_node("N23").strict_prereqs
 
-    # 3. Verify Group B (Parabolas: N24, N25, N26)
-    assert "N24" in all_nodes
-    assert "N25" in all_nodes
-    assert "N26" in all_nodes
-    assert "N10" in dag.get_node("N24").strict_prereqs
-    assert "N18" in dag.get_node("N24").strict_prereqs
-    assert "N24" in dag.get_node("N25").strict_prereqs
-    assert "N24" in dag.get_node("N26").strict_prereqs
+    # 3. Verify Group B (Parabolas: N24 - N38)
+    for n in range(24, 39):
+        assert f"N{n:02d}" in all_nodes
+    assert "N24" in dag.get_node("N27").strict_prereqs
+    assert "N24" in dag.get_node("N28").strict_prereqs
+    assert "N20" in dag.get_node("N33").strict_prereqs
+    assert "N33" in dag.get_node("N34").strict_prereqs
+
+    # 4. Verify Group C (Polynomials: N39 - N50)
+    for n in range(39, 51):
+        assert f"N{n:02d}" in all_nodes
+    assert "N03" in dag.get_node("N39").strict_prereqs
+    assert "N39" in dag.get_node("N40").strict_prereqs
+    assert "N40" in dag.get_node("N41").strict_prereqs
+    assert "N41" in dag.get_node("N42").strict_prereqs
+    assert "N42" in dag.get_node("N47").strict_prereqs
 
 
 def test_topological_sort_and_cycle_free():
     dag = KnowledgeDAG()
     dag.assert_cycle_free()
     sorted_nodes = dag.topological_sort()
-    assert len(sorted_nodes) == 26
+    assert len(sorted_nodes) == 50
 
     # Verify order constraint: prerequisites must precede dependent nodes
     idx_map = {n: i for i, n in enumerate(sorted_nodes)}

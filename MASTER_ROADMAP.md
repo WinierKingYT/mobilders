@@ -1,43 +1,132 @@
 # KİŞİSEL ÖĞRENME MOTORU (PLE) — MASTER YOL HARİTASI
-## Bilişsel Matematik İşletim Sistemi — 14 Kademeli Tam Müfredat ve Teknoloji Planı
+## Bilişsel Matematik İşletim Sistemi — Sıfırdan Zirveye Tam Pedagoji ve Müfredat Planı
 
-Bu belge, Kişisel Öğrenme Motoru'nun lise ve üniversite hazırlık matematiğini (9-12. Sınıf, YKS, IB DP, AP Calculus) %100 kapsayan ve bilişsel öğrenme bilimi ilkeleriyle çalışan nihai yol haritasıdır.
+Bu belge, Kişisel Öğrenme Motoru'nun (Personal Learning Engine - PLE) kuramsal, pedagojik, matematiksel ve yazılımsal mimarisini içeren nihai master yol haritasıdır.
+
+**Temel Tasarım İlkesi (The First-User Dogfooding Invariant):**  
+Bu sistemin ilk kullanıcısı, geliştiricisinin bizzat kendisidir. Sistem; hiçbir matematik temeli olmayan veya geçmişte matematikten kopmuş bir öğrenciyi en temel kavramlardan (sayı doğrusu, borç/alacak, değişken ve terazi sezgisi) alıp üniversite hazırlık zirvesine (Kalkülüs, İspat, Analitik Geometri) kadar **pasif anlatım olmaksızın, kendi çözüyormuş gibi** en yüksek hız ve kalitede öğretmek üzere tasarlanmıştır.
 
 ---
 
-## 🗺️ MASTER YOL HARİTASI GENEL BAKIŞ
+## 🧭 BÖLÜM 1: BİLİŞSEL ÖĞRETİM MANİFESTOSU VE HIZLI ÖĞRENME İLKELERİ
+
+Geleneksel eğitim platformları (video izletenler veya doğrudan çözümü veren chatbotlar) beyni pasif bir izleyiciye dönüştürür ve "Anlama İllüzyonu" (*Illusion of Competence*) yaratır. PLE bu illüzyonu 4 katı pedagojik ilkeyle yıkar:
+
+1. **Sıfır Pasif Monolog (Zero Passive Lecture):** Sistem asla 5 dakikalık bir video izletmez veya 3 paragraflık bir teorik metin okutmaz. Bilgi, sadece öğrencinin yapacağı bir sonraki eylemin gerekçesi olarak aktarılır.
+2. **Aktif Birlikte Çözme (Active Co-Solving):** Konu anlatımı dahi bir problem çözme sürecidir. Sistem soruyu alt hedeflere böler; öğrenci her mikro adımı bizzat klavye veya kanvas üzerinden kendisi yazar.
+3. **Bruner E-I-S Modeli (Concreteness Fading):** Her soyut cebirsel kavram 3 aşamalı somutluk sönümlemesinden geçer:
+   - *Eylemsel (Enactive):* Sayı doğrusunda yürüme, terazi kefelerine ağırlık koyma, Al-Harezmi karolarını birleştirme.
+   - *İkonik (Iconic):* Şematik alan taslakları, kutu modelleri, yönlü oklar.
+   - *Sembolik (Symbolic):* Saf cebirsel gösterim ($2x + 3 = 11$).
+4. **Anında Mikro-Zafer ve Dopamin Döngüsü (Micro-Triumph Loop):** Öğrenci sistemin desteğiyle bir adımı bulduğu anda, sistem arkasından aynı mantığı taşıyan küçük bir varyant verir ve desteksiz yaptırır. Beyin *"Bunu ben çözdüm"* başarısını tadar.
+5. **Akıllı Tereddüt Sensörü (Cognitive Hesitation Sensor):** Öğrenci 8-10 saniye hareketsiz kaldığında (Ratcliff DDM drift hızı sıfırlandığında), sistem öğrenciyi boğmadan hafif bir parıltı veya tek cümlelik bir odaklama fısıltısı (*"Önce parantezin içindeki sayıya bakalım mı?"*) ile kilitlenmeyi çözer.
+6. **"Nereden Geldi Bu?" Geri Sarım Düğmesi (Source Unpacker):** Öğrencinin kafası karıştığında tek dokunuşla o sayının veya terimin önceki hangi iki sayının çarpımından/toplamından doğduğunu gösteren mikro-animasyon devreye girer.
+
+---
+
+## 🌳 BÖLÜM 2: KÖK MATEMATİK ONTOLOJİSİ (SEVİYE -3'TEN SEVİYE 0'A KADAR TAM AĞ)
+
+Lise konularında takılan bir öğrencinin sorunu %85 oranında lise matematiği değil, Seviye 0'ın altındaki bu 15 temel bilgi bileşenindeki (Knowledge Component - KC) görünmez deliklerdir:
 
 ```text
-[ FAZ I: ALTYAPI VE MOBİL SAĞLAMLAŞTIRMA ]
-  └── HEDEF 1: Üretim Hazırlığı, Çevrimdışı Kalıcılık ve Mobil E2E Sağlamlaştırma
+[ SEVİYE -3: SAYI HİSSİ, YÖN VE İŞARET SEZGİSİ ]
+├── N_ROOT_01: Sayı Doğrusu ve Yön Sezgisi (Sıfırın sağı pozitif/kazanç, solu negatif/kayıp)
+├── N_ROOT_02: Borç / Alacak ve Sıcaklık Modeli (-6 - 5 = -11; borcun büyümesi sezgisi)
+├── N_ROOT_03: Zıt İşaretlerin Toplanması (-8 + 5 = -3; büyük olanın işaretinin baskınlığı)
+└── N_ROOT_04: Çarpma ve Bölmede İşaret Kuralları ((+)·(-) = (-), (-)·(-) = (+); yön değiştirme kuralı)
 
-[ FAZ II: TAM LİSE MATEMATİK MÜFREDATI (CEBİR & ANALİZ) ]
-  ├── HEDEF 2: Müfredat Faz A — Paraboller, 2. Dereceden Fonksiyonlar ve Polinomlar (Cebir II)
-  ├── HEDEF 3: Müfredat Faz B — Trigonometri, Logaritma ve Üstel Fonksiyonlar (İleri Fonksiyonlar)
-  ├── HEDEF 4: Müfredat Faz C — Limit, Süreklilik ve Türev (Kalkülüs I / Diferansiyel Analiz)
-  └── HEDEF 6: Müfredat Faz D — İntegral ve Alan Hesabı (Kalkülüs II / Tam Analiz)
+[ SEVİYE -2.5: KESİRLER VE RASYONEL SEZGİ (ORAN-ORANTI TOHUMLARI) ]
+├── N_ROOT_05: Kesir Bir Bölmedir (Pasta/Pizza dilimi, 1/4'ün 1 bütünün 4'e bölünmesi olduğu)
+├── N_ROOT_06: Denk Kesirler ve Sadeleştirme (2/4 = 1/2 mantığı; pay ve paydayı aynı sayıyla ölçekleme)
+└── N_ROOT_07: Ortak Payda Mantığı (Farklı büyüklükteki dilimler doğrudan toplanamaz: 1/2 + 1/3)
 
-[ FAZ III: MULTIMODAL ETKİLEŞİM VE DIŞ DÜNYA BAĞLANTISI ]
-  ├── HEDEF 5: Defterden/Kitaptan Soru Fotoğraflama ve Sokratik Hata Teşhis Kamerası (OCR Scanner)
-  └── HEDEF 8: Yeni Nesil Hikayeli Problemler ve Modelleme Motoru (Word Problems & Modeling)
+[ SEVİYE -2: İŞLEM ÖNCELİĞİ VE PARANTEZ SEZGİSİ ]
+├── N_ROOT_08: Çarpmanın Önceliği Sezgisi (3 + 2 · 4 = 11; 2 tane 4'lük paket + 3 tek)
+├── N_ROOT_09: Parantezin Koruyucu Kalkanı (Parantez içi tek bir sayı gibi işlem görür)
+└── N_ROOT_10: Hediye Paketi Dağılma Özelliği (2(x + 4) = 2x + 8; paketteki her şeye 2 katı)
 
-[ FAZ IV: GEOMETRİ VE ŞEKİLSEL DÜŞÜNME ]
-  ├── HEDEF 7: Analitik Geometri ve Vektörler Motoru (Koordinat Geometrisi)
-  └── HEDEF 12: Sentetik Öklid Geometrisi ve Akıllı Ek Çizim Motoru (Visual Geometry)
+[ SEVİYE -1.5: ÜSLÜ VE KÖKLÜ SAYI TOHUMLARI ]
+├── N_ROOT_11: Üs Bir Çarpma Sayacıdır (2³ = 2·2·2 = 8; asla 2·3 = 6 DEĞİLDİR)
+└── N_ROOT_12: Karekök Alan Sezgisi (√25 = "Alanı 25 olan karenin bir kenarı kaçtır?")
 
-[ FAZ V: BİLİŞSEL DERİNLİK, İSPAT VE İÇERİK FABRİKASI ]
-  ├── HEDEF 9: Kişisel "Hata Otopsisi" Kasası ve Akıllı Zaaf Avcısı (Cognitive Mistake Vault)
-  ├── HEDEF 10: Bilişsel Tuzaklı Sonsuz Soru Üretim Fabrikası (Dynamic Item Generator)
-  ├── HEDEF 11: Olasılık, Kombinatorik ve İstatistik Motoru (Ayrık Matematik & Monte Carlo)
-  ├── HEDEF 13: Matematiksel İspat ve Mantık Laboratuvarı ("Nedenini Anla" - Proof Engine)
-  └── HEDEF 14: Yaşayan Kişisel Matematik Atlası ve Zihin Haritası Gezgini (Interactive Knowledge Navigator)
+[ SEVİYE -1: DEĞİŞKEN, EŞİTLİK VE TERAZİ SEZGİSİ (CEBİRİN DOĞUŞU) ]
+├── N_ROOT_13: x Bir Harf Değil "Gizli Sayı Kutusu"dur (Kutunun içinde tek bir doğru sayı saklı)
+├── N_ROOT_14: Örtük Çarpma (3x ifadesi "3 tane x" ya da 3 · x demektir, 30 küsur değildir)
+├── N_ROOT_15: Terazi Modeli ile Denklem Çözme (Sol kefeden 5 alırsan, sağ kefeden de 5 almalısın)
+└── N_ROOT_16: Fonksiyon Sezgisi (Girdi -> Kural Fabrikası -> Çıktı Modeli)
+```
+
+---
+
+## ⚠️ BÖLÜM 3: 15 TEMEL KÖK YANILGI KATALOĞU (`BUG-FOUND-01..15`)
+
+Sistem, öğrencinin adımlarını incelerken aşağıdaki 15 kök yanılgıyı deterministik olarak yakalar ve öğrencinin **Bilişsel Zaaf Defterine** işler:
+
+| Kod | Yanılgı Adı | Öğrencinin Yaptığı Hata | Doğru Zihinsel Model |
+| :--- | :--- | :--- | :--- |
+| `BUG-FOUND-01` | **Çift Eksi Tuzağı** | $-(-4) = -4$ sanma | İki ters yön birbirini pozitife çevirir: $-(-4) = +4$. |
+| `BUG-FOUND-02` | **İşlem Önceliği Körlüğü** | $3 + 4 \cdot 2 = 14$ bulma | Çarpma paket oluşturur; önce $4 \cdot 2 = 8$, sonra $3 + 8 = 11$. |
+| `BUG-FOUND-03` | **Kuvvet ile İşaret Çelişkisi** | $-3^2 = 9$ yazma | Parantez yoksa üs sadece sayıya aittir: $-3^2 = -(3\cdot 3) = -9$. |
+| `BUG-FOUND-04` | **Kesir Düz Toplama Hatası**| $\frac{1}{2} + \frac{1}{3} = \frac{2}{5}$ yazma | Farklı boyutlu dilimler toplanamaz; payda eşitlenmelidir ($5/6$). |
+| `BUG-FOUND-05` | **Yarım Dağılma Hatası** | $2(x + 3) = 2x + 3$ yazma | Parantezdeki her eleman 2 ile çarpılmalıdır ($2x + 6$). |
+| `BUG-FOUND-06` | **Toplama/Çarpma Karışıklığı** | $x + x = x^2$ sanma | $x+x = 2x$ (iki tane x); $x \cdot x = x^2$. |
+| `BUG-FOUND-07` | **Katsayıyı Çıkarma Sanma** | $3x = 12 \implies x = 12 - 3 = 9$ | 3 ile x çarpım durumundadır; karşıya bölme geçer ($x = 12/3 = 4$). |
+| `BUG-FOUND-08` | **Elma ile Armudu Toplama**| $2x + 3 = 5x$ yazma | Sabit sayı ile değişkenli terim toplanamaz; $2x + 3$ en sade haldedir. |
+| `BUG-FOUND-09` | **Üs ile Tabanı Çarpma** | $2^3 = 6$ yazma | Üs kaç defa çarpılacağını söyler: $2 \cdot 2 \cdot 2 = 8$. |
+| `BUG-FOUND-10` | **Negatif Sıralama Yanılgısı**| $-8 > -3$ sanma (8 büyük diye) | Sayı doğrusunda sola gidildikçe değer küçülür: $-8 < -3$. |
+| `BUG-FOUND-11` | **Sıfıra Bölme Hatası** | $\frac{5}{0} = 0$ veya $5$ yazma | Sıfıra bölme tanımsızdır; $\frac{0}{5} = 0$'dır. |
+| `BUG-FOUND-12` | **Eksi Parantez Dağılma** | $-(x - 4) = -x - 4$ yazma | Eksi içeri dağılırken tüm işaretleri ters çevirir: $-x + 4$. |
+| `BUG-FOUND-13` | **Fonksiyonu Sayı Sanma** | $f(x) = 2x$ için $f(3) = 23$ yazma | 2 ile x çarpım durumundadır; $2 \cdot 3 = 6$'dır. |
+| `BUG-FOUND-14` | **Eşitsizlikte Yön Unutma** | $-2x < 6 \implies x < -3$ yazma | Negatife bölerken eşitsizlik yön değiştirir: $x > -3$. |
+| `BUG-FOUND-15` | **Tek Taraflı Terazi Hatası**| $x + 4 = 10 \implies x + 4 - 4 = 10$ | Terazi dengesi için her iki taraftan da 4 çıkarılmalıdır ($x = 6$). |
+
+---
+
+## 🗺️ MASTER YOL HARİTASI 16 AŞAMALI GENEL BAKIŞ
+
+```text
+========================================================================================
+[ FAZ 0: KÖK PEDAGOJİ, TEMEL MATEMATİK VE ÇÖZDÜREREK ÖĞRETME ÇEKİRDEĞİ ] (1. ÖNCELİK)
+========================================================================================
+  ├── HEDEF 1: Üretim Hazırlığı, Çevrimdışı Kalıcılık ve Mobil E2E Sağlamlaştırma
+  ├── HEDEF 2: Temel Matematik Sezgisi ve Kök Önkoşul Ağı (Seviye -3..-1: Sıfırdan Başlayan Öğrenci)
+  └── HEDEF 3: Aktif Birlikte Çözme (Active Co-Solving), Zaaf Defteri ve Mikro-Kum Havuzu
+
+========================================================================================
+[ FAZ I: TAM LİSE MATEMATİK MÜFREDATI (CEBİR & ANALİZ) ]
+========================================================================================
+  ├── HEDEF 4: Müfredat Faz A — Paraboller, 2. Dereceden Fonksiyonlar ve Polinomlar (Cebir II)
+  ├── HEDEF 5: Müfredat Faz B — Trigonometri, Logaritma ve Üstel Fonksiyonlar (İleri Fonksiyonlar)
+  ├── HEDEF 6: Müfredat Faz C — Limit, Süreklilik ve Türev (Kalkülüs I / Diferansiyel Analiz)
+  └── HEDEF 7: Müfredat Faz D — İntegral ve Alan Hesabı (Kalkülüs II / Tam Analiz)
+
+========================================================================================
+[ FAZ II: MULTIMODAL ETKİLEŞİM VE DIŞ DÜNYA BAĞLANTISI ]
+========================================================================================
+  ├── HEDEF 8: Defterden/Kitaptan Soru Fotoğraflama ve Sokratik Hata Teşhis Kamerası (OCR Scanner)
+  └── HEDEF 9: Yeni Nesil Hikayeli Problemler ve Modelleme Motoru (Word Problems & Modeling)
+
+========================================================================================
+[ FAZ III: GEOMETRİ VE ŞEKİLSEL DÜŞÜNME ]
+========================================================================================
+  ├── HEDEF 10: Analitik Geometri ve Vektörler Motoru (Koordinat Geometrisi)
+  └── HEDEF 11: Sentetik Öklid Geometrisi ve Akıllı Ek Çizim Motoru (Visual Geometry)
+
+========================================================================================
+[ FAZ IV: BİLİŞSEL DERİNLİK, İSPAT VE İÇERİK FABRİKASI ]
+========================================================================================
+  ├── HEDEF 12: Kişisel "Hata Otopsisi" Kasası ve Akıllı Zaaf Avcısı (Cognitive Mistake Vault)
+  ├── HEDEF 13: Bilişsel Tuzaklı Sonsuz Soru Üretim Fabrikası (Dynamic Item Generator)
+  ├── HEDEF 14: Olasılık, Kombinatorik ve İstatistik Motoru (Ayrık Matematik & Monte Carlo)
+  ├── HEDEF 15: Matematiksel İspat ve Mantık Laboratuvarı ("Nedenini Anla" - Proof Engine)
+  └── HEDEF 16: Yaşayan Kişisel Matematik Atlası ve Zihin Haritası Gezgini (Interactive Knowledge Navigator)
 ```
 
 ---
 
 ## 📋 TÜM HEDEFLER İÇİN ÇALIŞTIRILABİLİR /goal ŞABLONLARI
 
-Aşağıdaki şablonları dilediğiniz zaman kopyalayıp sohbete `/goal <İÇERİK>` şeklinde göndererek ilgili hedefin geliştirme döngüsünü başlatabilirsiniz.
+Dilediğiniz an ilgili bloğu kopyalayıp sohbete `/goal <İÇERİK>` şeklinde göndererek geliştirme sürecini başlatabilirsiniz.
 
 ---
 
@@ -52,9 +141,48 @@ Aşağıdaki şablonları dilediğiniz zaman kopyalayıp sohbete `/goal <İÇER�
 
 ---
 
-### 🔹 HEDEF 2: Müfredat Faz A — Paraboller, 2. Dereceden Fonksiyonlar ve Polinomlar
+### 🔹 HEDEF 2: Temel Matematik Sezgisi ve Kök Önkoşul Ağı (Sıfırdan Başlayan Öğrenci Patikası)
 ```markdown
-/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 2 kapsamındaki "Paraboller, İkinci Dereceden Fonksiyonlar ve Polinomlar" müfredat genişlemesini uygula ve doğrula.
+/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 2 kapsamındaki "Temel Matematik Sezgisi ve Kök Önkoşul Ağı (Seviye -3..-1)" paketini uçtan uca uygula ve doğrula.
+- Kapsam: Hiçbir matematik temeli olmayan bir öğrenciyi sıfırdan lise cebirine hazırlayan kök DAG mimarisi.
+- Kök Bilgi Grafı (DAG N_ROOT_01 .. N_ROOT_16):
+  * Seviye -3 (Sayı Doğrusu & İşaret Mantığı): Borç/alacak modeli ile negatif sayılarda toplama-çıkarma (-6 - 5 = -11), çarpma/bölmede işaret kuralı ((+) * (-) = (-), (-) * (-) = (+)).
+  * Seviye -2.5 (Kesir & Rasyonel Sezgi): Pasta/dilim modeli, denk kesirler, sadeleştirme ve ortak payda mantığı.
+  * Seviye -2 (İşlem Önceliği & Parantez Sezgisi): PEMDAS / İşlem sırası (önce parantez içi, sonra çarpma/bölme, sonra toplama/çıkarma), dağılma özelliği (2(x+3) = 2x+6).
+  * Seviye -1.5 (Üslü & Köklü Sezgi): 2^3 = 8 (asla 6 değil), karekök alan sezgisi (√25 = 5).
+  * Seviye -1 (Değişken & Eşitlik Sezgisi): x bir kutudur / bilinmeyendir mantığı, terazi metaforu ile denklem çözme (her iki taraftan aynı şeyi çıkarma), örtük çarpma (2x = 2 * x).
+- BUG-FOUND-01..15 temel yanılgı dedektörlerini detector.py'a ekle.
+- Sıfır Tabanlı Bilişsel Sezgi Testi (Zero-Baseline Diagnostic): Uygulamaya ilk giren öğrencinin 3 soruda temel aritmetik seviyesini tespit edip gerekirse doğrudan bu temel patikadan başlatma.
+- İnteraktif Görsel Kanvas: Dokunmatik Sayı Doğrusu, Pasta Kesir ve Terazi Kanvası (NumberLineBalanceCanvas).
+- 40 yeni test ile 0 False Positive ve %90+ coverage sağla.
+```
+
+---
+
+### 🔹 HEDEF 3: Aktif Birlikte Çözme (Active Co-Solving), Zaaf Defteri ve Mikro-Kum Havuzu
+```markdown
+/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 3 kapsamındaki "Aktif Birlikte Çözme (Active Co-Solving), Zaaf Defteri ve Mikro-Kum Havuzu" paketini uçtan uca uygula ve doğrula.
+- Kapsam: Öğrenci yanlış yaptığında hatanın kök nedenini tespit edip zaaf defterine kaydetme; hiç çözemediğinde ise pasif anlatım YAPMADAN konuyu adım adım mikro hedeflerle öğrencinin kendisine çözdürme.
+- 1. Bilişsel Zaaf Defteri (CognitiveWeaknessLedger):
+  * Öğrenci bir soruda (örn. fonksiyon) hata yaptığında hatanın seviyesini belirle: Basit işlem hatası mı, kavram yanılgısı mı, yoksa Seviye -3 kök önkoşul eksikliği mi?
+  * SQLite/Postgres üzerinde kalıcı zaaf kaydı aç ve BKT yetkinlik olasılığını ilgili önkoşulda güncelle.
+- 2. Aktif Birlikte Çözme Motoru (ActiveCoSolverEngine - Faded Worked Examples & Subgoal Labeling):
+  * Pasif video veya statik açıklama KESİNLİKLE YASAKTIR.
+  * Soruyu 3 mikro alt hedefe böl (Girdiyi tespit et -> Kuralı uygula -> Sadeleştir).
+  * Her adımda öğrenciye mini bir keşif sorusu (Pump/Hint) sor; adımın sonucunu bizzat öğrencinin klavyeden yazmasını sağla.
+- 3. Akıllı Tereddüt Sensörü & Kaynak Geri Sarımı:
+  * 8 saniye hareketsizlikte hafif parıltı fısıltısı, "Nereden Geldi Bu?" butonuyla sayının köken animasyonu.
+- 4. Mikro-Kum Havuzu (In-Situ Remediation Sandbox):
+  * Lise sorusu çözerken öğrenci temel bir kuralda (örn. -6 - 5 = ?) takılırsa, ana soruyu ekranda dondur.
+  * Yan tarafta 45 saniyelik görsel sayı doğrusu kum havuzu açıp kuralı anında kavrat; kum havuzu kapanınca öğrenciyi ana soruya döndür.
+- 45 yeni test ile pedagojik FSM durum geçişlerini ve sıfır sızıntıyı doğrula.
+```
+
+---
+
+### 🔹 HEDEF 4: Müfredat Faz A — Paraboller, 2. Dereceden Fonksiyonlar ve Polinomlar
+```markdown
+/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 4 kapsamındaki "Paraboller, İkinci Dereceden Fonksiyonlar ve Polinomlar" müfredat genişlemesini uygula ve doğrula.
 - Bilgi Grafı Genişlemesi: N27-N38 (Parabol tepe noktası, simetri ekseni, kök geometrisi) ve N39-N50 (Polinom bölmesi, kalan teoremi, katsayılar toplamı).
 - 10 Yeni Yanılgı Kuralı: BUG-PARAB-01..05 (-b/2a formülü eksi işareti, simetri ekseni yanılgısı) ve BUG-POLY-01..05 (bölümde sahte kök, derece karışıklığı).
 - SymPy CAS motorunda fonksiyon dönüşümleri ve polinom sadeleştirmelerini güvenli AST sandbox içinde destekle.
@@ -63,9 +191,9 @@ Aşağıdaki şablonları dilediğiniz zaman kopyalayıp sohbete `/goal <İÇER�
 
 ---
 
-### 🔹 HEDEF 3: Müfredat Faz B — Trigonometri, Üstel ve Logaritmik Fonksiyonlar
+### 🔹 HEDEF 5: Müfredat Faz B — Trigonometri, Üstel ve Logaritmik Fonksiyonlar
 ```markdown
-/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 3 kapsamındaki "Trigonometri, Logaritma ve Üstel Fonksiyonlar" genişlemesini uçtan uca uygula ve doğrula.
+/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 5 kapsamındaki "Trigonometri, Logaritma ve Üstel Fonksiyonlar" genişlemesini uçtan uca uygula ve doğrula.
 - Bilgi Grafı Genişlemesi: N51-N65 (Birim çember, oranlar, özdeşlikler, indirgeme, trigonometrik denklemler) ve N66-N80 (Üstel model, logaritma kuralları, taban değiştirme, logaritmik denklemler).
 - 10 Yeni Yanılgı Kuralı: BUG-TRIG-01..05 (Lineerlik tuzağı sin(a+b)=sin a+sin b, isim sadeleştirme, periyot/kök kaybı) ve BUG-LOG-01..05 (Dağılma tuzağı, kuvvet kuralı hatası, negatif tanım kümesi ihmali).
 - SymPy CAS'a sin, cos, tan, log, ln, exp operasyonlarını güvenli ekle; tanım kümesi denetleyicisi (evaluate_domain_constraints) yaz.
@@ -75,9 +203,9 @@ Aşağıdaki şablonları dilediğiniz zaman kopyalayıp sohbete `/goal <İÇER�
 
 ---
 
-### 🔹 HEDEF 4: Müfredat Faz C — Limit, Süreklilik ve Türev (Kalkülüs I)
+### 🔹 HEDEF 6: Müfredat Faz C — Limit, Süreklilik ve Türev (Kalkülüs I)
 ```markdown
-/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 4 kapsamındaki "Limit, Süreklilik ve Türev (Kalkülüs I)" paketini uçtan uca uygula ve doğrula.
+/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 6 kapsamındaki "Limit, Süreklilik ve Türev (Kalkülüs I)" paketini uçtan uca uygula ve doğrula.
 - Bilgi Grafı Genişlemesi: N81-N110 (Limit sezgisel tanımı, sağ-sol limit, 0/0 belirsizliği, çarpanlara ayırma ve L'Hôpital, süreklilik, türevin limit tanımı, türev alma kuralları [çarpım, bölüm, zincir kuralı], teğet denklemi ve yerel ekstremumlar).
 - 10 Yeni Yanılgı Kuralı: BUG-CALC-01..05 (Zincir kuralında iç türevi unutma [d/dx f(g(x)) = f'(g(x))], bölüm türevinde eksi işareti ve payda karesi hatası, 0/0 belirsizliğini "tanımsız" deyip bırakma, türevin sıfır olduğu her noktayı mutlak ekstremum sanma).
 - CAS Genişlemesi: SymPy Limit ve Derivative nesnelerini güvenli AST sandbox'a bağla; adım adım türev alma kurallarını doğrula.
@@ -87,9 +215,21 @@ Aşağıdaki şablonları dilediğiniz zaman kopyalayıp sohbete `/goal <İÇER�
 
 ---
 
-### 🔹 HEDEF 5: Defterden/Kitaptan Soru Fotoğraflama ve Sokratik Hata Teşhis Kamerası
+### 🔹 HEDEF 7: Müfredat Faz D — İntegral ve Alan Hesabı (Kalkülüs II)
 ```markdown
-/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 5 kapsamındaki "Defterden/Kitaptan Soru Fotoğraflama ve Sokratik Hata Teşhis Kamerası" paketini uygula ve doğrula.
+/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 7 kapsamındaki "İntegral ve Alan Hesabı (Kalkülüs II)" paketini uçtan uca uygula ve doğrula.
+- Bilgi Grafı Genişlemesi: N111-N135 (Belirsiz integral, integrasyon sabitinin anlamı, temel integrasyon kuralları, değişken değiştirme [u-substitution], kısmi integrasyon [uv - int v du], Riemann alt/üst toplamları, Belirli İntegral [Kalkülüsün Temel Teoremi], iki eğri arasında kalan alan).
+- 10 Yeni Yanılgı Kuralı: BUG-INT-01..05 (İntegrasyon sabiti +C'yi unutma, değişken değiştirmede dx'i du'ya çevirmeden integralleme, belirli integralde F(b)-F(a) yerine ters çıkarma, x ekseninin altında kalan alanda negatif sonucu doğrudan alan kabul etme).
+- SymPy CAS İntegral Doğrulayıcı: Hem sembolik integrali hem de adım adım değişken dönüşümlerini AST seviyesinde denetleyen güvenli motor.
+- Mobil Riemann Kanvası: Eğrinin altına dikdörtgenler yerleştirerek n sonsuza giderken alanın integrale yakınsamasını görselleştiren RiemannIntegralCanvas.
+- 45 yeni test ile tüm kalkülüs paketinin yeşil geçtiğini doğrula.
+```
+
+---
+
+### 🔹 HEDEF 8: Defterden/Kitaptan Soru Fotoğraflama ve Sokratik Hata Teşhis Kamerası
+```markdown
+/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 8 kapsamındaki "Defterden/Kitaptan Soru Fotoğraflama ve Sokratik Hata Teşhis Kamerası" paketini uygula ve doğrula.
 - Mobil Kamera Arayüzü: Flutter mobil istemcide kamera ile soru veya el yazısı defter adımı çekme arayüzü (MathScannerView).
 - Vision/OCR Pipeline: Görüntüden LaTeX ve cebirsel adım çıkarımı; ham görüntüyü sırayla adımlara bölen segmentasyon.
 - Sokratik Hata Teşhisi (Antitezi Photomath): Doğrudan cevabı vermek YASAKTIR.
@@ -102,32 +242,9 @@ Aşağıdaki şablonları dilediğiniz zaman kopyalayıp sohbete `/goal <İÇER�
 
 ---
 
-### 🔹 HEDEF 6: Müfredat Faz D — İntegral ve Alan Hesabı (Kalkülüs II)
+### 🔹 HEDEF 9: Yeni Nesil Hikayeli Problemler ve Modelleme Motoru
 ```markdown
-/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 6 kapsamındaki "İntegral ve Alan Hesabı (Kalkülüs II)" paketini uçtan uca uygula ve doğrula.
-- Bilgi Grafı Genişlemesi: N111-N135 (Belirsiz integral, integrasyon sabitinin anlamı, temel integrasyon kuralları, değişken değiştirme [u-substitution], kısmi integrasyon [uv - int v du], Riemann alt/üst toplamları, Belirli İntegral [Kalkülüsün Temel Teoremi], iki eğri arasında kalan alan).
-- 10 Yeni Yanılgı Kuralı: BUG-INT-01..05 (İntegrasyon sabiti +C'yi unutma, değişken değiştirmede dx'i du'ya çevirmeden integralleme, belirli integralde F(b)-F(a) yerine ters çıkarma, x ekseninin altında kalan alanda negatif sonucu doğrudan alan kabul etme).
-- SymPy CAS İntegral Doğrulayıcı: Hem sembolik integrali hem de adım adım değişken dönüşümlerini AST seviyesinde denetleyen güvenli motor.
-- Mobil Riemann Kanvası: Eğrinin altına dikdörtgenler yerleştirerek n sonsuza giderken alanın integrale yakınsamasını görselleştiren RiemannIntegralCanvas.
-- 45 yeni test ile tüm kalkülüs paketinin yeşil geçtiğini doğrula.
-```
-
----
-
-### 🔹 HEDEF 7: Analitik Geometri ve Vektörler Motoru
-```markdown
-/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 7 kapsamındaki "Analitik Geometri ve Vektörler Motoru" paketini uygula ve doğrula.
-- Bilgi Grafı Genişlemesi: N136-N160 (Noktanın analitiği, iki nokta arası uzaklık, orta nokta, doğrunun eğimi ve denklemi, paralel ve dik doğruların eğim bağıntıları, noktanın doğruya uzaklığı, çemberin standart denklemi (x-a)^2 + (y-b)^2 = r^2, 2B vektörler ve iç çarpım).
-- Yanılgı Katalogları: BUG-ANAG-01..05 (Dik doğrularda m1*m2=-1 kuralını m1=m2 sanma, eğim açısı geniş açı olduğunda eğimi pozitif alma, çember merkez koordinatlarının işaretlerini formülde ters okuma).
-- Mobil İnteraktif Koordinat Kanvası (InteractiveCoordinateCanvas): Öğrencinin noktaları sürükleyip doğru denkleminin ve çember yarıçapının gerçek zamanlı değişimini gördüğü dokunmatik kanvas.
-- 40 yeni test ile koordinat ve cebir doğrulamasını tamamla.
-```
-
----
-
-### 🔹 HEDEF 8: Yeni Nesil Hikayeli Problemler ve Modelleme Motoru
-```markdown
-/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 8 kapsamındaki "Yeni Nesil Hikayeli Problemler ve Modelleme Motoru" paketini uygula ve doğrula.
+/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 9 kapsamındaki "Yeni Nesil Hikayeli Problemler ve Modelleme Motoru" paketini uygula ve doğrula.
 - Kapsam: Yaş, hareket (hız-zaman-yol), yüzde-kâr-zarar, işçi-havuz ve optimizasyon problemleri.
 - Modelleme İskelesi: Paragraf halindeki problemi doğrudan çözmek yerine 3 aşamalı Sokratik Modelleme akışı kur:
   1. Değişkenleri Tanımla ("Hangi bilinmeyene x demeliyiz?")
@@ -139,43 +256,20 @@ Aşağıdaki şablonları dilediğiniz zaman kopyalayıp sohbete `/goal <İÇER�
 
 ---
 
-### 🔹 HEDEF 9: Kişisel "Hata Otopsisi" Kasası ve Akıllı Zaaf Avcısı
+### 🔹 HEDEF 10: Analitik Geometri ve Vektörler Motoru
 ```markdown
-/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 9 kapsamındaki "Kişisel Hata Otopsisi (Mistake Vault) ve Akıllı Zaaf Avcısı" paketini uygula ve doğrula.
-- Hata Kasası Veri Modeli: Öğrencinin çözümlerde veya Hedef 5 kamerasında düştüğü tüm bozuk kuralları (BUG-xxxx) zaman damgası, konu düğümü ve tam adım bağlamıyla SQLite/Postgres üzerinde sakla.
-- Kendi Kendini Düzeltme Seansı (Self-Correction Session): Öğrencinin geçmişte yaptığı hatalı adımı önüne çıkarıp: "3 gün önce bu adımda bir hata yapmıştın. Kendi hatanı bulup düzeltebilir misin?" diyen üstbilişsel arayüz.
-- FSRS-4.5 Zaaf Adaptasyonu: Unutma eğrisi motorunu öğrencinin en sık hata yaptığı bozuk kurallarla eşleştir; haftalık "Boss Battle" tekrar oturumları üret.
-- 35 test ve simülasyon doğrulaması ile tamamla.
+/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 10 kapsamındaki "Analitik Geometri ve Vektörler Motoru" paketini uygula ve doğrula.
+- Bilgi Grafı Genişlemesi: N136-N160 (Noktanın analitiği, iki nokta arası uzaklık, orta nokta, doğrunun eğimi ve denklemi, paralel ve dik doğruların eğim bağıntıları, noktanın doğruya uzaklığı, çemberin standart denklemi (x-a)^2 + (y-b)^2 = r^2, 2B vektörler ve iç çarpım).
+- Yanılgı Katalogları: BUG-ANAG-01..05 (Dik doğrularda m1*m2=-1 kuralını m1=m2 sanma, eğim açısı geniş açı olduğunda eğimi pozitif alma, çember merkez koordinatlarının işaretlerini formülde ters okuma).
+- Mobil İnteraktif Koordinat Kanvası (InteractiveCoordinateCanvas): Öğrencinin noktaları sürükleyip doğru denkleminin ve çember yarıçapının gerçek zamanlı değişimini gördüğü dokunmatik kanvas.
+- 40 yeni test ile koordinat ve cebir doğrulamasını tamamla.
 ```
 
 ---
 
-### 🔹 HEDEF 10: Bilişsel Tuzaklı Sonsuz Soru Üretim Fabrikası
+### 🔹 HEDEF 11: Sentetik Öklid Geometrisi ve Akıllı Ek Çizim Motoru
 ```markdown
-/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 10 kapsamındaki "Bilişsel Tuzaklı Sonsuz Soru Üretim Fabrikası (Dynamic Item Generator & Exam Maker)" paketini uygula ve doğrula.
-- CAS Tabanlı Dinamik Üretici: Sadece rastgele sayı üreten değil; öğrencinin zayıf olduğu Buggy Rule'u tetikleyecek özel çeldiricili sorular sentezleyen ters-SymPy jeneratörü.
-- Formel Kanıt: Üretilen her sorunun tam sayı köklere sahip olduğunu ve çözüm adımlarının %100 geçerli olduğunu SymPy ile formel olarak kanıtla.
-- Deneme Sınavı & PDF Export: Tek tıkla LaTeX kalitesinde temiz, çözümlü PDF çalışma yaprağı ve deneme sınavı üretme motoru.
-- 30 test ve 500 sentetik soru üretim testi ile doğrula.
-```
-
----
-
-### 🔹 HEDEF 11: Olasılık, Kombinatorik ve İstatistik Motoru (Ayrık Matematik)
-```markdown
-/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 11 kapsamındaki "Olasılık, Kombinatorik ve İstatistik Motoru" paketini uygula ve doğrula.
-- Bilgi Grafı: Permütasyon, Kombinasyon, Faktöriyel cebiri, Binom açılımı, Basit ve Koşullu Olasılık, Bayes Teoremi, Beklenen Değer.
-- Sezgisel Hata Dedektörleri: BUG-COMB-01..05 (Sıralama ile seçmeyi karıştırma, tekrarlı permütasyonda özdeş elemanı bölmeme, bağımsız olay çarpımı hatası).
-- Canlı Monte Carlo Doğrulayıcı: Öğrencinin teorik sonucunu anında 100.000 sanal deneyle simüle eden ve ampirik frekansı gösteren simülasyon motoru.
-- İnteraktif Sayma Ağacı & Venn Şeması Kanvası.
-- 40 test ile doğrula.
-```
-
----
-
-### 🔹 HEDEF 12: Sentetik Öklid Geometrisi ve Akıllı Ek Çizim Motoru
-```markdown
-/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 12 kapsamındaki "Sentetik Öklid Geometrisi ve Akıllı Ek Çizim Motoru" paketini uygula ve doğrula.
+/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 11 kapsamındaki "Sentetik Öklid Geometrisi ve Akıllı Ek Çizim Motoru" paketini uygula ve doğrula.
 - Kapsam: Üçgende açılar, kenarortay, açıortay, benzerlik teoeremleri (Thales, Kelebek), dik üçgen bağıntıları (Öklid, Pisagor), çemberde açılar ve kirişler.
 - Geometrik Kısıt Çözücü: Ekrana çizilen şeklin geometrik tutarlılığını (açı toplamı 180, kenar eşitsizliği) doğrulayan motor.
 - Sokratik Ek Çizim İskelesi: Öğrenci tıkandığında çizgiyi doğrudan çekmek yerine: "Bu ikizkenar üçgenin tabanına dik inersek taban nasıl bölünür?" diyerek ek çizimi öğrenciye yaptıran rehber.
@@ -185,9 +279,43 @@ Aşağıdaki şablonları dilediğiniz zaman kopyalayıp sohbete `/goal <İÇER�
 
 ---
 
-### 🔹 HEDEF 13: Matematiksel İspat ve Mantık Laboratuvarı ("Nedenini Anla")
+### 🔹 HEDEF 12: Kişisel "Hata Otopsisi" Kasası ve Akıllı Zaaf Avcısı
 ```markdown
-/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 13 kapsamındaki "Matematiksel İspat ve Mantık Laboratuvarı" paketini uygula ve doğrula.
+/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 12 kapsamındaki "Kişisel Hata Otopsisi (Mistake Vault) ve Akıllı Zaaf Avcısı" paketini uygula ve doğrula.
+- Hata Kasası Veri Modeli: Öğrencinin çözümlerde veya Hedef 8 kamerasında düştüğü tüm bozuk kuralları (BUG-xxxx) zaman damgası, konu düğümü ve tam adım bağlamıyla SQLite/Postgres üzerinde sakla.
+- Kendi Kendini Düzeltme Seansı (Self-Correction Session): Öğrencinin geçmişte yaptığı hatalı adımı önüne çıkarıp: "3 gün önce bu adımda bir hata yapmıştın. Kendi hatanı bulup düzeltebilir misin?" diyen üstbilişsel arayüz.
+- FSRS-4.5 Zaaf Adaptasyonu: Unutma eğrisi motorunu öğrencinin en sık hata yaptığı bozuk kurallarla eşleştir; haftalık "Boss Battle" tekrar oturumları üret.
+- 35 test ve simülasyon doğrulaması ile tamamla.
+```
+
+---
+
+### 🔹 HEDEF 13: Bilişsel Tuzaklı Sonsuz Soru Üretim Fabrikası
+```markdown
+/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 13 kapsamındaki "Bilişsel Tuzaklı Sonsuz Soru Üretim Fabrikası (Dynamic Item Generator & Exam Maker)" paketini uygula ve doğrula.
+- CAS Tabanlı Dinamik Üretici: Sadece rastgele sayı üreten değil; öğrencinin zayıf olduğu Buggy Rule'u tetikleyecek özel çeldiricili sorular sentezleyen ters-SymPy jeneratörü.
+- Formel Kanıt: Üretilen her sorunun tam sayı köklere sahip olduğunu ve çözüm adımlarının %100 geçerli olduğunu SymPy ile formel olarak kanıtla.
+- Deneme Sınavı & PDF Export: Tek tıkla LaTeX kalitesinde temiz, çözümlü PDF çalışma yaprağı ve deneme sınavı üretme motoru.
+- 30 test ve 500 sentetik soru üretim testi ile doğrula.
+```
+
+---
+
+### 🔹 HEDEF 14: Olasılık, Kombinatorik ve İstatistik Motoru (Ayrık Matematik)
+```markdown
+/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 14 kapsamındaki "Olasılık, Kombinatorik ve İstatistik Motoru" paketini uygula ve doğrula.
+- Bilgi Grafı: Permütasyon, Kombinasyon, Faktöriyel cebiri, Binom açılımı, Basit ve Koşullu Olasılık, Bayes Teoremi, Beklenen Değer.
+- Sezgisel Hata Dedektörleri: BUG-COMB-01..05 (Sıralama ile seçmeyi karıştırma, tekrarlı permütasyonda özdeş elemanı bölmeme, bağımsız olay çarpımı hatası).
+- Canlı Monte Carlo Doğrulayıcı: Öğrencinin teorik sonucunu anında 100.000 sanal deneyle simüle eden ve ampirik frekansı gösteren simülasyon motoru.
+- İnteraktif Sayma Ağacı & Venn Şeması Kanvası.
+- 40 test ile doğrula.
+```
+
+---
+
+### 🔹 HEDEF 15: Matematiksel İspat ve Mantık Laboratuvarı ("Nedenini Anla")
+```markdown
+/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 15 kapsamındaki "Matematiksel İspat ve Mantık Laboratuvarı" paketini uygula ve doğrula.
 - Kapsam: Önermeler mantığı, doğruluk tabloları, niceleyiciler, Tümevarım ile ispat, Olmayana Ergi (Çelişki) ile ispat, Karşıt-Ters yöntemi.
 - Adım Adım Mantık Denetleyicisi: Öğrencinin bir hipotezden başlayıp adım adım teorem türettiği ve motorun her adımın mantıksal geçerliliğini (Modus Ponens) denetlediği ispat sandbox'ı.
 - Temel Teorem İspat Kataloğu: Karekök 2'nin irrasyonelliği, asal sayıların sonsuzluğu, Gauss toplam formülü vb.
@@ -196,14 +324,14 @@ Aşağıdaki şablonları dilediğiniz zaman kopyalayıp sohbete `/goal <İÇER�
 
 ---
 
-### 🔹 HEDEF 14: Yaşayan Kişisel Matematik Atlası ve Zihin Haritası Gezgini
+### 🔹 HEDEF 16: Yaşayan Kişisel Matematik Atlası ve Zihin Haritası Gezgini
 ```markdown
-/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 14 kapsamındaki "Yaşayan Kişisel Matematik Atlası ve Zihin Haritası Gezgini" paketini uygula ve doğrula.
-- Bütünleşik Bilgi Grafı (N01 - N160): Tüm lise matematiğinin birbirine bağlandığı organik bir 2B/3B Zihin Ağı (Knowledge Graph Navigator).
+/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 16 kapsamındaki "Yaşayan Kişisel Matematik Atlası ve Zihin Haritası Gezgini" paketini uygula ve doğrula.
+- Bütünleşik Bilgi Grafı (N_ROOT_01 - N160): Temel sayı doğrusundan en ileri Kalkülüs ve İspata kadar tüm matematiğin birbirine bağlandığı organik bir 2B/3B Zihin Ağı (Knowledge Graph Navigator).
 - Dinamik Zihinsel Durum: Öğrencinin BKT posterior ustalığına göre yeşil/sarı/kırmızı parıldayan, zayıf önkoşul köprülerini gösteren interaktif harita.
-- Konular Arası Köprüler: Parabol tepe noktasından Türev teğetine, Diskriminanttan İkinci Dereceden Kök formülüne uzanan canlı kavramsal bağlantılar.
+- Konular Arası Köprüler: Sayı doğrusundaki eksi sayı modelinden Parabol köklerine, oradan Türev ve İntegrale uzanan canlı kavramsal bağlantılar.
 - Mobil donanım hızlandırmalı graf görselleştiricisi ve 30 test ile doğrula.
 ```
 
 ---
-*Bu belge projenin kalıcı ana yol haritasıdır. İhtiyaç duyulduğunda ilgili hedefin /goal bloğu kopyalanıp doğrudan çalıştırılabilir.*
+*Bu belge projenin kalıcı master şartnamesidir. İlk kullanıcının sıfırdan zirveye eksiksiz ve en yüksek pedagojik kalitede öğrenmesi için optimize edilmiştir.*

@@ -82,6 +82,56 @@ class QuadraticMisconceptionDetector:
         if bug10:
             return bug10
 
+        # 11. BUG-PARAB-01: Parabol Tepe Apsisi Formülü Eksi İşareti Hatası
+        bug_p1 = self._check_bug_parab_01(clean_user, clean_prev)
+        if bug_p1:
+            return bug_p1
+
+        # 12. BUG-PARAB-02: Simetri Ekseni Kargaşası ve Ordinat Yanılgısı
+        bug_p2 = self._check_bug_parab_02(clean_user, clean_prev)
+        if bug_p2:
+            return bug_p2
+
+        # 13. BUG-PARAB-03: Kök Geometrisi ve Tepe Noktası İlişkisi Hatası
+        bug_p3 = self._check_bug_parab_03(clean_user, clean_prev)
+        if bug_p3:
+            return bug_p3
+
+        # 14. BUG-PARAB-04: Y-Kesişimi ile X-Kesişimini Karıştırma
+        bug_p4 = self._check_bug_parab_04(clean_user, clean_prev)
+        if bug_p4:
+            return bug_p4
+
+        # 15. BUG-PARAB-05: Başkatsayı a İşaretine Göre Ekstremum Tersliği
+        bug_p5 = self._check_bug_parab_05(clean_user, clean_prev)
+        if bug_p5:
+            return bug_p5
+
+        # 16. BUG-POLY-01: Kalan Teoreminde Kök İşareti Yanılgısı
+        bug_poly1 = self._check_bug_poly_01(clean_user, clean_prev)
+        if bug_poly1:
+            return bug_poly1
+
+        # 17. BUG-POLY-02: Katsayılar Toplamı ve Sabit Terim Kargaşası
+        bug_poly2 = self._check_bug_poly_02(clean_user, clean_prev)
+        if bug_poly2:
+            return bug_poly2
+
+        # 18. BUG-POLY-03: Polinom Bölmesinde Derece Kuralı İhlali
+        bug_poly3 = self._check_bug_poly_03(clean_user, clean_prev)
+        if bug_poly3:
+            return bug_poly3
+
+        # 19. BUG-POLY-04: Polinom Derece Aritmetiğinde Çarpım/Kuvvet Yanılgısı
+        bug_poly4 = self._check_bug_poly_04(clean_user, clean_prev)
+        if bug_poly4:
+            return bug_poly4
+
+        # 20. BUG-POLY-05: Polinom Bölmesinde Kökü Doğrudan Kalana Eşitleme
+        bug_poly5 = self._check_bug_poly_05(clean_user, clean_prev)
+        if bug_poly5:
+            return bug_poly5
+
         return None
 
     def _check_bug_quad_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
@@ -330,4 +380,353 @@ class QuadraticMisconceptionDetector:
         except Exception:
             pass
         return None
+
+    def _extract_quadratic_poly(self, expr_str: str) -> Optional[sp.Poly]:
+        """İfade metninden (f(x) = ax^2 + bx + c veya ax^2 + bx + c = 0) kuadratik polinomu çıkarır."""
+        try:
+            clean = expr_str.strip()
+            if "=" in clean:
+                parts = clean.split("=")
+                lhs, rhs = parts[0].strip(), parts[1].strip()
+                if lhs in {"f(x)", "y", "g(x)", "P(x)", "h(x)"}:
+                    clean = rhs
+                elif rhs in {"0", "0.0"}:
+                    clean = lhs
+                else:
+                    clean = f"({lhs}) - ({rhs})"
+            e = self.cas.parse_to_sympy(clean)
+            poly = sp.Poly(e, self.x)
+            if poly.degree() == 2:
+                return poly
+        except Exception:
+            pass
+        return None
+
+    def _check_bug_parab_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-PARAB-01: Parabol Tepe Noktası Apsisi Formülünde Eksi İşareti Hatası (r = b/(2a) veya r = -b/a).
+        """
+        try:
+            clean_u = user_str.lower().replace(" ", "")
+            if "r=" in clean_u or "tepeapsisi=" in clean_u:
+                poly = self._extract_quadratic_poly(prev_str)
+                if poly and poly.degree() == 2:
+                    coeffs = poly.all_coeffs()
+                    a_val, b_val = float(coeffs[0]), float(coeffs[1])
+                    true_r = -b_val / (2.0 * a_val)
+                    buggy_r_no_minus = b_val / (2.0 * a_val)
+                    buggy_r_no_two = -b_val / a_val
+
+                    user_val_str = user_str.split("=")[1].strip()
+                    user_val = float(sp.sympify(user_val_str))
+                    if abs(user_val - true_r) > 1e-4:
+                        if abs(user_val - buggy_r_no_minus) < 1e-4:
+                            return DiagnosticPayload(
+                                bug_id="BUG-PARAB-01",
+                                severity="CRITICAL",
+                                category="PARABOLA_VERTEX_FORMULA_SIGN",
+                                description="Parabolün tepe noktası apsisi r = -b/(2a) formülüyle bulunur; eksi işareti hatası yapıldı.",
+                                remediation_directive="Türevin sıfır olduğu tepe noktası şartını (2ax + b = 0 => x = -b/(2a)) hatırlatan Sokratik bir soru sor.",
+                                offending_term=user_str,
+                            )
+        except Exception:
+            pass
+        return None
+
+    def _check_bug_parab_02(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-PARAB-02: Simetri Ekseni Kargaşası ve Ordinat Yanılgısı (y = r doğrusu sanma veya k = c alma).
+        """
+        clean_u = user_str.lower()
+        if "simetri ekseni" in clean_u:
+            if re.search(r"\by\s*=", clean_u):
+                return DiagnosticPayload(
+                    bug_id="BUG-PARAB-02",
+                    severity="CRITICAL",
+                    category="PARABOLA_AXIS_CONFUSION",
+                    description="Simetri ekseni düşey bir doğru olup denklemi x = r'dir (y = r yatay doğrudur).",
+                    remediation_directive="Parabolü iki eş parçaya bölen simetri çizgisinin düşey olduğunu ve denkleminin x=r olduğunu göster.",
+                    offending_term=user_str,
+                )
+        try:
+            clean_tight = clean_u.replace(" ", "")
+            if "k=" in clean_tight or "tepeordinati=" in clean_tight:
+                poly = self._extract_quadratic_poly(prev_str)
+                if poly and poly.degree() == 2:
+                    coeffs = poly.all_coeffs()
+                    a_val, b_val, c_val = float(coeffs[0]), float(coeffs[1]), float(coeffs[2])
+                    true_r = -b_val / (2.0 * a_val)
+                    true_k = c_val - (b_val ** 2) / (4.0 * a_val)
+                    val_str = user_str.split("=")[1].strip()
+                    user_val = float(sp.sympify(val_str))
+                    if abs(user_val - c_val) < 1e-4 and abs(user_val - true_k) > 1e-4:
+                        return DiagnosticPayload(
+                            bug_id="BUG-PARAB-02",
+                            severity="CRITICAL",
+                            category="PARABOLA_AXIS_CONFUSION",
+                            description="Tepe ordinatı k, sabit terim c değildir; k = f(r) değeridir (x yerine r konulmalıdır).",
+                            remediation_directive="Sabit terim c'nin parabolün y-eksenini kestiği nokta olduğunu, tepe noktasının ise f(r) ile bulunduğunu sorgula.",
+                            offending_term=user_str,
+                        )
+        except Exception:
+            pass
+        return None
+
+    def _check_bug_parab_03(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-PARAB-03: Kök Geometrisi ve Tepe Noktası İlişkisi Hatası (r = x1 + x2 sanma).
+        """
+        clean_u = user_str.lower().replace(" ", "")
+        if "r=x1+x2" in clean_u or "r=kökler_toplamı" in clean_u or "r=-b/a" in clean_u:
+            return DiagnosticPayload(
+                bug_id="BUG-PARAB-03",
+                severity="CRITICAL",
+                category="PARABOLA_ROOT_GEOMETRY",
+                description="Tepe noktası apsisi köklerin toplamı değil, aritmetik ortalamasıdır: r = (x1 + x2)/2.",
+                remediation_directive="Köklerin simetri eksenine eşit uzaklıkta olduğunu ve orta noktanın 2'ye bölünerek bulunduğunu hatırlat.",
+                offending_term=user_str,
+            )
+        try:
+            if "r=" in clean_u:
+                poly = self._extract_quadratic_poly(prev_str)
+                if poly and poly.degree() == 2:
+                    coeffs = poly.all_coeffs()
+                    a_val, b_val = float(coeffs[0]), float(coeffs[1])
+                    true_r = -b_val / (2.0 * a_val)
+                    sum_roots = -b_val / a_val
+                    user_val = float(sp.sympify(user_str.split("=")[1].strip()))
+                    if abs(user_val - sum_roots) < 1e-4 and abs(user_val - true_r) > 1e-4:
+                        return DiagnosticPayload(
+                            bug_id="BUG-PARAB-03",
+                            severity="CRITICAL",
+                            category="PARABOLA_ROOT_GEOMETRY",
+                            description="Tepe noktası apsisi kökler toplamı değildir; kökler toplamının yarısıdır (r = (x1+x2)/2).",
+                            remediation_directive="Kökler toplamını (-b/a) bulduktan sonra neden 2'ye bölmemiz gerektiğini Sokratik olarak sorgula.",
+                            offending_term=user_str,
+                        )
+        except Exception:
+            pass
+        return None
+
+    def _check_bug_parab_04(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-PARAB-04: Y-Kesişimi (c) ile Kökleri (X-Kesişimlerini) Karıştırma.
+        """
+        clean_u = user_str.lower()
+        if "kök = c" in clean_u or "kök=c" in clean_u or "kökü c" in clean_u:
+            return DiagnosticPayload(
+                bug_id="BUG-PARAB-04",
+                severity="CRITICAL",
+                category="PARABOLA_INTERCEPT_CONFUSION",
+                description="Parabolün y-eksenini kestiği sabit terim c ile kökler (x-kesişimleri) birbirine karıştırıldı.",
+                remediation_directive="Bir fonksiyonun köklerinin f(x) = 0 yapan x değerleri olduğunu, c'nin ise f(0) olduğunu vurgula.",
+                offending_term=user_str,
+            )
+        try:
+            poly = self._extract_quadratic_poly(prev_str)
+            if poly and poly.degree() == 2:
+                coeffs = poly.all_coeffs()
+                c_val = float(coeffs[2])
+                roots = [float(r) for r in sp.solve(poly.as_expr(), self.x)]
+                if re.search(r"\bx\s*=\s*" + re.escape(str(int(c_val) if c_val.is_integer() else c_val)), user_str):
+                    if not any(abs(r - c_val) < 1e-4 for r in roots):
+                        if "kök" in clean_u or "root" in clean_u or "sıfır" in clean_u:
+                            return DiagnosticPayload(
+                                bug_id="BUG-PARAB-04",
+                                severity="CRITICAL",
+                                category="PARABOLA_INTERCEPT_CONFUSION",
+                                description="Sabit terim c doğrudan parabolün kökü sanıldı; c sadece y-ekseni kesişimidir.",
+                                remediation_directive="Köklerin y=0 iken bulunduğunu, sabit terimin ise x=0 iken çıktığını sorgulat.",
+                                offending_term=user_str,
+                            )
+        except Exception:
+            pass
+        return None
+
+    def _check_bug_parab_05(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-PARAB-05: Başkatsayı a'nın İşaretine Göre Kollar ve Ekstremum Yönü Tersliği.
+        """
+        try:
+            clean_u = user_str.lower()
+            poly = self._extract_quadratic_poly(prev_str)
+            if poly and poly.degree() == 2:
+                a_val = float(poly.all_coeffs()[0])
+                if a_val > 0:
+                    if "maksimum" in clean_u or "en büyük" in clean_u or "maximum" in clean_u:
+                        return DiagnosticPayload(
+                            bug_id="BUG-PARAB-05",
+                            severity="CRITICAL",
+                            category="PARABOLA_EXTREMA_ORIENTATION",
+                            description="Başkatsayı a > 0 olduğunda parabol kolları yukarı bakar ve tepe noktası minimumdur; maksimum değildir.",
+                            remediation_directive="Kolları yukarı bakan bir çanağın en dip noktasının en küçük değer (minimum) olduğunu canlandır.",
+                            offending_term=user_str,
+                        )
+                elif a_val < 0:
+                    if "minimum" in clean_u or "en küçük" in clean_u:
+                        return DiagnosticPayload(
+                            bug_id="BUG-PARAB-05",
+                            severity="CRITICAL",
+                            category="PARABOLA_EXTREMA_ORIENTATION",
+                            description="Başkatsayı a < 0 olduğunda parabol kolları aşağı bakar ve tepe noktası maksimumdur; minimum değildir.",
+                            remediation_directive="Kolları aşağı bakan bir tepenin zirvesinin en büyük değer (maksimum) olduğunu canlandır.",
+                            offending_term=user_str,
+                        )
+        except Exception:
+            pass
+        return None
+
+    def _check_bug_poly_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-POLY-01: Polinom Kalan Teoreminde Bölen Kökünün İşaretini Ters Alma (P(x) / (x-a) için P(-a) alma).
+        """
+        clean_u = user_str.replace(" ", "")
+        clean_p = prev_str.replace(" ", "")
+        match_div = re.search(r"\(x([+-]\d+)\)", clean_p)
+        if match_div:
+            offset = int(match_div.group(1))
+            true_root = -offset
+            buggy_root = offset
+            if f"P({buggy_root})" in clean_u and f"P({true_root})" not in clean_u:
+                return DiagnosticPayload(
+                    bug_id="BUG-POLY-01",
+                    severity="CRITICAL",
+                    category="POLYNOMIAL_REMAINDER_SIGN",
+                    description=f"Kalan teoreminde bölen sıfıra eşitlenmelidir (x {'+' if offset >= 0 else ''}{offset} = 0 => x = {true_root}); P({buggy_root}) yerine P({true_root}) hesaplanmalıdır.",
+                    remediation_directive="Bölen ifadeyi sıfıra eşitleyen denklemi açıkça çözdürerek kökün işaretini doğrulamasını sağla.",
+                    offending_term=user_str,
+                )
+        return None
+
+    def _check_bug_poly_02(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-POLY-02: Katsayılar Toplamı ve Sabit Terim Kargaşası (Katsayılar toplamı için x=0 veya sabit terim için x=1).
+        """
+        clean_u = user_str.lower()
+        if "katsayılar toplamı" in clean_u or "katsayı toplamı" in clean_u:
+            if "x = 0" in clean_u or "x=0" in clean_u or "p(0)" in clean_u:
+                return DiagnosticPayload(
+                    bug_id="BUG-POLY-02",
+                    severity="CRITICAL",
+                    category="POLYNOMIAL_COEFFS_VS_CONSTANT",
+                    description="Katsayılar toplamı için x = 1 yazılmalıdır; x = 0 sabit terimi verir.",
+                    remediation_directive="P(x) = a*x + b polinomunda x yerine 1 koyduğumuzda a+b'nin (katsayılar toplamının) nasıl kaldığını göster.",
+                    offending_term=user_str,
+                )
+        if "sabit terim" in clean_u:
+            if "x = 1" in clean_u or "x=1" in clean_u or "p(1)" in clean_u:
+                return DiagnosticPayload(
+                    bug_id="BUG-POLY-02",
+                    severity="CRITICAL",
+                    category="POLYNOMIAL_COEFFS_VS_CONSTANT",
+                    description="Sabit terim için x = 0 yazılmalıdır; x = 1 katsayılar toplamını verir.",
+                    remediation_directive="x=0 konulduğunda x'e bağlı tüm değişken terimlerin sıfırlanıp sadece sabit terimin kaldığını hatırlat.",
+                    offending_term=user_str,
+                )
+        return None
+
+    def _check_bug_poly_03(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-POLY-03: Polinom Bölmesinde Derece Kuralı İhlali (der(Kalan) >= der(Bölen)).
+        """
+        clean_u = user_str.lower()
+        clean_p = prev_str.lower()
+        try:
+            match_deg_b = (
+                re.search(r"der\(b.*len\)\s*=\s*(\d+)", clean_p)
+                or re.search(r"der\(b\)\s*=\s*(\d+)", clean_p)
+                or re.search(r"b.*len derecesi\s*=\s*(\d+)", clean_p)
+            )
+            match_deg_k = (
+                re.search(r"der\(kalan\)\s*=\s*(\d+)", clean_u)
+                or re.search(r"der\(k\)\s*=\s*(\d+)", clean_u)
+                or re.search(r"kalan derecesi\s*=\s*(\d+)", clean_u)
+            )
+            if match_deg_b and match_deg_k:
+                deg_b = int(match_deg_b.group(1))
+                deg_k = int(match_deg_k.group(1))
+                if deg_k >= deg_b:
+                    return DiagnosticPayload(
+                        bug_id="BUG-POLY-03",
+                        severity="CRITICAL",
+                        category="POLYNOMIAL_REMAINDER_DEGREE_VIOLATION",
+                        description=f"Kalanın derecesi ({deg_k}) bölenin derecesinden ({deg_b}) küçük olmalıdır; der(Kalan) < der(Bölen) kuralı ihlal edildi.",
+                        remediation_directive="Kalanın derecesi bölenin derecesinden küçük olana kadar bölme işleminin devam etmesi gerektiğini sorgula.",
+                        offending_term=user_str,
+                    )
+            if "kalan=" in clean_u.replace(" ", ""):
+                kalan_str = user_str.split("=")[1].strip()
+                k_expr = self.cas.parse_to_sympy(kalan_str)
+                k_poly = sp.Poly(k_expr, self.x)
+                if "x-" in clean_p or "x+" in clean_p or "derecesi 1" in clean_p or "der(b)=1" in clean_p:
+                    if k_poly.degree() >= 1:
+                        return DiagnosticPayload(
+                            bug_id="BUG-POLY-03",
+                            severity="CRITICAL",
+                            category="POLYNOMIAL_REMAINDER_DEGREE_VIOLATION",
+                            description="Bölen 1. dereceden iken kalan x'e bağlı olamaz (sabit bir sayı olmalıdır, der(K) = 0).",
+                            remediation_directive="1. dereceden bir bölende kalanın neden sadece bir sabit reel sayı olması gerektiğini hatırlat.",
+                            offending_term=user_str,
+                        )
+        except Exception:
+            pass
+        return None
+
+    def _check_bug_poly_04(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-POLY-04: Polinom Derece Aritmetiğinde Çarpım/Kuvvet Yanılgısı (der(P*Q) = der(P) * der(Q)).
+        """
+        clean_u = user_str.lower().replace(" ", "")
+        if "der(p*q)=der(p)*der(q)" in clean_u or "deg(p*q)=deg(p)*deg(q)" in clean_u:
+            return DiagnosticPayload(
+                bug_id="BUG-POLY-04",
+                severity="CRITICAL",
+                category="POLYNOMIAL_DEGREE_ARITHMETIC",
+                description="Polinomların çarpımının derecesi derecelerin toplamıdır; dereceler birbiriyle çarpılmaz.",
+                remediation_directive="x^2 ile x^3 çarpıldığında üslerin neden toplandığını (x^5) sorgulat.",
+                offending_term=user_str,
+            )
+        match_p = re.search(r"der\(p\)\s*=\s*(\d+)", prev_str.lower())
+        match_q = re.search(r"der\(q\)\s*=\s*(\d+)", prev_str.lower())
+        if match_p and match_q:
+            dp, dq = int(match_p.group(1)), int(match_q.group(1))
+            true_deg = dp + dq
+            mult_deg = dp * dq
+            if mult_deg != true_deg:
+                match_user = re.search(r"der\(p\*q\)\s*=\s*(\d+)", clean_u) or re.search(r"der\(p\.q\)\s*=\s*(\d+)", clean_u)
+                if match_user and int(match_user.group(1)) == mult_deg:
+                    return DiagnosticPayload(
+                        bug_id="BUG-POLY-04",
+                        severity="CRITICAL",
+                        category="POLYNOMIAL_DEGREE_ARITHMETIC",
+                        description=f"Polinom çarpımının derecesi dereceler toplamıdır ({dp} + {dq} = {true_deg}); dereceler çarpılarak {mult_deg} bulundu.",
+                        remediation_directive="x^a * x^b = x^(a+b) üslü sayı özelliğini hatırlatan Sokratik bir soru sor.",
+                        offending_term=user_str,
+                    )
+        return None
+
+    def _check_bug_poly_05(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-POLY-05: Polinom Bölmesinde Bölen Kökünü Doğrudan Kalana Eşitleme (K = a sanma).
+        """
+        clean_u = user_str.lower().replace(" ", "")
+        clean_p = prev_str.lower().replace(" ", "")
+        match_div = re.search(r"\(x([+-]\d+)\)", clean_p)
+        if match_div:
+            offset = int(match_div.group(1))
+            root_val = -offset
+            match_k = re.search(r"kalan\s*=\s*([+-]?\d+)", user_str.lower()) or re.search(r"\bk\s*=\s*([+-]?\d+)", user_str.lower())
+            if match_k:
+                k_val = int(match_k.group(1))
+                if k_val == root_val and f"p({root_val})" not in clean_u:
+                    return DiagnosticPayload(
+                        bug_id="BUG-POLY-05",
+                        severity="CRITICAL",
+                        category="POLYNOMIAL_FALSE_REMAINDER_ASSIGNMENT",
+                        description=f"Bölenin kökü x = {root_val} doğrudan kalan demek değildir; kalan P({root_val}) polinom değeridir.",
+                        remediation_directive="Bölme eşitliğinde x yerine kök yazıldığında kalan teriminin P(kök) değerine eşit olduğunu hatırlat.",
+                        offending_term=user_str,
+                    )
+        return None
+
 
