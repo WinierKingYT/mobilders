@@ -6,8 +6,8 @@ def test_knowledge_dag_50_nodes_expansion():
     dag = KnowledgeDAG()
     all_nodes = dag.get_all_node_ids()
 
-    # 1. Total nodes count must be 80
-    assert len(all_nodes) == 80
+    # 1. Total nodes count must be 110 (Phase II Calculus)
+    assert len(all_nodes) == 110
 
     # 2. Verify Group A (Inequalities: N21, N22, N23)
     assert "N21" in all_nodes
@@ -51,12 +51,16 @@ def test_knowledge_dag_50_nodes_expansion():
     assert "N72" in dag.get_node("N73").strict_prereqs
     assert "N71" in dag.get_node("N78").strict_prereqs
 
+    # 7. Verify Group F (Calculus I: Limit, Süreklilik ve Türev: N81 - N110)
+    for n in range(81, 111):
+        assert f"N{n:02d}" if n < 100 else f"N{n}" in all_nodes
+
 
 def test_topological_sort_and_cycle_free():
     dag = KnowledgeDAG()
     dag.assert_cycle_free()
     sorted_nodes = dag.topological_sort()
-    assert len(sorted_nodes) == 80
+    assert len(sorted_nodes) == len(dag.nodes)
 
     # Verify order constraint: prerequisites must precede dependent nodes
     idx_map = {n: i for i, n in enumerate(sorted_nodes)}

@@ -33,8 +33,8 @@ def mapper():
 # ==============================================================================
 
 def test_dag_hedef3_total_nodes_80(dag):
-    """Grafın tam 80 düğüm içerdiğini ve N51-N80 aralığının eksiksiz olduğunu doğrular."""
-    assert len(dag.nodes) == 80
+    """Grafın en az 80 düğüm içerdiğini ve N51-N80 aralığının eksiksiz olduğunu doğrular."""
+    assert len(dag.nodes) >= 80
     for i in range(51, 81):
         n_id = f"N{i:02d}"
         assert n_id in dag.nodes, f"Düğüm {n_id} eksik!"
@@ -56,10 +56,10 @@ def test_dag_hedef3_prerequisites_integrity(dag):
 
 
 def test_dag_hedef3_cycle_freedom_and_topological_sort(dag):
-    """80 düğümlük genişletilmiş grafın döngüsüz olduğunu ve Kahn sıralamasının geçerliliğini doğrular."""
+    """80+ düğümlük genişletilmiş grafın döngüsüz olduğunu ve Kahn sıralamasının geçerliliğini doğrular."""
     dag.assert_cycle_free()
     sorted_nodes = dag.topological_sort()
-    assert len(sorted_nodes) == 80
+    assert len(sorted_nodes) == len(dag.nodes)
 
     index_map = {n_id: idx for idx, n_id in enumerate(sorted_nodes)}
     for n_id, node in dag.nodes.items():

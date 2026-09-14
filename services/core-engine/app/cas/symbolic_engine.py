@@ -1,6 +1,6 @@
 import ast
 import time
-from typing import Tuple, Optional, Set
+from typing import Tuple, Optional, Set, Any
 import sympy as sp
 from app.cas.preprocessor import ImplicitMultiplicationPreprocessor
 
@@ -20,13 +20,15 @@ class SymbolicEquivalenceEngine:
     MAX_AST_DEPTH = 15
     ALLOWED_VARIABLES = {
         "x", "y", "z", "a", "b", "c", "k", "n", "m", "r", "p", "q", "d", "Delta", "P", "Q", "R",
-        "theta", "alpha", "beta", "pi", "e"
+        "theta", "alpha", "beta", "pi", "e",
+        "h", "dx", "dy", "dt", "u", "v", "w", "t", "oo", "inf"
     }
     ALLOWED_FUNCTIONS = {
         "sqrt", "Abs", "degree", "rem", "quo", "Poly",
         "sin", "cos", "tan", "cot", "sec", "csc",
         "asin", "acos", "atan",
-        "log", "ln", "exp"
+        "log", "ln", "exp",
+        "diff", "limit", "Derivative", "Limit"
     }
 
     def __init__(self):
@@ -34,6 +36,8 @@ class SymbolicEquivalenceEngine:
         self.symbols = {name: sp.Symbol(name) for name in self.ALLOWED_VARIABLES}
         self.symbols["pi"] = sp.pi
         self.symbols["e"] = sp.E
+        self.symbols["oo"] = sp.oo
+        self.symbols["inf"] = sp.oo
         self.symbols["sqrt"] = sp.sqrt
         self.symbols["Abs"] = sp.Abs
         self.symbols["degree"] = sp.degree
@@ -52,6 +56,10 @@ class SymbolicEquivalenceEngine:
         self.symbols["log"] = sp.log
         self.symbols["ln"] = sp.log
         self.symbols["exp"] = sp.exp
+        self.symbols["diff"] = sp.diff
+        self.symbols["limit"] = sp.limit
+        self.symbols["Derivative"] = sp.Derivative
+        self.symbols["Limit"] = sp.Limit
 
         # Eşdeğerlik LRU önbelleği (Tekrar eden adımlarda <0.1ms hızlı yol)
         self._cache: dict = {}
@@ -295,5 +303,89 @@ class SymbolicEquivalenceEngine:
             return True
         expanded_diff = sp.expand_log(diff, force=True)
         return sp.simplify(expanded_diff) == 0
+
+    def compute_limit(
+        self, expr_str: str, var: str = "x", target_val: Any = 0, dir_str: str = "+-"
+    ) -> Tuple[sp.Expr, bool]:
+        """
+        Verilen ifadenin limitini hesaplar.
+        Returns: (limit_değeri, sonlu_mu)
+        """
+        expr = self.parse_to_sympy(expr_str)
+        var_sym = self.symbols.get(var, sp.Symbol(var))
+
+        if target_val in ("oo", "inf", sp.oo):
+            target = sp.oo
+        elif target_val in ("-oo", "-inf", -sp.oo):
+            target = -sp.oo
+        else:
+            target = sp.sympify(target_val, locals=self.symbols)
+
+        lim = sp.limit(expr, var_sym, target, dir=dir_str)
+        is_finite = bool(lim.is_finite if hasattr(lim, "is_finite") else True)
+        return lim, is_finite
+
+    def compute_derivative(self, expr_str: str, var: str = "x", order: int = 1) -> sp.Expr:
+        """İfadenin belirtilen değişkene göre n. dereceden türevini hesaplar."""
+        expr = self.parse_to_sympy(expr_str)
+        var_sym = self.symbols.get(var, sp.Symbol(var))
+        return sp.diff(expr, var_sym, order)
+
+    def verify_derivative(self, expr_str: str, candidate_deriv_str: str, var: str = "x") -> bool:
+        """Öğrencinin türev adımının doğruluğunu teyit eder."""
+        actual = self.compute_derivative(expr_str, var=var)
+        candidate = self.parse_to_sympy(candidate_deriv_str)
+        diff = sp.simplify(actual - candidate)
+        if diff == 0:
+            return True
+        if sp.trigsimp(diff) == 0:
+            return True
+        return False
+
+    def compute_tangent_line(self, func_str: str, x0: float) -> Tuple[sp.Expr, float, float]:
+        """
+        f(x) eğrisine x0 noktasındaki teğet doğrusunun denklemini ve eğimini hesaplar.
+        Returns: (teğet_denklemi, eğim, y0)
+        """
+        expr = self.parse_to_sympy(func_str)
+        x = self.symbols.get("x", sp.Symbol("x"))
+        y0_val = expr.subs(x, x0).evalf()
+        deriv = sp.diff(expr, x)
+        slope_val = deriv.subs(x, x0).evalf()
+
+        y0 = float(y0_val)
+        slope = float(slope_val)
+        tangent_expr = sp.simplify(slope * (x - x0) + y0)
+        return tangent_expr, slope, y0
+
+    def check_continuity(
+        self, expr_str: str, var: str = "x", pt: float = 0.0
+    ) -> Tuple[bool, Optional[float], Optional[float]]:
+        """
+        Fonksiyonun verilen noktada sürekli olup olmadığını denetler.
+        Returns: (is_continuous, limit_val, function_val)
+        """
+        expr = self.parse_to_sympy(expr_str)
+        var_sym = self.symbols.get(var, sp.Symbol(var))
+
+        try:
+            left_lim = sp.limit(expr, var_sym, pt, dir="-")
+            right_lim = sp.limit(expr, var_sym, pt, dir="+")
+            func_val = expr.subs(var_sym, pt).evalf()
+
+            if not (left_lim.is_finite and right_lim.is_finite and func_val.is_finite):
+                return False, None, None
+
+            left_f = float(left_lim.evalf())
+            right_f = float(right_lim.evalf())
+            val_f = float(func_val)
+
+            if abs(left_f - right_f) < 1e-7 and abs(left_f - val_f) < 1e-7:
+                return True, left_f, val_f
+            else:
+                lim_f = left_f if abs(left_f - right_f) < 1e-7 else None
+                return False, lim_f, val_f
+        except Exception:
+            return False, None, None
 
 

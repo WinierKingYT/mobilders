@@ -115,7 +115,13 @@ class LocalAnalyticsReporter:
                                 "TRIGONOMETRY" if n_id in [f"N{i:02d}" for i in range(51, 66)]
                                 else (
                                     "EXPONENTIAL_LOGARITHMIC" if n_id in [f"N{i:02d}" for i in range(66, 81)]
-                                    else "QUADRATICS_CORE"
+                                    else (
+                                        "CALCULUS_LIMIT" if n_id in [f"N{i:02d}" for i in range(81, 89)]
+                                        else (
+                                            "CALCULUS_DERIVATIVE" if n_id in [f"N{i:02d}" for i in range(89, 111)]
+                                            else "QUADRATICS_CORE"
+                                        )
+                                    )
                                 )
                             )
                         )

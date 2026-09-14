@@ -182,6 +182,56 @@ class QuadraticMisconceptionDetector:
         if bug_l5:
             return bug_l5
 
+        # 31. BUG-CALC-01: Zincir Kuralında İç Türevi Unutma
+        bug_c1 = self._check_bug_calc_01(clean_user, clean_prev)
+        if bug_c1:
+            return bug_c1
+
+        # 32. BUG-CALC-02: Bölümün Türevinde İşaret Hatası
+        bug_c2 = self._check_bug_calc_02(clean_user, clean_prev)
+        if bug_c2:
+            return bug_c2
+
+        # 33. BUG-CALC-03: 0/0 Belirsizliğini Tanımsız veya Sıfır İlan Etme
+        bug_c3 = self._check_bug_calc_03(clean_user, clean_prev)
+        if bug_c3:
+            return bug_c3
+
+        # 34. BUG-CALC-04: f'(x)=0 Noktasını Kesin Ekstremum Sanma
+        bug_c4 = self._check_bug_calc_04(clean_user, clean_prev)
+        if bug_c4:
+            return bug_c4
+
+        # 35. BUG-CALC-05: Çarpımın Türevinde Sahte Doğrusallık ((uv)' = u'v')
+        bug_c5 = self._check_bug_calc_05(clean_user, clean_prev)
+        if bug_c5:
+            return bug_c5
+
+        # 36. BUG-CALC-06: Sabit Sayının Türevini Sıfır Yerine Kendisi Bırakma
+        bug_c6 = self._check_bug_calc_06(clean_user, clean_prev)
+        if bug_c6:
+            return bug_c6
+
+        # 37. BUG-CALC-07: Limiti Fonksiyon Değeriyle Özdeşleştirme Fallacy
+        bug_c7 = self._check_bug_calc_07(clean_user, clean_prev)
+        if bug_c7:
+            return bug_c7
+
+        # 38. BUG-CALC-08: Kosinüs Türevinde Eksi İşareti Hatası
+        bug_c8 = self._check_bug_calc_08(clean_user, clean_prev)
+        if bug_c8:
+            return bug_c8
+
+        # 39. BUG-CALC-09: L'Hôpital ile Bölüm Türevinin Karıştırılması ((f/g)' = f'/g')
+        bug_c9 = self._check_bug_calc_09(clean_user, clean_prev)
+        if bug_c9:
+            return bug_c9
+
+        # 40. BUG-CALC-10: Teğet Doğrusu Eğimini Fonksiyon Değerine Eşitleme
+        bug_c10 = self._check_bug_calc_10(clean_user, clean_prev)
+        if bug_c10:
+            return bug_c10
+
         return None
 
     def _check_bug_quad_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
@@ -1076,6 +1126,279 @@ class QuadraticMisconceptionDetector:
                 category="LOG_BASE_EXPONENT_INVERSION_ERROR",
                 description="log_a(b) = c eşitliğinde taban a yerinde kalır ve b = a^c olur; taban ile üs yer değiştirilemez (b != c^a).",
                 remediation_directive="Logaritmanın üstel fonksiyonun tersi olduğunu ve tabanın daima altta kaldığını hatırlat.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_calc_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-CALC-01: Zincir Kuralında İç Türevi Unutma ([f(g(x))]' = f'(g(x))).
+        Örnek: d/dx(sin(2x)) = cos(2x) veya d/dx((3x+1)^4) = 4*(3x+1)^3.
+        """
+        clean_u = user_str.lower().replace(" ", "")
+        clean_p = prev_str.lower().replace(" ", "")
+
+        # 1. Trigonometrik iç türev kaybı: sin(k*x) -> cos(k*x), cos(k*x) -> -sin(k*x) (k != 1)
+        if (
+            "cos(2*x)" in clean_u or "cos(2x)" in clean_u or "cos(3*x)" in clean_u
+        ) and ("sin(2*x)" in clean_p or "sin(2x)" in clean_p or "sin(3*x)" in clean_p):
+            if not ("2*cos" in clean_u or "2cos" in clean_u or "3*cos" in clean_u or "*2" in clean_u or "*3" in clean_u):
+                return DiagnosticPayload(
+                    bug_id="BUG-CALC-01",
+                    severity="CRITICAL",
+                    category="CALCULUS_CHAIN_RULE_MISSING_INNER_DERIVATIVE",
+                    description="Bileşke fonksiyonun türevinde iç türev kuralı unutulmuştur: d/dx[sin(2x)] = 2*cos(2x) olmalıdır, cos(2x) değil.",
+                    remediation_directive="Bileşke fonksiyonlarda zincir kuralını uygula: [f(g(x))]' = f'(g(x)) * g'(x). İçteki g(x) ifadesinin türevini çarpan olarak ekle.",
+                    offending_term=user_str,
+                )
+
+        # 2. Polinom kuvveti iç türev kaybı: (3x+1)^4 -> 4*(3x+1)^3 (iç türev 3 eksik)
+        if (
+            "4*(3*x+1)**3" in clean_u
+            or "4*(3x+1)**3" in clean_u
+            or "4*(3*x+1)^3" in clean_u
+            or "3*(2*x+5)**2" in clean_u
+            or "3*(2x+5)**2" in clean_u
+        ):
+            has_inner_mult = bool(
+                "12*" in clean_u or "6*" in clean_u
+                or re.search(r"(?<!\*)\*\s*[23]\b", clean_u)
+            )
+            if not has_inner_mult:
+                return DiagnosticPayload(
+                    bug_id="BUG-CALC-01",
+                    severity="CRITICAL",
+                    category="CALCULUS_CHAIN_RULE_MISSING_INNER_DERIVATIVE",
+                    description="Kuvvet zincir kuralında iç fonksiyonun türevi çarpılmamıştır: [(3x+1)^4]' = 4*(3x+1)^3 * 3 = 12*(3x+1)^3 olmalıdır.",
+                    remediation_directive="İç türevi (tabandaki fonksiyonun türevi) daima dış türevle çarpmayı unutma.",
+                    offending_term=user_str,
+                )
+
+        # 3. Üstel fonksiyon iç türev kaybı: e^(2x) -> e^(2x) (2 çarpanı eksik)
+        if ("e**(2*x)" in clean_u or "exp(2*x)" in clean_u or "e^(2x)" in clean_u) and ("e**(2*x)" in clean_p or "exp(2*x)" in clean_p or "e^(2x)" in clean_p):
+            if ("diff" in clean_p or "turev" in clean_p or "'" in clean_p) and not ("2*" in clean_u or "*2" in clean_u):
+                return DiagnosticPayload(
+                    bug_id="BUG-CALC-01",
+                    severity="CRITICAL",
+                    category="CALCULUS_CHAIN_RULE_MISSING_INNER_DERIVATIVE",
+                    description="Doğal üstel fonksiyonda d/dx[e^(g(x))] = g'(x)*e^(g(x)) kuralı uygulanmalı, üssün türevi 2 unutulmamalıdır.",
+                    remediation_directive="e^(u) türevinde üssün türevi olan u' ile çarpmayı hatırla.",
+                    offending_term=user_str,
+                )
+
+        return None
+
+    def _check_bug_calc_02(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-CALC-02: Bölümün Türevinde İşaret Hatası ((f'g + fg') / g^2 sanma).
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+
+        if (
+            "(f'*g+f*g')/g^2" in clean_u
+            or "(u'*v+u*v')/v^2" in clean_u
+            or "(f'g+fg')/g^2" in clean_u
+            or "(u'v+uv')/v^2" in clean_u
+            or "(1*(x-1)+(x+1)*1)/(x-1)^2" in clean_u
+            or "(1*(x-1)+(x+1)*1)/(x-1)**2" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-CALC-02",
+                severity="CRITICAL",
+                category="CALCULUS_QUOTIENT_RULE_SIGN_ERROR",
+                description="Bölümün türev kuralında pay kısmında eksi işareti olmalıdır: [f/g]' = (f'g - fg') / g^2. Çarpımın türeviyle karıştırıp artı koyma.",
+                remediation_directive="Bölüm kuralı formülünü hatırla: Pay = (Payın türevi * Payda) - (Pay * Paydanın türevi).",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_calc_03(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-CALC-03: 0/0 Belirsizliğini Tanımsız veya Sıfır İlan Etme (0/0 = 0 veya 0/0 = tanımsız sanma).
+        """
+        clean_u = user_str.lower().replace(" ", "")
+        clean_p = prev_str.lower().replace(" ", "")
+
+        if (
+            "0/0=0" in clean_u
+            or "0/0=tanimsiz" in clean_u
+            or "0/0=undefined" in clean_u
+            or clean_u in {"limit=0", "lim=0", "limit=tanimsiz", "lim=tanimsiz", "tanimsiz", "undefined"}
+            and ("0/0" in clean_p or "(x**2-4)/(x-2)" in clean_p or "(x^2-4)/(x-2)" in clean_p or "sin(x)/x" in clean_p)
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-CALC-03",
+                severity="CRITICAL",
+                category="CALCULUS_INDETERMINATE_FORM_FALLACY",
+                description="0/0 ifadesi tanımsızlık değil, bir belirsizliktir (indeterminate form). Limit değeri 0 olmak zorunda değildir ve sonlu bir gerçel sayı çıkabilir.",
+                remediation_directive="0/0 belirsizliğini gidermek için çarpanlara ayırma, eşlenikle çarpma veya L'Hôpital kuralını uygula.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_calc_04(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-CALC-04: f'(x)=0 Noktasını Kesin Ekstremum Sanma (Büküm Noktası İhmali).
+        Örnek: f(x) = x^3 için f'(0) = 0 olmasına rağmen x=0 bir büküm noktasıdır, yerel ekstremum değildir.
+        """
+        clean_u = user_str.lower().replace(" ", "")
+
+        if (
+            "f'(0)=0oldugundanx=0yerel" in clean_u
+            or "f'(x)=0iseyerelekstremum" in clean_u
+            or "x=0yerelmaksimum" in clean_u and "x^3" in prev_str.lower()
+            or "x=0yerelminimum" in clean_u and "x^3" in prev_str.lower()
+            or "f'(c)=0olankesinlinekstremum" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-CALC-04",
+                severity="CRITICAL",
+                category="CALCULUS_CRITICAL_POINT_FALSE_EXTREMA",
+                description="f'(c) = 0 olması ekstremum için zorunludur ancak yeterli değildir. f'(x)'in c noktasında işaret değiştirip değiştirmediği incelenmelidir (ör. f(x)=x^3 için x=0 büküm noktasıdır).",
+                remediation_directive="Birinci türev işaret tablosu yaparak türevin işaretinin (+)'dan (-)'ye veya (-)'den (+)'ya değiştiğini teyit etmesini iste.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_calc_05(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-CALC-05: Çarpımın Türevinde Sahte Doğrusallık ((uv)' = u'v' sanma).
+        Örnek: (x * sin(x))' = 1 * cos(x) = cos(x).
+        """
+        clean_u = user_str.lower().replace(" ", "")
+
+        if (
+            "(uv)'=u'v'" in clean_u
+            or "(fg)'=f'g'" in clean_u
+            or "(u*v)'=u'*v'" in clean_u
+            or "(f*g)'=f'*g'" in clean_u
+            or "1*cos(x)=cos(x)" in clean_u
+            or "2*x*e**x" in clean_u and "x**2*e**x" in prev_str.lower()
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-CALC-05",
+                severity="CRITICAL",
+                category="CALCULUS_PRODUCT_RULE_FALSE_LINEARITY",
+                description="Türev çarpma üzerine dağılmaz! İki fonksiyonun çarpımının türevi: (f * g)' = f' * g + f * g' kuralıyla hesaplanır.",
+                remediation_directive="Çarpımın türevi formülünü eksiksiz uygula: Birincinin türevi * İkinci + Birinci * İkincinin türevi.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_calc_06(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-CALC-06: Sabit Sayının Türevini Sıfır Yerine Kendisi Bırakma (d/dx(c) = c sanma).
+        Örnek: (x^2 + 5)' = 2x + 5 veya (3x + 7)' = 3 + 7.
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+        clean_p = prev_str.lower().replace(" ", "").replace("**", "^")
+
+        if (
+            "2*x+5" in clean_u and "x^2+5" in clean_p
+            or "2x+5" in clean_u and "x^2+5" in clean_p
+            or "3+7" in clean_u and ("3*x+7" in clean_p or "3x+7" in clean_p)
+            or "diff(5,x)=5" in clean_u
+            or "d/dx(5)=5" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-CALC-06",
+                severity="CRITICAL",
+                category="CALCULUS_CONSTANT_DERIVATIVE_ERROR",
+                description="Sabit bir sayının türevi kendisi değil, sıfırdır: d/dx(c) = 0. Örneğin (x^2 + 5)' = 2x + 0 = 2x olmalıdır.",
+                remediation_directive="Sabit sayıların değişim hızı sıfır olduğu için türevlerinin 0 olduğunu hatırla.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_calc_07(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-CALC-07: Limiti Fonksiyon Değeriyle Özdeşleştirme Fallacy.
+        Örnek: f(a) tanımsız olduğu için limitin de olmadığını iddia etme.
+        """
+        clean_u = user_str.lower().replace(" ", "")
+
+        if (
+            "f(a)tanimsizolduguicinlimityoktur" in clean_u
+            or "f(a)tanimsiziselimityoktur" in clean_u
+            or "f(2)tanimsizoldugundanlimityoktur" in clean_u
+            or "f(c)tanimsizisepuntanimsizdir" in clean_u
+            or "limf(x)=f(a)herzamandogrudur" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-CALC-07",
+                severity="CRITICAL",
+                category="CALCULUS_LIMIT_EQUALS_FUNCTION_VALUE_FALLACY",
+                description="Limit, fonksiyonun o noktadaki tanımına bağlı değildir. Fonksiyon x = a noktasında tanımsız olsa bile sağ ve sol limitler eşitse fonksiyonun limiti vardır.",
+                remediation_directive="Limit kavramının o noktaya 'yaklaşma' olduğunu, fonksiyon değeriyle (f(a)) aynı şey olmadığını kavrat.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_calc_08(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-CALC-08: Kosinüs Türevinde Eksi İşareti Hatası (d/dx(cos x) = sin x sanma).
+        """
+        clean_u = user_str.lower().replace(" ", "")
+
+        if (
+            "(cos(x))'=sin(x)" in clean_u
+            or "cos'(x)=sin(x)" in clean_u
+            or "diff(cos(x),x)=sin(x)" in clean_u
+            or "d/dx(cos(x))=sin(x)" in clean_u
+            or "cos(x)'=sin(x)" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-CALC-08",
+                severity="CRITICAL",
+                category="CALCULUS_COSINE_DERIVATIVE_SIGN_ERROR",
+                description="d/dx[cos(x)] = -sin(x)'tir. Eksi işareti unutulmuştur.",
+                remediation_directive="Kosinüs fonksiyonunun türevinde daima eksi işareti bulunduğunu hatırla: d/dx(cos x) = -sin(x).",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_calc_09(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-CALC-09: L'Hôpital ile Bölüm Türevinin Karıştırılması ((f/g)' = f'/g' sanma).
+        """
+        clean_u = user_str.lower().replace(" ", "")
+
+        if (
+            "(f/g)'=f'/g'" in clean_u
+            or "(u/v)'=u'/v'" in clean_u
+            or "d/dx(f/g)=f'/g'" in clean_u
+            or "cos(x)/1=cos(x)" in clean_u and "sin(x)/x" in prev_str.lower()
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-CALC-09",
+                severity="CRITICAL",
+                category="CALCULUS_LHOPITAL_QUOTIENT_CONFUSION",
+                description="L'Hôpital kuralı yalnızca 0/0 limit belirsizliklerinde limit hesaplarken kullanılır; fonksiyonun bölüm türevi (f/g)' alınırken uygulanamaz.",
+                remediation_directive="Türev alma ile limit hesaplamayı ayır: Bölümün türevi için (f'g - fg')/g^2 kuralını uygula.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_calc_10(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-CALC-10: Teğet Doğrusu Eğimini Fonksiyon Değerine Eşitleme (m = f(x_0) sanma).
+        """
+        clean_u = user_str.lower().replace(" ", "")
+
+        if (
+            "m=f(x_0)" in clean_u
+            or "m=f(x0)" in clean_u
+            or "egim=f(x0)" in clean_u
+            or "m=f(a)" in clean_u
+            or "egim=f(a)" in clean_u
+            or "egim=y0" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-CALC-10",
+                severity="CRITICAL",
+                category="CALCULUS_TANGENT_SLOPE_FUNCTION_VALUE_CONFUSION",
+                description="Teğet doğrusunun eğimi (m), fonksiyonun o noktadaki değerine değil, birinci türevinin o noktadaki değerine eşittir: m = f'(x_0).",
+                remediation_directive="Teğet eğimi için önce f'(x) türevini alıp ardından teğet noktasının apsisini (x_0) türevde yerine koy.",
                 offending_term=user_str,
             )
         return None
