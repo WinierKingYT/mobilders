@@ -232,6 +232,56 @@ class QuadraticMisconceptionDetector:
         if bug_c10:
             return bug_c10
 
+        # 41. BUG-INT-01: İntegrasyon Sabiti (+C) Unutulması
+        bug_i1 = self._check_bug_int_01(clean_user, clean_prev)
+        if bug_i1:
+            return bug_i1
+
+        # 42. BUG-INT-02: u-İkamesinde Diferansiyel İhmali
+        bug_i2 = self._check_bug_int_02(clean_user, clean_prev)
+        if bug_i2:
+            return bug_i2
+
+        # 43. BUG-INT-03: Belirli İntegralde Sınır Sırasını Ters Çıkarma
+        bug_i3 = self._check_bug_int_03(clean_user, clean_prev)
+        if bug_i3:
+            return bug_i3
+
+        # 44. BUG-INT-04: Negatif Belirli İntegrali Alan Kabul Etme
+        bug_i4 = self._check_bug_int_04(clean_user, clean_prev)
+        if bug_i4:
+            return bug_i4
+
+        # 45. BUG-INT-05: Kısmi İntegrasyon Formülü İşaret Hatası
+        bug_i5 = self._check_bug_int_05(clean_user, clean_prev)
+        if bug_i5:
+            return bug_i5
+
+        # 46. BUG-INT-06: 1/x İntegralinde Kuvvet Kuralı Hatası
+        bug_i6 = self._check_bug_int_06(clean_user, clean_prev)
+        if bug_i6:
+            return bug_i6
+
+        # 47. BUG-INT-07: Belirli u-İkamesinde Sınırları Güncellememe
+        bug_i7 = self._check_bug_int_07(clean_user, clean_prev)
+        if bug_i7:
+            return bug_i7
+
+        # 48. BUG-INT-08: İki Eğri Arası Alan Sırası Hatası
+        bug_i8 = self._check_bug_int_08(clean_user, clean_prev)
+        if bug_i8:
+            return bug_i8
+
+        # 49. BUG-INT-09: İntegralin Çarpma Üzerine Dağılması Sanrısı
+        bug_i9 = self._check_bug_int_09(clean_user, clean_prev)
+        if bug_i9:
+            return bug_i9
+
+        # 50. BUG-INT-10: FTC 1 Zincir Kuralı İhmali
+        bug_i10 = self._check_bug_int_10(clean_user, clean_prev)
+        if bug_i10:
+            return bug_i10
+
         return None
 
     def _check_bug_quad_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
@@ -318,7 +368,7 @@ class QuadraticMisconceptionDetector:
     def _check_bug_quad_04(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
         """BUG-QUAD-04: Sadeleştirme Yanılsaması / Kök Katli (x^2 = 6x => x = 6)."""
         clean_p = prev_str.lower()
-        if any(trig in clean_p for trig in ("sin", "cos", "tan", "cot", "sec", "csc")):
+        if any(trig in clean_p for trig in ("sin", "cos", "tan", "cot", "sec", "csc", "integrate", "diff", "limit", "int(")):
             return None
         try:
             prev_e = self.cas.parse_to_sympy(prev_str)
@@ -1402,5 +1452,283 @@ class QuadraticMisconceptionDetector:
                 offending_term=user_str,
             )
         return None
+
+    def _check_bug_int_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-INT-01: İntegrasyon Sabiti (+C) Unutulması.
+        Belirsiz integralde keyfi sabit +C'nin yazılmaması veya önemsiz sanılması.
+        Örnek: ∫ 2x dx = x^2 (yerine x^2 + C).
+        """
+        clean_u = user_str.lower().replace(" ", "")
+        clean_p = prev_str.lower().replace(" ", "")
+
+        # Direct explicit misconceptions
+        if (
+            "+cyegerekyok" in clean_u
+            or "cyegerekyok" in clean_u
+            or "integralsabitigerekmez" in clean_u
+            or "sabityok" in clean_u
+            or "+colmasadagolur" in clean_u
+            or "belirsizintegraldecsabitigerekmez" in clean_u
+            or "csabitigerekmez" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-INT-01",
+                severity="CRITICAL",
+                category="CALCULUS_MISSING_CONSTANT_OF_INTEGRATION",
+                description="Belirsiz integral hesaplanırken integrasyon sabiti (+ C) unutulmuştur. Türevi aynı olan sonsuz sayıda fonksiyon ailesi (+ C) mevcuttur.",
+                remediation_directive="Belirsiz integralin sonucuna daima keyfi bir integrasyon sabiti olan '+ C' eklenmesi gerektiğini hatırlat.",
+                offending_term=user_str,
+            )
+
+        # Pattern match: prev was indefinite integral, user answered without +C or +c
+        is_definite = any(k in clean_p for k in [",0,", ",1,", ",2,", "_0^", "_a^", "(x,0", "(x,1", "definite"])
+        has_c = "+c" in clean_u or clean_u.endswith("+c") or (len(clean_u) > 1 and clean_u[-1] == "c" and clean_u[-2] == "+")
+
+        if not is_definite and not has_c and ("integrate" in clean_p or "int(" in clean_p or "integral" in clean_p):
+            if clean_u in {"x^2", "x**2", "x^2/2", "x**2/2", "x^3/3", "x**3/3", "-cos(x)", "sin(x)", "e^x", "e**x", "ln(x)", "ln|x|"}:
+                return DiagnosticPayload(
+                    bug_id="BUG-INT-01",
+                    severity="CRITICAL",
+                    category="CALCULUS_MISSING_CONSTANT_OF_INTEGRATION",
+                    description="Belirsiz integral hesaplanırken integrasyon sabiti (+ C) unutulmuştur. Belirsiz integral tek bir fonksiyon değil, bir fonksiyon ailesi belirtir.",
+                    remediation_directive="Çözümün sonuna daima '+ C' integrasyon sabitini ekle.",
+                    offending_term=user_str,
+                )
+
+        return None
+
+    def _check_bug_int_02(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-INT-02: u-İkamesinde Diferansiyel (dx -> du) Dönüşümünün İhmali.
+        Örnek: ∫ (2x+1)^3 dx = (2x+1)^4 / 4 (du = 2 dx hesaba katılmadığı için 1/2 çarpanı eksik).
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+        clean_p = prev_str.lower().replace(" ", "").replace("**", "^")
+
+        if (
+            "du=dx" in clean_u and ("u=2x" in clean_u or "u=2*x" in clean_u or "u=3x" in clean_u or "u=x^2" in clean_u)
+            or "dx=du" in clean_u and ("2x" in clean_p or "3x" in clean_p)
+            or "(2x+1)^4/4" in clean_u and "2x+1" in clean_p
+            or "(2*x+1)^4/4" in clean_u and "2*x+1" in clean_p
+            or "(3x+2)^5/5" in clean_u and "3x+2" in clean_p
+            or "cos(2x)/2" not in clean_u and "cos(2x)" in clean_u and "sin(2x)" in clean_p and not clean_u.endswith("/2")
+            or "uikamesindedxyerineduyazilabilir" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-INT-02",
+                severity="CRITICAL",
+                category="CALCULUS_U_SUBSTITUTION_MISSING_DIFFERENTIAL",
+                description="u-ikamesi uygulanırken dx diferansiyeli du'ya dönüştürülmemiş veya iç fonksiyonun türevi (du = g'(x)dx) hesaba katılmamıştır.",
+                remediation_directive="u = g(x) dönüşümünde du = g'(x)dx diferansiyelini alarak dx = du/g'(x) yerine koymasını sağla.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_int_03(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-INT-03: Belirli İntegralde Sınır Sırasını Ters Çıkarma (F(a) - F(b)).
+        Örnek: ∫_a^b f(x)dx = F(a) - F(b) sanma (doğrusu F(b) - F(a)).
+        """
+        clean_u = user_str.lower().replace(" ", "")
+
+        if (
+            "f(a)-f(b)" in clean_u
+            or "f(alt)-f(ust)" in clean_u
+            or "altsinir-ustsinir" in clean_u
+            or "f(0)-f(1)" in clean_u and "1" in prev_str
+            or "f(0)-f(2)" in clean_u
+            or "f(1)-f(3)" in clean_u
+            or "[f(x)]_a^b=f(a)-f(b)" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-INT-03",
+                severity="CRITICAL",
+                category="CALCULUS_DEFINITE_INTEGRAL_REVERSED_LIMITS",
+                description="Belirli integral hesaplanırken sınırlar ters çıkarılmıştır: ∫_a^b f(x)dx = F(b) - F(a) kuralı yerine F(a) - F(b) uygulanmıştır.",
+                remediation_directive="Kalkülüsün Temel Teoremi gereği önce ÜST sınırın (F(b)), ardından ALT sınırın (F(a)) hesaplanıp F(b) - F(a) yapıldığını kontrol et.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_int_04(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-INT-04: Negatif Belirli İntegral Değerini Doğrudan Alan Kabul Etme.
+        Örnek: Alan = -4 br^2 veya Alan = ∫ f(x)dx = -6.
+        """
+        clean_u = user_str.lower().replace(" ", "")
+
+        if (
+            "alan=-" in clean_u
+            or "area=-" in clean_u
+            or "alaninegatif" in clean_u
+            or "alan=-4" in clean_u
+            or "-4br^2" in clean_u
+            or "-4birimkare" in clean_u
+            or "alan=-6" in clean_u
+            or "alan=-2" in clean_u
+            or "alan=-10" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-INT-04",
+                severity="CRITICAL",
+                category="CALCULUS_NEGATIVE_DEFINITE_INTEGRAL_AS_AREA",
+                description="Geometrik alan negatif olamaz! Eğri x-ekseninin altında kaldığında integral negatif çıkar, ancak alan bu integralin mutlak değeridir (|∫ f(x)dx|).",
+                remediation_directive="x-ekseninin altında kalan bölgelerde alan için integralin işaretini eksi ile çarp veya mutlak değer al: Alan = -∫_a^b f(x)dx.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_int_05(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-INT-05: Kısmi İntegrasyon Formülünde İşaret Hatası (∫ u dv = uv + ∫ v du sanma).
+        """
+        clean_u = user_str.lower().replace(" ", "")
+
+        if (
+            "u*v+int(v*du)" in clean_u
+            or "uv+int(vdu)" in clean_u
+            or "u*v+integrate(v" in clean_u
+            or "uv+integrate(v" in clean_u
+            or "uv+\\int" in clean_u
+            or "u*v+\\int" in clean_u
+            or "kismi:uv+int" in clean_u
+            or "udv=uv+vdu" in clean_u
+            or "uv+vdu" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-INT-05",
+                severity="CRITICAL",
+                category="CALCULUS_INTEGRATION_BY_PARTS_SIGN_ERROR",
+                description="Kısmi integrasyon formülünde işaret hatası yapılmıştır: ∫ u dv = u*v - ∫ v du olmalıdır, aradaki işaret eksi (-) olmalıdır.",
+                remediation_directive="Kısmi integrasyon formülünü doğru uygula: u*v - ∫ v du (eksi işaretine dikkat et).",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_int_06(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-INT-06: 1/x İntegralinde Standart Kuvvet Kuralı Uygulama (x^0 / 0 sanma).
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+
+        if (
+            "x^0/0" in clean_u
+            or "x^0/0+c" in clean_u
+            or "1/0*x^0" in clean_u
+            or "int(1/x)=x^0/0" in clean_u
+            or "integrate(1/x)=x^0/0" in clean_u
+            or "x^(-1+1)/(-1+1)" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-INT-06",
+                severity="CRITICAL",
+                category="CALCULUS_POWER_RULE_ON_RECIPROCAL_ERROR",
+                description="1/x (veya x^-1) fonksiyonuna standart kuvvet kuralı uygulanamaz, çünkü n = -1 için n+1 = 0 paydada tanımsızlık (x^0 / 0) yaratır. ∫ (1/x) dx = ln|x| + C olmalıdır.",
+                remediation_directive="1/x'in türevi değil, kendisinin integrali ln|x| + C'dir. Kuvvet kuralının n ≠ -1 için geçerli olduğunu hatırla.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_int_07(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-INT-07: Belirli İntegralde Değişken Değiştirirken Sınırları Güncellememe.
+        """
+        clean_u = user_str.lower().replace(" ", "")
+
+        if (
+            "sinirlardegismez" in clean_u
+            or "sinirlariaynibrak" in clean_u
+            or "udegiskeninegecildiamasinirlarayni" in clean_u
+            or "sinirlar0ve1kalir" in clean_u
+            or "udegisimindesinirlardegismez" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-INT-07",
+                severity="CRITICAL",
+                category="CALCULUS_DEFINITE_U_SUBSTITUTION_LIMITS_UNCHANGED",
+                description="Belirli integralde u-ikamesi yapıldığında sınırlar da yeni değişkene (u) uyarlanmalıdır. Eski x sınırları u integrali için geçerli değildir.",
+                remediation_directive="u = g(x) dönüşümünde alt sınır için u(a), üst sınır için u(b) değerlerini hesaplayarak sınırları güncelle.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_int_08(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-INT-08: İki Eğri Arasında Alan Hesabında Üst-Alt Eğri Sırasını Ters Çıkarma.
+        """
+        clean_u = user_str.lower().replace(" ", "")
+        clean_p = prev_str.lower().replace(" ", "")
+
+        if (
+            "alan=int(alt-ust)" in clean_u
+            or "int(altegrisi-ustegrisi)" in clean_u
+            or "altsinir-ustfonksiyon" in clean_u
+            or "altegrisindenustegrisicikarilir" in clean_u
+            or "alanicinalttakindenusttekicikarilir" in clean_u
+            or ("alan=int(g-f)" in clean_u and "f>g" in clean_p)
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-INT-08",
+                severity="CRITICAL",
+                category="CALCULUS_AREA_BETWEEN_CURVES_ORDER_REVERSED",
+                description="İki eğri arasındaki alan hesaplanırken 'üst fonksiyon - alt fonksiyon' sırası ters çevrilmiştir. Alt fonksiyondan üst fonksiyon çıkarılırsa alan negatif çıkar.",
+                remediation_directive="Aralıkta f(x) ≥ g(x) ise alan daima ∫ [f(x) - g(x)] dx olarak kurulmalıdır (üst - alt).",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_int_09(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-INT-09: İntegralin Çarpma Üzerine Dağılması Sanrısı (∫ f*g = ∫ f * ∫ g).
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+        clean_p = prev_str.lower().replace(" ", "").replace("**", "^")
+
+        if (
+            "int(f*g)=int(f)*int(g)" in clean_u
+            or "integrate(f*g)=integrate(f)*integrate(g)" in clean_u
+            or "(intf)*(intg)" in clean_u
+            or "int(x*sin(x))=int(x)*int(sin(x))" in clean_u
+            or "int(x)*int(sin(x))" in clean_u
+            or "int(x)*int(e^x)" in clean_u
+            or "int(x)*int(e**x)" in clean_u
+            or ("(x^2/2)*e^x" in clean_u and "x*e^x" in clean_p)
+            or ("(x^2/2)*(-cos(x))" in clean_u and "x*sin(x)" in clean_p)
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-INT-09",
+                severity="CRITICAL",
+                category="CALCULUS_INTEGRAL_PRODUCT_DISTRIBUTION_FALLACY",
+                description="İntegral işlemi çarpma üzerine dağılmaz: ∫ [f(x) * g(x)] dx ≠ (∫ f(x) dx) * (∫ g(x) dx). Çarpım integralleri için u-ikamesi veya kısmi integrasyon kullanılmalıdır.",
+                remediation_directive="Çarpım durumundaki integralleri çarpanlarına ayrı ayrı integralleme; değişken değiştirme veya kısmi integrasyon yöntemini seç.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_int_10(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """
+        BUG-INT-10: Kalkülüsün Temel Teoremi 1'de Zincir Kuralını Unutma (d/dx ∫_a^g(x) f(t)dt = f(g(x))).
+        """
+        clean_u = user_str.lower().replace(" ", "").replace("**", "^")
+        clean_p = prev_str.lower().replace(" ", "").replace("**", "^")
+
+        if (
+            "d/dxint_a^g(x)=f(g(x))" in clean_u
+            or "d/dx(int_0^(x^2))=sin(x^2)" in clean_u
+            or (clean_u == "sin(x^2)" and "int_0^(x^2)sin(t)dt" in clean_p)
+            or "ftc1zincirkuralinagerekyok" in clean_u
+            or "d/dxint=f(ustsinir)" in clean_u
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-INT-10",
+                severity="CRITICAL",
+                category="CALCULUS_FTC1_MISSING_CHAIN_RULE",
+                description="Kalkülüsün Temel Teoremi (FTC-1) uygulanırken üst sınır değişken x yerine bir fonksiyon g(x) olduğunda zincir kuralı gereği g'(x) türeviyle çarpılmalıdır: d/dx [∫_a^{g(x)} f(t) dt] = f(g(x)) * g'(x).",
+                remediation_directive="Üst sınırın türevi olan g'(x) çarpanını sonuca ekle: f(g(x)) * g'(x).",
+                offending_term=user_str,
+            )
+        return None
+
 
 

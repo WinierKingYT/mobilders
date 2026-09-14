@@ -52,7 +52,8 @@ class ImplicitMultiplicationPreprocessor:
             "sin", "cos", "tan", "cot", "sec", "csc",
             "asin", "acos", "atan",
             "log", "ln", "exp",
-            "diff", "limit", "Derivative", "Limit"
+            "diff", "limit", "Derivative", "Limit",
+            "integrate", "Integral"
         }
 
         def _paren_mult(match):

@@ -8,7 +8,7 @@ def dag():
 
 
 def test_dag_initialization_20_nodes(dag):
-    assert len(dag.nodes) == 110
+    assert len(dag.nodes) >= 110
     assert "N01" in dag.nodes
     assert "N15" in dag.nodes
     assert "N20" in dag.nodes
@@ -25,6 +25,8 @@ def test_dag_initialization_20_nodes(dag):
     assert "N81" in dag.nodes
     assert "N98" in dag.nodes
     assert "N110" in dag.nodes
+    assert "N111" in dag.nodes
+    assert "N135" in dag.nodes
 
 
 def test_dag_is_cycle_free(dag):
@@ -34,7 +36,7 @@ def test_dag_is_cycle_free(dag):
 
 def test_dag_topological_sort_validity(dag):
     sorted_nodes = dag.topological_sort()
-    assert len(sorted_nodes) == 110
+    assert len(sorted_nodes) == len(dag.nodes)
 
     # Her düğümün katı önkoşulu listede kendisinden önce gelmelidir
     index_map = {n_id: idx for idx, n_id in enumerate(sorted_nodes)}

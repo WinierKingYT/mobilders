@@ -118,8 +118,11 @@ class LocalAnalyticsReporter:
                                     else (
                                         "CALCULUS_LIMIT" if n_id in [f"N{i:02d}" for i in range(81, 89)]
                                         else (
-                                            "CALCULUS_DERIVATIVE" if n_id in [f"N{i:02d}" for i in range(89, 111)]
-                                            else "QUADRATICS_CORE"
+                                            "CALCULUS_DERIVATIVE" if n_id in [f"N{i:02d}" if i < 100 else f"N{i}" for i in range(89, 111)]
+                                            else (
+                                                "CALCULUS_INTEGRAL" if n_id in [f"N{i}" for i in range(111, 136)]
+                                                else "QUADRATICS_CORE"
+                                            )
                                         )
                                     )
                                 )

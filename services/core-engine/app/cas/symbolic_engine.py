@@ -21,14 +21,15 @@ class SymbolicEquivalenceEngine:
     ALLOWED_VARIABLES = {
         "x", "y", "z", "a", "b", "c", "k", "n", "m", "r", "p", "q", "d", "Delta", "P", "Q", "R",
         "theta", "alpha", "beta", "pi", "e",
-        "h", "dx", "dy", "dt", "u", "v", "w", "t", "oo", "inf"
+        "h", "dx", "dy", "dt", "u", "v", "w", "t", "oo", "inf", "C"
     }
     ALLOWED_FUNCTIONS = {
         "sqrt", "Abs", "degree", "rem", "quo", "Poly",
         "sin", "cos", "tan", "cot", "sec", "csc",
         "asin", "acos", "atan",
         "log", "ln", "exp",
-        "diff", "limit", "Derivative", "Limit"
+        "diff", "limit", "Derivative", "Limit",
+        "integrate", "Integral"
     }
 
     def __init__(self):
@@ -60,6 +61,8 @@ class SymbolicEquivalenceEngine:
         self.symbols["limit"] = sp.limit
         self.symbols["Derivative"] = sp.Derivative
         self.symbols["Limit"] = sp.Limit
+        self.symbols["integrate"] = sp.integrate
+        self.symbols["Integral"] = sp.Integral
 
         # Eşdeğerlik LRU önbelleği (Tekrar eden adımlarda <0.1ms hızlı yol)
         self._cache: dict = {}
@@ -387,5 +390,93 @@ class SymbolicEquivalenceEngine:
                 return False, lim_f, val_f
         except Exception:
             return False, None, None
+
+    def compute_indefinite_integral(
+        self, expr_str: str, var: str = "x", add_constant: bool = True
+    ) -> sp.Expr:
+        """
+        Belirsiz integrali hesaplar: int f(x)dx = F(x) + C.
+        """
+        expr = self.parse_to_sympy(expr_str)
+        var_sym = self.symbols.get(var, sp.Symbol(var))
+        antideriv = sp.integrate(expr, var_sym)
+        if add_constant:
+            antideriv = antideriv + self.symbols["C"]
+        return antideriv
+
+    def compute_definite_integral(
+        self, expr_str: str, var: str = "x", a: Any = 0, b: Any = 1
+    ) -> Tuple[sp.Expr, float]:
+        """
+        Belirli integrali hesaplar: int_a^b f(x)dx.
+        Returns: (tam_sembolik_deger, ondalikli_sayi)
+        """
+        expr = self.parse_to_sympy(expr_str)
+        var_sym = self.symbols.get(var, sp.Symbol(var))
+
+        lower = sp.oo if a in ("oo", "inf") else (-sp.oo if a in ("-oo", "-inf") else sp.sympify(a, locals=self.symbols))
+        upper = sp.oo if b in ("oo", "inf") else (-sp.oo if b in ("-oo", "-inf") else sp.sympify(b, locals=self.symbols))
+
+        exact = sp.integrate(expr, (var_sym, lower, upper))
+        val = float(exact.evalf())
+        return exact, val
+
+    def compute_area_between_curves(
+        self, f_str: str, g_str: str, a: float, b: float
+    ) -> float:
+        """
+        İki eğri arasında kalan geometrik alanı hesaplar: int_a^b |f(x) - g(x)| dx.
+        """
+        f = self.parse_to_sympy(f_str)
+        g = self.parse_to_sympy(g_str)
+        x = self.symbols.get("x", sp.Symbol("x"))
+        area = sp.integrate(sp.Abs(f - g), (x, a, b))
+        return float(area.evalf())
+
+    def verify_integral(
+        self, integrand_str: str, candidate_integral_str: str, var: str = "x"
+    ) -> bool:
+        """
+        Öğrencinin bulduğu belirsiz integralin doğruluğunu (türevini alarak) teyit eder.
+        d/dx [Candidate(x)] == Integrand(x) ?
+        """
+        integrand = self.parse_to_sympy(integrand_str)
+        candidate = self.parse_to_sympy(candidate_integral_str)
+        var_sym = self.symbols.get(var, sp.Symbol(var))
+
+        deriv = sp.diff(candidate, var_sym)
+        diff = sp.simplify(deriv - integrand)
+        if diff == 0:
+            return True
+        if sp.trigsimp(diff) == 0:
+            return True
+        return False
+
+    def compute_riemann_sum(
+        self, expr_str: str, a: float, b: float, n: int, method: str = "midpoint"
+    ) -> float:
+        """
+        Riemann toplamını hesaplar (sol, sağ, orta nokta).
+        """
+        if n <= 0:
+            raise ValueError("Alt aralık sayısı n pozitif tam sayı olmalıdır.")
+
+        expr = self.parse_to_sympy(expr_str)
+        x = self.symbols.get("x", sp.Symbol("x"))
+        dx = (b - a) / float(n)
+        total = 0.0
+
+        for i in range(n):
+            if method == "left":
+                xi = a + i * dx
+            elif method == "right":
+                xi = a + (i + 1) * dx
+            else:  # midpoint
+                xi = a + (i + 0.5) * dx
+
+            yi = float(expr.subs(x, xi).evalf())
+            total += yi * dx
+
+        return round(total, 6)
 
 
