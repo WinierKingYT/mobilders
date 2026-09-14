@@ -407,6 +407,31 @@ class QuadraticMisconceptionDetector:
         if bug_f15:
             return bug_f15
 
+        # 76. BUG-ANAG-01: Dik Doğrularda Eğim Bağıntısı Hatası (m1 = m2 veya m1*m2 = 1)
+        bug_a1 = self._check_bug_anag_01(clean_user, clean_prev)
+        if bug_a1:
+            return bug_a1
+
+        # 77. BUG-ANAG-02: Geniş Açı ve Eğim İşareti Hatası (theta > 90 fakat m > 0)
+        bug_a2 = self._check_bug_anag_02(clean_user, clean_prev)
+        if bug_a2:
+            return bug_a2
+
+        # 78. BUG-ANAG-03: Çember Merkez Koordinatında İşaret Tersliği (M(-a, -b))
+        bug_a3 = self._check_bug_anag_03(clean_user, clean_prev)
+        if bug_a3:
+            return bug_a3
+
+        # 79. BUG-ANAG-04: Uzaklık Formülünde Karekökü Unutma (d = (x2-x1)^2 + (y2-y1)^2)
+        bug_a4 = self._check_bug_anag_04(clean_user, clean_prev)
+        if bug_a4:
+            return bug_a4
+
+        # 80. BUG-ANAG-05: Vektör İç Çarpımında Vektörel Sonuç Üretme ((u1*v1, u2*v2))
+        bug_a5 = self._check_bug_anag_05(clean_user, clean_prev)
+        if bug_a5:
+            return bug_a5
+
         return None
 
     def _check_bug_quad_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
@@ -2301,3 +2326,114 @@ class QuadraticMisconceptionDetector:
                 offending_term=user_str,
             )
         return None
+
+    def _check_bug_anag_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-ANAG-01: Dik Doğrularda Eğim Bağıntısı Hatası (m1 = m2 veya m1*m2 = 1)."""
+        clean = user_str.replace(" ", "").lower()
+        prev_clean = prev_str.replace(" ", "").lower()
+        is_perp_context = "dik" in prev_clean or "perpendicular" in prev_clean or "m1.m2" in clean or "m1*m2" in clean
+        if "m1*m2=1" in clean or "m1.m2=1" in clean or "m_dik=m" in clean:
+            return DiagnosticPayload(
+                bug_id="BUG-ANAG-01",
+                severity="CRITICAL",
+                category="GEOMETRY_PERPENDICULAR_SLOPE_ERROR",
+                description="Birbirine dik iki doğrunun eğimleri çarpımı -1'dir: m₁ · m₂ = -1 (m₂ = -1 / m₁). Eğimlerin eşit olması (m₁ = m₂) paralellik şartıdır.",
+                remediation_directive="Dik doğruların eğimleri birbirinin negatif tersidir: m2 = -1 / m1.",
+                offending_term=user_str,
+            )
+        if is_perp_context and ("m2=m1" in clean or "m_dik=m1" in clean or "m1=m2" in clean or "m=2=>m_dik=2" in clean):
+            return DiagnosticPayload(
+                bug_id="BUG-ANAG-01",
+                severity="CRITICAL",
+                category="GEOMETRY_PERPENDICULAR_SLOPE_ERROR",
+                description="Dik doğruların eğimleri eşit olamaz. Paralel doğruların eğimleri eşittir. Dik doğrularda m1 · m2 = -1 olmalıdır.",
+                remediation_directive="Eğimler çarpımının -1 olması gerektiğini uygula: m2 = -1 / m1.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_anag_02(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-ANAG-02: Geniş Açı ve Eğim İşareti Hatası (theta > 90 fakat m > 0)."""
+        clean = user_str.replace(" ", "").lower()
+        if (
+            "tan(135)=1" in clean
+            or "tan(120)=sqrt(3)" in clean
+            or "tan(150)=1/sqrt(3)" in clean
+            or "theta=135=>m=1" in clean
+            or "m=tan(135)=1" in clean
+            or "egimacisi=135=>m=1" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-ANAG-02",
+                severity="CRITICAL",
+                category="GEOMETRY_OBTUSE_SLOPE_SIGN_ERROR",
+                description="Geniş açılı (90° < θ < 180°) doğrular sola yatıktır ve eğimleri negatiftir: tan(135°) = -1, tan(120°) = -√3.",
+                remediation_directive="Geniş açının tanjantının negatif olduğunu hatırla: tan(180° - x) = -tan(x).",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_anag_03(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-ANAG-03: Çember Merkez Koordinatında İşaret Tersliği (M(-a, -b))."""
+        clean = user_str.replace(" ", "")
+        prev_clean = prev_str.replace(" ", "")
+        # Örnek: (x-2)^2 + (y-3)^2 = 16 için M(-2,-3)
+        if (
+            ("(x-2)^2" in prev_clean or "(x-2)**2" in prev_clean)
+            and ("M(-2," in clean or "merkez=(-2," in clean or "m(-2," in clean)
+        ) or (
+            "(x-3)^2+(y+4)^2=25=>M(-3,4)" in clean
+            or "(x-a)^2+(y-b)^2=r^2=>M(-a,-b)" in clean
+            or "(x-2)^2+(y-3)^2=16=>M(-2,-3)" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-ANAG-03",
+                severity="CRITICAL",
+                category="GEOMETRY_CIRCLE_CENTER_SIGN_REVERSAL",
+                description="Çember standart denklemi (x - a)² + (y - b)² = r² biçimindedir. Parantez içini sıfırlayan değerler merkez koordinatlarıdır: x - a = 0 => x = a. Dolayısıyla merkez M(a, b)'dir, işaretler ters çevrilmelidir.",
+                remediation_directive="Çember merkezini bulurken terimlerin zıt işaretlisini al: (x - a) için +a, (y + b) için -b.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_anag_04(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-ANAG-04: Uzaklık Formülünde Karekökü Unutma (d = (x2-x1)^2 + (y2-y1)^2)."""
+        clean = user_str.replace(" ", "").lower()
+        if (
+            "d=(x2-x1)^2+(y2-y1)^2" in clean
+            or "d=(x2-x1)**2+(y2-y1)**2" in clean
+            or "d=(3-0)^2+(4-0)^2=25" in clean
+            or "d=(4-1)^2+(6-2)^2=25" in clean
+            or "(x2-x1)^2+(y2-y1)^2=25=>d=25" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-ANAG-04",
+                severity="CRITICAL",
+                category="GEOMETRY_DISTANCE_OMITTED_SQUARE_ROOT",
+                description="İki nokta arasındaki uzaklık formülü Pisagor teoreminden gelir: d = √[(x₂ - x₁)² + (y₂ - y₁)²]. Kareler toplamının mutlaka karekökü alınmalıdır.",
+                remediation_directive="Kareler toplamını bulduktan sonra karekök almayı unutma: d² = 25 ise d = 5.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_anag_05(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-ANAG-05: Vektör İç Çarpımında Vektörel Sonuç Üretme ((u1*v1, u2*v2))."""
+        clean = user_str.replace(" ", "").lower()
+        if (
+            "u.v=(u1*v1,u2*v2)" in clean
+            or "u.v=(u1v1,u2v2)" in clean
+            or "u.v=(8,3)" in clean
+            or "(2,3).(4,1)=(8,3)" in clean
+            or "(1,2).(3,4)=(3,8)" in clean
+            or "u*v=(8,3)" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-ANAG-05",
+                severity="CRITICAL",
+                category="GEOMETRY_VECTOR_DOT_PRODUCT_VECTORIAL_FALLACY",
+                description="İki vektörün nokta (skaler / iç) çarpımı bir sayı (skaler) üretir: u · v = u₁v₁ + u₂v₂. Bileşenler ayrı ayrı çarpılıp yeni bir vektör oluşturulmaz.",
+                remediation_directive="Bileşen çarpımlarını virgülle ayırmak yerine topla: u1*v1 + u2*v2.",
+                offending_term=user_str,
+            )
+        return None
+

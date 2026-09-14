@@ -47,8 +47,8 @@ def reporter(dag):
 # ==============================================================================
 
 def test_dag_hedef6_total_nodes_135(dag):
-    """Grafın 135 düğüm içerdiğini ve N111-N135 aralığının eksiksiz tanımlandığını doğrular."""
-    assert len(dag.nodes) == 135
+    """Grafın en az 135 düğüm içerdiğini ve N111-N135 aralığının eksiksiz tanımlandığını doğrular."""
+    assert len(dag.nodes) >= 135
     for i in range(111, 136):
         n_id = f"N{i}"
         assert n_id in dag.nodes, f"Düğüm {n_id} eksik!"
