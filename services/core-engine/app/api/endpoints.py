@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, status
 from app.models.schemas import (
     StepVerificationRequest,
     StepVerificationResponse,
+    StepPsychometrics,
     CATNextItemRequest,
     CATItemResponse,
     CATSubmitRequest,
@@ -13,6 +14,8 @@ from app.cas.symbolic_engine import SymbolicEquivalenceEngine, SecurityViolation
 from app.misconceptions.detector import QuadraticMisconceptionDetector
 from app.graph.knowledge_dag import KnowledgeDAG
 from app.adaptive.cat_engine import CATEngine
+from app.psychometrics.bkt import IndividualizedBKT
+from app.psychometrics.ddm import EZDiffusionSolver
 
 router = APIRouter(tags=["Session, Verification & Diagnostic"])
 
@@ -52,6 +55,37 @@ async def verify_step(request: StepVerificationRequest) -> StepVerificationRespo
 
         total_latency_ms = (time.perf_counter() - start_time) * 1000.0
 
+        # 3. Psikometri ve Bilişsel Modelleme Hesaplaması (iBKT + Ratcliff DDM)
+        current_pl = request.current_p_l if request.current_p_l is not None else 0.20
+        post_pl, next_pl = IndividualizedBKT.update_mastery(p_l=current_pl, is_correct=is_equiv)
+
+        ddm_v = None
+        ddm_a = None
+        ddm_state = None
+        if request.elapsed_ms is not None:
+            # 15 saniyeden uzun kesintiler DDM hesabından hariç tutulur (Doc 19: Outlier Truncation)
+            if 150 <= request.elapsed_ms <= 15000:
+                try:
+                    step_mrt = request.elapsed_ms / 1000.0
+                    step_vrt = 0.04
+                    step_pc = 0.85 if is_equiv else 0.15
+                    ddm_res = EZDiffusionSolver.solve(mrt=step_mrt, vrt=step_vrt, pc=step_pc)
+                    ddm_v = ddm_res.drift_rate
+                    ddm_a = ddm_res.boundary_separation
+                    ddm_state = ddm_res.cognitive_state
+                except Exception:
+                    pass
+            elif request.elapsed_ms > 15000:
+                ddm_state = "outlier_interruption"
+
+        psychometrics = StepPsychometrics(
+            bkt_posterior_p_l=round(post_pl, 4),
+            bkt_next_p_l=round(next_pl, 4),
+            ddm_drift_rate=ddm_v,
+            ddm_boundary_separation=ddm_a,
+            ddm_cognitive_state=ddm_state,
+        )
+
         return StepVerificationResponse(
             is_valid=is_equiv,
             is_target_reached=is_equiv and ("=" in request.user_expression and not ("**2" in request.user_expression or "^2" in request.user_expression)),
@@ -59,6 +93,7 @@ async def verify_step(request: StepVerificationRequest) -> StepVerificationRespo
             canonical_expression=diff_str if is_equiv else None,
             error_message=None,
             analysis_latency_ms=total_latency_ms,
+            psychometrics=psychometrics,
         )
 
     except SecurityViolationError as sve:

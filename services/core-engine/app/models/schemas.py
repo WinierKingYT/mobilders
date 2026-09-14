@@ -11,6 +11,14 @@ class DiagnosticPayload(BaseModel):
     offending_term: Optional[str] = Field(None, description="Hatalı terim veya adım")
 
 
+class StepPsychometrics(BaseModel):
+    bkt_posterior_p_l: float = Field(..., description="Güncellenmiş ustalık olasılığı P(L_t | obs)")
+    bkt_next_p_l: float = Field(..., description="Bir sonraki adım için yansıtılan ustalık olasılığı P(L_t+1)")
+    ddm_drift_rate: Optional[float] = Field(None, description="Ratcliff DDM sürüklenme hızı (v)")
+    ddm_boundary_separation: Optional[float] = Field(None, description="Ratcliff DDM temkinlilik / sınır mesafesi (a)")
+    ddm_cognitive_state: Optional[str] = Field(None, description="Bilişsel profil teşhisi (fluent_mastery, cautious_effort, vb.)")
+
+
 class StepVerificationRequest(BaseModel):
     session_id: str = Field(..., description="Oturum UUID")
     node_id: str = Field("N15", description="Hedef DAG düğümü (örn: N12, N15, N18)")
@@ -20,6 +28,7 @@ class StepVerificationRequest(BaseModel):
     previous_step: Optional[str] = Field(None, description="Bir önceki doğrulanmış adım")
     elapsed_ms: Optional[int] = Field(None, ge=0, description="Adımı yazarken geçen süre (milisaniye)")
     confidence_rating: Optional[float] = Field(None, ge=0.0, le=1.0, description="Metabilişsel güven beyanı")
+    current_p_l: Optional[float] = Field(0.20, ge=0.0, le=1.0, description="Mevcut BKT ustalık düzeyi P(L)")
 
 
 class StepVerificationResponse(BaseModel):
@@ -29,6 +38,7 @@ class StepVerificationResponse(BaseModel):
     canonical_expression: Optional[str] = Field(None, description="Sembolik standart form")
     error_message: Optional[str] = Field(None, description="Sözdizimi veya ayrıştırma hatası")
     analysis_latency_ms: float = Field(..., description="CAS analiz süresi")
+    psychometrics: Optional[StepPsychometrics] = Field(None, description="Anlık bilişsel ve psikometrik kestirim")
 
 
 class CATItemResponse(BaseModel):
