@@ -83,7 +83,35 @@ class ZeroLeakageGuardrail:
             if re.search(pat, proposed_text, re.IGNORECASE):
                 return fallback, True
 
+        # 3. Check AST / Symbolic equivalence leaks
+        if solution_roots:
+            if cls._check_symbolic_ast_leak(proposed_text, solution_roots):
+                return fallback, True
+
         return proposed_text, False
+
+    @classmethod
+    def _check_symbolic_ast_leak(cls, text: str, solution_roots: List[Any]) -> bool:
+        """
+        Extracts mathematical equality candidates and evaluates AST equivalence against solution roots.
+        """
+        import sympy as sp
+
+        # Find patterns like variable = expression or expression = number
+        matches = re.findall(r"([a-zA-Z]\s*=\s*[^.!,;\n]+)", text)
+        for match in matches:
+            parts = match.split("=")
+            if len(parts) == 2:
+                rhs = parts[1].strip()
+                try:
+                    expr = sp.sympify(rhs)
+                    val = float(expr.evalf())
+                    for root in solution_roots:
+                        if abs(val - float(root)) < 1e-5:
+                            return True
+                except Exception:
+                    continue
+        return False
 
     @classmethod
     def calculate_socratic_ratio(cls, text: str) -> float:

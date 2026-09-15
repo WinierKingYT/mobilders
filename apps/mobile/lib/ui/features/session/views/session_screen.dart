@@ -10,6 +10,7 @@ import '../../accessibility/dyscalculia_helpers.dart';
 import '../../accessibility/tunnel_focus_mode.dart';
 import '../view_models/session_view_model.dart';
 import '../widgets/hesitation_whisper_bubble.dart';
+import '../widgets/socratic_hint_dialog.dart';
 import '../widgets/source_unpacker_widget.dart';
 import 'zen_focus_overlay.dart';
 
@@ -504,47 +505,11 @@ class _SessionScreenState extends State<SessionScreen> {
   }
 
   void _showSocraticHint(BuildContext context, SessionViewModel viewModel) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.bgSurface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.lightbulb_rounded, color: AppColors.accentWarning),
-                  SizedBox(width: 8),
-                  Text(
-                    'Sokratik İpucu Düzeyi 1',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Hedef denklem: ${viewModel.targetEquation}\n'
-                'Tüm terimleri bir tarafta toplayıp sağ tarafı sıfır yapmayı düşündün mü?',
-                style: const TextStyle(fontSize: 14, color: AppColors.textSecondary, height: 1.4),
-              ),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentPrimary),
-                  child: const Text('Anladım, Denedim', style: TextStyle(color: Colors.white)),
-                ),
-              ),
-            ],
-          ),
-        );
+    SocraticHintDialog.show(
+      context,
+      targetEquation: viewModel.targetEquation,
+      onResolved: () {
+        // Boost feedback
       },
     );
   }
