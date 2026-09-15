@@ -1,5 +1,5 @@
 # KİŞİSEL ÖĞRENME MOTORU (PLE) — MASTER YOL HARİTASI
-## Bilişsel Matematik İşletim Sistemi — Sıfırdan Zirveye Tam Pedagoji ve Müfredat Planı
+## Bilişsel Matematik İşletim Sistemi — Sıfırdan Zirveye Tam Pedagoji, Akış ve Müfredat Planı
 
 Bu belge, Kişisel Öğrenme Motoru'nun (Personal Learning Engine - PLE) kuramsal, pedagojik, matematiksel ve yazılımsal mimarisini içeren nihai master yol haritasıdır.
 
@@ -10,7 +10,7 @@ Bu sistemin ilk kullanıcısı, geliştiricisinin bizzat kendisidir. Sistem; hi�
 
 ## 🧭 BÖLÜM 1: BİLİŞSEL ÖĞRETİM MANİFESTOSU VE HIZLI ÖĞRENME İLKELERİ
 
-Geleneksel eğitim platformları (video izletenler veya doğrudan çözümü veren chatbotlar) beyni pasif bir izleyiciye dönüştürür ve "Anlama İllüzyonu" (*Illusion of Competence*) yaratır. PLE bu illüzyonu 4 katı pedagojik ilkeyle yıkar:
+Geleneksel eğitim platformları (video izletenler veya doğrudan çözümü veren chatbotlar) beyni pasif bir izleyiciye dönüştürür ve "Anlama İllüzyonu" (*Illusion of Competence*) yaratır. PLE bu illüzyonu 6 katı pedagojik ilkeyle yıkar:
 
 1. **Sıfır Pasif Monolog (Zero Passive Lecture):** Sistem asla 5 dakikalık bir video izletmez veya 3 paragraflık bir teorik metin okutmaz. Bilgi, sadece öğrencinin yapacağı bir sonraki eylemin gerekçesi olarak aktarılır.
 2. **Aktif Birlikte Çözme (Active Co-Solving):** Konu anlatımı dahi bir problem çözme sürecidir. Sistem soruyu alt hedeflere böler; öğrenci her mikro adımı bizzat klavye veya kanvas üzerinden kendisi yazar.
@@ -24,9 +24,94 @@ Geleneksel eğitim platformları (video izletenler veya doğrudan çözümü ver
 
 ---
 
-## 🌳 BÖLÜM 2: KÖK MATEMATİK ONTOLOJİSİ (SEVİYE -3'TEN SEVİYE 0'A KADAR TAM AĞ)
+## 🎯 BÖLÜM 2: TAKILMA ANINDA METOT ANLATIMI (SONUCU DEĞİL, YÖNTEMİ BULDUGURAN AKIŞ)
 
-Lise konularında takılan bir öğrencinin sorunu %85 oranında lise matematiği değil, Seviye 0'ın altındaki bu 15 temel bilgi bileşenindeki (Knowledge Component - KC) görünmez deliklerdir:
+Öğrenci bir soruda bir ara adımda takıldığında sistem **SONUCU ASLA VERMEZ**. Sonucu söylemek öğrenmeyi öldürür. Sistem **YÖNTEMİN SEZGİSİNİ** minik bir keşifle öğrenciye hissettirir.
+
+### Somut Örnek: Eşitsizlikte Eksi Sayıya Bölme Takılması
+**Soru:** $-3x + 5 \le 14$  
+Öğrenci 5'i karşıya attı ve $-3x \le 9$ adımına geldi. Burada tıkandı veya yanlışlıkla $x \le -3$ yazdı.
+
+```text
+[ DURUM: ÖĞRENCİ TIKANDI / "NASIL YAPILIR?" BUTONUNA BASTI ]
+                             │
+                             ▼
+[ 1. AŞAMA: CEVAP YOK, MANTIK SEZGİSİ VAR ]
+AI Tutor: "Harika geldin, sona çok yaklaştın! 
+Şimdi x'i yalnız bırakmak için her iki tarafı (-3)'e böleceğiz. 
+Ama dur! Eşitsizliklerde negatif bir sayıya böldüğümüzde sihirli bir kural vardı..."
+                             │
+                             ▼
+[ 2. AŞAMA: MİNİK BİR SEZGİ ÖRNEĞİ (GROUNDING) ]
+AI Tutor: "Düşün bakalım: 2 sayısı 5'ten küçüktür (2 < 5). 
+İki tarafı da (-1) ile çarparsak -2 ve -5 olur. 
+Sayı doğrusunda -2 mi daha büyüktür, -5 mi?"
+                             │
+                             ▼
+[ ÖĞRENCİ CEVAPLAR ]: "-2 daha büyüktür."
+                             │
+                             ▼
+[ 3. AŞAMA: KURALI ÖĞRENCİYE KENDİSİNE BULDURMA ]
+AI Tutor: "Gördün mü! Sayılar negatife dönünce küçüktür işareti BÜYÜKTÜR'e döndü. 
+Yani negatif bir sayıya böldüğümüzde eşitsizlik işareti daima YÖN DEĞİŞTİRİR. 
+Şimdi kendi soruna dön: Her iki tarafı -3'e böldüğünde ≤ işareti neye dönüşmeli?"
+                             │
+                             ▼
+[ ÖĞRENCİ ADIMI KENDİSİ YAZAR ]: "x >= -3" (DOĞRULANDI ✓)
+```
+
+---
+
+## 📚 BÖLÜM 3: GERİYE DOĞRU ZİNCİRLENMİŞ YAŞAYAN DERS NOTLARI
+*(Explorable Prerequisite Notes — "Bunu Çözmek İçin Bu Lazım")*
+
+Öğrenci soru çözerken takıldığında veya doğrudan konuyu sıfırdan öğrenmek istediğinde ekranda beliren yaşayan, tıklanabilir ders kartlarıdır. Statik PDF değildir; her not bir **"Önkoşul Merdiveni" (Prerequisite Chain)** barındırır:
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ 📖 DERS NOTU: 2. Dereceden Denklemler Nasıl Çözülür?        │
+├─────────────────────────────────────────────────────────────┤
+│ 💡 TEMEL FİKİR (1 Cümle):                                   │
+│ "İçinde x² olan bir denklemin amacı, onu çarpanlarına        │
+│  ayırarak İKİ TANE BASİT (1. Dereceden) denkleme bölmektir."│
+│                                                             │
+│ ⚠️ DİKKAT! BU KONUYU ANLAMAK İÇİN ŞUNLAR LAZIM:             │
+│                                                             │
+│ 🔗 1. Önkoşul: [ 1. Dereceden Denklem Nasıl Çözülür? ➔ ]   │
+│    "x'i yalnız bırakmayı bilmiyorsan, x²'yi hiç çözemezsin. │
+│     Durumun nasıl? [Emin Değilim, Buna Bak] [Biliyorum]"   │
+│                                                             │
+│ 🔗 2. Önkoşul: [ Çarpanlara Ayırma & Sıfır Çarpım ➔ ]       │
+│    "İki sayının çarpımı 0 ise biri kesinlikle 0'dır."       │
+│                                                             │
+│ ─────────── 2. DERECEDEN DENKLEM ÇÖZÜM REÇETESİ ────────────│
+│                                                             │
+│ 1. ADIM: Eşitliğin sağını daima 0 yap (Terimleri sola topla)│
+│    Örnek: x² + 5x = 6  ──►  x² + 5x - 6 = 0                 │
+│                                                             │
+│ 2. ADIM: Çarpanlarına ayır (İki parantez yap)              │
+│    (x + 6)(x - 1) = 0                                       │
+│                                                             │
+│ 3. ADIM: Her parantezi AYRI AYRI 1. Dereceden denklem yap! │
+│    x + 6 = 0  ──►  x = -6                                   │
+│    x - 1 = 0  ──►  x = 1                                    │
+│                                                             │
+│ [ 🎮 10 Saniyelik Mini Alıştırma: Bir Tane Kendin Dene! ]   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 🔄 Geriye Doğru Temele İniş Örneği:
+Öğrenci yukarıdaki notta *"1. Önkoşul: 1. Dereceden Denklem"* bağlantısına dokunduğunda:
+1. Ekran 1. Dereceden denklemin **Terazi Modeline** iner.
+2. Notun altında: *"Bunu yapabilmek için Negatif Sayılarda İşaretler lazım"* uyarısı çıkar.
+3. Öğrenci oradan da **Negatif Sayılar** kartına inebilir.
+4. Temeli anladığında **[ ⬅️ Anladım, Kaldığım Soruya Geri Dön ]** butonuna basarak adım adım lise sorusuna geri döner.
+
+---
+
+## 🌳 BÖLÜM 4: KÖK MATEMATİK ONTOLOJİSİ (SEVİYE -3'TEN SEVİYE 0'A KADAR TAM AĞ)
+
+Lise konularında takılan bir öğrencinin sorunu %85 oranında lise matematiği değil, Seviye 0'ın altındaki bu 16 temel bilgi bileşenindeki (Knowledge Component - KC) görünmez deliklerdir:
 
 ```text
 [ SEVİYE -3: SAYI HİSSİ, YÖN VE İŞARET SEZGİSİ ]
@@ -58,7 +143,7 @@ Lise konularında takılan bir öğrencinin sorunu %85 oranında lise matematiğ
 
 ---
 
-## ⚠️ BÖLÜM 3: 15 TEMEL KÖK YANILGI KATALOĞU (`BUG-FOUND-01..15`)
+## ⚠️ BÖLÜM 5: 15 TEMEL KÖK YANILGI KATALOĞU (`BUG-FOUND-01..15`)
 
 Sistem, öğrencinin adımlarını incelerken aşağıdaki 15 kök yanılgıyı deterministik olarak yakalar ve öğrencinin **Bilişsel Zaaf Defterine** işler:
 
@@ -82,15 +167,27 @@ Sistem, öğrencinin adımlarını incelerken aşağıdaki 15 kök yanılgıyı 
 
 ---
 
-## 🗺️ MASTER YOL HARİTASI 16 AŞAMALI GENEL BAKIŞ
+## 💎 BÖLÜM 6: UYGULAMA KALİTESİ, HAPTİK VE AKICILIK STANDARTLARI (MOBILE CRAFTSMANSHIP)
+
+Uygulamanın zanaatkarlık kalitesi, Apple Design Award ve Linear standartlarında katı mühendislik ilkelerine dayanır:
+
+1. **Haptik Dokunsal Geri Bildirim:** Tuş vuruşlarında hafif mekanik tık (`lightImpact`), doğru adımlarda çift vuruşlu zafer darbesi (`mediumImpact`), bozuk kuralda yumuşak ikaz titreşimi (`heavyImpact`).
+2. **Sıfır Arayüz Sıçraması (Zero Layout Shift):** Touchpad, Klavye ve Çizim Kanvası geçişlerinde ekran zıplamaz; yay fiziği (`spring physics`) ile 60/120 FPS akıcı geçiş yapar.
+3. **Sıfır Gecikmeli Yerel Denetim (<5ms):** Kullanıcı yazarken parantez eşleştirmeleri (Rainbow Brackets) ve geçersiz operatör kontrolleri sunucuyu beklemeden cihazda anında doğrulanır.
+4. **Çökme Direnci & Durum Koruma (State Restoration):** Telefon çaldığında veya uygulama kapatıldığında seans, çözülen adımlar ve yarım kalan girdi tek bir harf dahi kaybolmadan geri yüklenir.
+5. **Zen Odak Modu & KaTeX Mükemmelliği:** Dikkat dağıtan tüm menüleri gizleyen saf çalışma alanı; kesir çizgileri ve sembol oranları piksel düzeyinde optimize edilmiş TeX tipografisi.
+
+---
+
+## 🗺️ BÖLÜM 7: MASTER YOL HARİTASI 16 AŞAMALI GENEL BAKIŞ
 
 ```text
 ========================================================================================
 [ FAZ 0: KÖK PEDAGOJİ, TEMEL MATEMATİK VE ÇÖZDÜREREK ÖĞRETME ÇEKİRDEĞİ ] (1. ÖNCELİK)
 ========================================================================================
-  ├── HEDEF 1: Üretim Hazırlığı, Çevrimdışı Kalıcılık ve Mobil E2E Sağlamlaştırma
+  ├── HEDEF 1: Üretim Hazırlığı, Çevrimdışı Kalıcılık ve Mobil E2E Sağlamlaştırma (Kalite Paketi)
   ├── HEDEF 2: Temel Matematik Sezgisi ve Kök Önkoşul Ağı (Seviye -3..-1: Sıfırdan Başlayan Öğrenci)
-  └── HEDEF 3: Aktif Birlikte Çözme (Active Co-Solving), Zaaf Defteri ve Mikro-Kum Havuzu
+  └── HEDEF 3: Aktif Birlikte Çözme (Active Co-Solving), Zaaf Defteri ve Yaşayan Ders Notları
 
 ========================================================================================
 [ FAZ I: TAM LİSE MATEMATİK MÜFREDATI (CEBİR & ANALİZ) ]
@@ -124,19 +221,22 @@ Sistem, öğrencinin adımlarını incelerken aşağıdaki 15 kök yanılgıyı 
 
 ---
 
-## 📋 TÜM HEDEFLER İÇİN ÇALIŞTIRILABİLİR /goal ŞABLONLARI
+## 📋 BÖLÜM 8: TÜM HEDEFLER İÇİN ÇALIŞTIRILABİLİR /goal ŞABLONLARI
 
 Dilediğiniz an ilgili bloğu kopyalayıp sohbete `/goal <İÇERİK>` şeklinde göndererek geliştirme sürecini başlatabilirsiniz.
 
 ---
 
-### 🔹 HEDEF 1: Üretim Hazırlığı, Çevrimdışı Kalıcılık ve Mobil E2E Sağlamlaştırma
+### 🔹 HEDEF 1: Üretim Hazırlığı, Çevrimdışı Kalıcılık, Mobil Kalite ve Haptik Sistem
 ```markdown
-/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 1 kapsamındaki "Üretim Hazırlığı, Çevrimdışı Kalıcılık ve Mobil E2E Entegrasyonu" paketini uçtan uca uygula ve doğrula.
+/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 1 kapsamındaki "Üretim Hazırlığı, Çevrimdışı Kalıcılık, Mobil Kalite ve Haptik Sistem" paketini uçtan uca uygula ve doğrula.
 - Working tree temizliği (Inking, LTI, Ses, Erişilebilirlik ve testlerini mantıksal bir git commit'i ile kaydet).
 - 23-OFFLINE-STATE-AND-SYNC uyarınca mobil tarafta kalıcı yerel kuyruk (OfflineSyncQueue) oluştur; ağ koptuğunda adımları diske yaz, ağ gelince idempotent aktar.
+- Haptik Dokunsal Geri Bildirim: Tuş vuruşları (light impact), doğru adımlar (medium impact) ve hata uyarıları için HapticFeedbackService geliştir ve tüm butonlara bağla.
+- Sıfır Arayüz Sıçraması (Zero Layout Shift): Touchpad, Klavye ve Çizim Kanvası geçişlerini AnimatedSwitcher ve yay fiziği ile 60/120 FPS akıcı hale getir.
+- Çökme Direnci: Seansı ve yarım kalan girdiyi SQLite/Isar'a anında kaydet; sıfır veri kaybıyla geri yükle (State Restoration).
 - VectorInkingCanvas, TunnelFocusMode ve DyscalculiaHelper bileşenlerini DailyJourneyScreen ve ayarlar çekmecesine bağla.
-- Tüm mobil ve backend (123 test) testlerinin %90+ coverage ile yeşil geçtiğini doğrula.
+- Tüm mobil ve backend testlerinin %90+ coverage ile yeşil geçtiğini doğrula.
 ```
 
 ---
@@ -159,22 +259,19 @@ Dilediğiniz an ilgili bloğu kopyalayıp sohbete `/goal <İÇERİK>` şeklinde 
 
 ---
 
-### 🔹 HEDEF 3: Aktif Birlikte Çözme (Active Co-Solving), Zaaf Defteri ve Mikro-Kum Havuzu
+### 🔹 HEDEF 3: Aktif Birlikte Çözme, Sokratik Metot Anlatımı ve Yaşayan Ders Notları
 ```markdown
-/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 3 kapsamındaki "Aktif Birlikte Çözme (Active Co-Solving), Zaaf Defteri ve Mikro-Kum Havuzu" paketini uçtan uca uygula ve doğrula.
-- Kapsam: Öğrenci yanlış yaptığında hatanın kök nedenini tespit edip zaaf defterine kaydetme; hiç çözemediğinde ise pasif anlatım YAPMADAN konuyu adım adım mikro hedeflerle öğrencinin kendisine çözdürme.
-- 1. Bilişsel Zaaf Defteri (CognitiveWeaknessLedger):
-  * Öğrenci bir soruda (örn. fonksiyon) hata yaptığında hatanın seviyesini belirle: Basit işlem hatası mı, kavram yanılgısı mı, yoksa Seviye -3 kök önkoşul eksikliği mi?
-  * SQLite/Postgres üzerinde kalıcı zaaf kaydı aç ve BKT yetkinlik olasılığını ilgili önkoşulda güncelle.
-- 2. Aktif Birlikte Çözme Motoru (ActiveCoSolverEngine - Faded Worked Examples & Subgoal Labeling):
-  * Pasif video veya statik açıklama KESİNLİKLE YASAKTIR.
-  * Soruyu 3 mikro alt hedefe böl (Girdiyi tespit et -> Kuralı uygula -> Sadeleştir).
-  * Her adımda öğrenciye mini bir keşif sorusu (Pump/Hint) sor; adımın sonucunu bizzat öğrencinin klavyeden yazmasını sağla.
-- 3. Akıllı Tereddüt Sensörü & Kaynak Geri Sarımı:
-  * 8 saniye hareketsizlikte hafif parıltı fısıltısı, "Nereden Geldi Bu?" butonuyla sayının köken animasyonu.
-- 4. Mikro-Kum Havuzu (In-Situ Remediation Sandbox):
-  * Lise sorusu çözerken öğrenci temel bir kuralda (örn. -6 - 5 = ?) takılırsa, ana soruyu ekranda dondur.
-  * Yan tarafta 45 saniyelik görsel sayı doğrusu kum havuzu açıp kuralı anında kavrat; kum havuzu kapanınca öğrenciyi ana soruya döndür.
+/goal Kişisel Öğrenme Motoru (PLE) projesinde Hedef 3 kapsamındaki "Aktif Birlikte Çözme, Sokratik Metot Anlatımı ve Yaşayan Ders Notları" paketini uçtan uca uygula ve doğrula.
+- 1. Sokratik Metot Anlatımı (Sonucu Değil, Yöntemi Anlatan Akış):
+  * Öğrenci bir adımda takıldığında cevabı vermek KESİNLİKLE YASAKTIR.
+  * Eşitsizliklerde negatif bölme yön değişimi gibi adımlarda 3 aşamalı keşif uygula: Sezgi Sorusu -> Öğrenci Yanıtı -> Kuralı Kendisinin Bulması.
+- 2. Yaşayan Bağlantılı Ders Notları (Explorable Prerequisite Notes):
+  * "2. Dereceden Denklem Nasıl Çözülür?" kartından 1. Dereceden Denkleme, oradan Terazi Modeline ve Negatif Sayılara geriye doğru inen tıklanabilir önkoşul merdiveni kur ("Bunu çözmek için bu lazım, ona da bu lazım").
+  * Her kart: 1 Cümlelik Sezgi -> Tıklanabilir Önkoşul Linkleri -> Adım Adım Reçete -> 10 Saniyelik Mini-Alıştırma Widget'ı.
+- 3. Bilişsel Zaaf Defteri (CognitiveWeaknessLedger):
+  * Öğrencinin yaptığı hatanın seviyesini belirle (Aritmetik, Kavram Yanılgısı, Kök Önkoşul Eksikliği) ve SQLite/Postgres'e kalıcı zaaf olarak işle.
+- 4. Mikro-Kum Havuzu (In-Situ Remediation):
+  * Lise sorusu çözerken temelde takılan öğrenci için ana soruyu dondur; 45 saniyelik görsel kum havuzunda kuralı kavratıp soruya geri döndür.
 - 45 yeni test ile pedagojik FSM durum geçişlerini ve sıfır sızıntıyı doğrula.
 ```
 
@@ -334,4 +431,4 @@ Dilediğiniz an ilgili bloğu kopyalayıp sohbete `/goal <İÇERİK>` şeklinde 
 ```
 
 ---
-*Bu belge projenin kalıcı master şartnamesidir. İlk kullanıcının sıfırdan zirveye eksiksiz ve en yüksek pedagojik kalitede öğrenmesi için optimize edilmiştir.*
+*Bu belge projenin kalıcı master şartnamesidir. İlk kullanıcının sıfırdan zirveye eksiksiz, akıcı ve en yüksek pedagojik kalitede öğrenmesi için optimize edilmiştir.*
