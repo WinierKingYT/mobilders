@@ -7,6 +7,7 @@ import 'scratchpad_overlay.dart';
 import 'al_khwarizmi_canvas.dart';
 import 'unit_circle_canvas.dart';
 import 'dynamic_tangent_canvas.dart';
+import 'riemann_integral_canvas.dart';
 import '../../analytics/views/cognitive_health_atlas_screen.dart';
 import '../../../../core/localization.dart';
 import '../../../../core/services/haptic_feedback_service.dart';
@@ -34,6 +35,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   bool _showGeometricCanvas = false;
   bool _showUnitCircleCanvas = false;
   bool _showTangentCanvas = false;
+  bool _showRiemannCanvas = false;
   double _confidenceLevel = 0.85;
   int? _selectedWarmupOption;
 
@@ -141,6 +143,19 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                   onPressed: () {
                     HapticFeedbackService().selectionClick();
                     setState(() => _showTangentCanvas = !_showTangentCanvas);
+                  },
+                ),
+              // Riemann Integral Canvas Toggle Button (Hedef 7)
+              if (_currentPhase == DailyPhase.problemBoard)
+                IconButton(
+                  icon: Icon(
+                    Icons.area_chart_rounded,
+                    color: _showRiemannCanvas ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                  ),
+                  tooltip: "Riemann İntegral Kanvası",
+                  onPressed: () {
+                    HapticFeedbackService().selectionClick();
+                    setState(() => _showRiemannCanvas = !_showRiemannCanvas);
                   },
                 ),
               // Vector Inking Canvas Quick Toggle Button
@@ -278,6 +293,11 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
               const Padding(
                 padding: EdgeInsets.all(12),
                 child: DynamicTangentCanvas(),
+              ),
+            if (_showRiemannCanvas)
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: RiemannIntegralCanvas(),
               ),
             const Expanded(
               child: SessionScreen(),
