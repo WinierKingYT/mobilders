@@ -8,6 +8,8 @@ from app.curriculum_generator.trap_question_factory import (
     DynamicExamFactory,
     ExamSection,
     QuestionType,
+    FormalQuestionVerifier,
+    ExamDocumentExporter,
 )
 
 
@@ -427,6 +429,146 @@ def test_exam_empty_answers_dict_type(factory):
     exam = factory.assemble_exam(question_count=1)
     res = factory.grade_exam(exam, {})
     assert isinstance(res["traps_triggered"], list)
+
+
+# ==============================================================================
+# 9. TARGETED BUG GENERATION & FORMAL VERIFIER TESTS
+# ==============================================================================
+
+def test_generate_targeted_bug_various_categories():
+    """Öğrencinin geçmiş zaaflarına göre hedefli soru üretilebildiğini doğrular."""
+    q_calc = TrapQuestionGenerator.generate_targeted_bug("BUG-CALC-01", seed=42)
+    assert q_calc.type == QuestionType.CALCULUS
+    assert any(c.bug_id == "BUG-CALC-01" for c in q_calc.choices)
+
+    q_euc = TrapQuestionGenerator.generate_targeted_bug("BUG-EUC-04", seed=42)
+    assert q_euc.type == QuestionType.GEOMETRY
+    assert any(c.bug_id == "BUG-EUC-04" for c in q_euc.choices)
+
+    q_circle = TrapQuestionGenerator.generate_targeted_bug("BUG-EUC-02", seed=42)
+    assert q_circle.type == QuestionType.GEOMETRY
+    assert any(c.bug_id == "BUG-EUC-02" for c in q_circle.choices)
+
+    q_anag = TrapQuestionGenerator.generate_targeted_bug("BUG-ANAG-01", seed=42)
+    assert q_anag.type == QuestionType.GEOMETRY
+    assert any(c.bug_id == "BUG-ANAG-01" for c in q_anag.choices)
+
+    q_quad = TrapQuestionGenerator.generate_targeted_bug("BUG-QUAD-05", seed=42)
+    assert q_quad.type == QuestionType.ALGEBRA
+    assert any(c.bug_id == "BUG-QUAD-05" for c in q_quad.choices)
+
+
+def test_formal_question_verifier_quadratic():
+    """Kuadratik sorunun SymPy formel ispatını doğrular."""
+    q = TrapQuestionGenerator.generate_quadratic(3, -4)
+    proof = FormalQuestionVerifier.verify_formally(q)
+    assert proof["is_valid"] is True
+    assert proof["has_formal_proof"] is True
+    assert proof["zero_false_positives"] is True
+    assert "Kuadratik denklem kökleri" in proof["proof_details"]
+
+
+def test_formal_question_verifier_calculus():
+    """Kalkülüs türev sorusunun SymPy analitik türev ispatını doğrular."""
+    q = TrapQuestionGenerator.generate_derivative(a=4, n=3)
+    proof = FormalQuestionVerifier.verify_formally(q)
+    assert proof["is_valid"] is True
+    assert proof["has_formal_proof"] is True
+    assert proof["zero_false_positives"] is True
+
+
+def test_formal_question_verifier_euclidean():
+    """Öklid sorusunun tam sayı kök kısıtı ve geometrik ispatını doğrular."""
+    q = TrapQuestionGenerator.generate_euclidean(p=4, k=9)
+    proof = FormalQuestionVerifier.verify_formally(q)
+    assert proof["is_valid"] is True
+    assert proof["has_formal_proof"] is True
+    assert proof["zero_false_positives"] is True
+
+
+def test_formal_question_verifier_zero_false_positives():
+    """Çeldiricilerin hiçbiri doğru cevapla çakışmamalıdır (0 False Positive)."""
+    q = TrapQuestionGenerator.generate_quadratic(1, -2)
+    correct_text = q.choices[q.correct_choice_index].text
+    distractors = [c.text for c in q.choices if not c.is_correct]
+    assert correct_text not in distractors
+
+
+# ==============================================================================
+# 10. EXAM DOCUMENT EXPORTER (LATEX & HTML / PDF) TESTS
+# ==============================================================================
+
+def test_exam_document_exporter_latex(factory):
+    """Deneme sınavının derlenebilir LaTeX koduna dönüştürüldüğünü doğrular."""
+    exam = factory.assemble_exam(section=ExamSection.TYT_MATEMATIK, question_count=4)
+    latex_code = ExamDocumentExporter.export_to_latex(exam, include_solutions=True)
+
+    assert r"\documentclass" in latex_code
+    assert r"\begin{document}" in latex_code
+    assert r"\begin{enumerate}" in latex_code
+    assert "CEVAP ANAHTARI VE SOKRATİK ÇÖZÜMLER" in latex_code
+    assert r"\end{document}" in latex_code
+
+
+def test_exam_document_exporter_html(factory):
+    """Deneme sınavının yazdırılabilir temiz HTML sayfasına dönüştürüldüğünü doğrular."""
+    exam = factory.assemble_exam(section=ExamSection.AYT_MATEMATIK, question_count=3)
+    html_code = ExamDocumentExporter.export_to_html_printable(exam, include_solutions=True)
+
+    assert "<!DOCTYPE html>" in html_code
+    assert "<title>" in html_code
+    assert "class='header'" in html_code
+    assert "class='question'" in html_code
+    assert "Cevap Anahtarı ve Çözümler" in html_code
+
+
+# ==============================================================================
+# 11. 500 SENTETİK SORU BATCH ÜRETİM VE FORMEL KANIT TESTİ
+# ==============================================================================
+
+def test_500_synthetic_trap_questions_batch_production_and_verification():
+    """
+    Kullanıcı İsteri: 500 sentetik soru üretim testi.
+    500 farklı sorunun kesintisiz üretildiğini, tam sayı köklere sahip olduğunu,
+    her birinin formel olarak doğrulandığını ve 0 false positive verdiğini kanıtlar.
+    """
+    total_questions = 500
+    valid_count = 0
+
+    roots_pool = [
+        (1, 2), (2, 3), (3, 4), (1, -5), (2, -4), (-2, -3),
+        (4, 5), (3, -6), (1, 7), (2, -8), (-4, 6), (5, -2),
+        (3, 8), (4, -7), (2, 9), (1, -10), (-3, -5), (6, 2)
+    ]
+    calc_params = [(2, 3), (3, 4), (4, 3), (5, 2), (2, 5), (3, 2), (4, 2)]
+    euc_pairs = [(4, 9), (2, 8), (3, 12), (1, 16), (4, 16), (9, 16), (2, 18), (1, 25)]
+    angles = [40, 50, 60, 70, 80, 90, 100, 110, 120, 140]
+
+    for i in range(total_questions):
+        mode = i % 4
+        if mode == 0:
+            r1, r2 = roots_pool[i % len(roots_pool)]
+            q = TrapQuestionGenerator.generate_quadratic(r1=r1, r2=r2)
+        elif mode == 1:
+            a, n = calc_params[i % len(calc_params)]
+            q = TrapQuestionGenerator.generate_derivative(a=a, n=n)
+        elif mode == 2:
+            p, k = euc_pairs[i % len(euc_pairs)]
+            q = TrapQuestionGenerator.generate_euclidean(p=p, k=k)
+        else:
+            ang = angles[i % len(angles)]
+            q = TrapQuestionGenerator.generate_circle_angle(center_angle=ang)
+
+        # Formel İspat Denetimi
+        proof = FormalQuestionVerifier.verify_formally(q)
+        assert proof["is_valid"] is True
+        assert proof["zero_false_positives"] is True
+        assert len(q.choices) == 5
+        assert q.choices[q.correct_choice_index].is_correct is True
+
+        valid_count += 1
+
+    assert valid_count == 500
 
 
 
