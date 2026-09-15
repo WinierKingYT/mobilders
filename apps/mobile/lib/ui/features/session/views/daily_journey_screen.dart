@@ -5,6 +5,7 @@ import '../../diagnostic/view_models/diagnostic_view_model.dart';
 import 'session_screen.dart';
 import 'scratchpad_overlay.dart';
 import 'al_khwarizmi_canvas.dart';
+import 'unit_circle_canvas.dart';
 import '../../analytics/views/cognitive_health_atlas_screen.dart';
 import '../../../../core/localization.dart';
 import '../../../../core/services/haptic_feedback_service.dart';
@@ -30,6 +31,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   DailyPhase _currentPhase = DailyPhase.warmup;
   bool _showScratchpad = false;
   bool _showGeometricCanvas = false;
+  bool _showUnitCircleCanvas = false;
   double _confidenceLevel = 0.85;
   int? _selectedWarmupOption;
 
@@ -111,6 +113,19 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                   onPressed: () {
                     HapticFeedbackService().selectionClick();
                     setState(() => _showGeometricCanvas = !_showGeometricCanvas);
+                  },
+                ),
+              // Unit Circle Canvas Toggle Button (Hedef 5)
+              if (_currentPhase == DailyPhase.problemBoard)
+                IconButton(
+                  icon: Icon(
+                    Icons.change_circle_outlined,
+                    color: _showUnitCircleCanvas ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8),
+                  ),
+                  tooltip: "Birim Çember Kanvası",
+                  onPressed: () {
+                    HapticFeedbackService().selectionClick();
+                    setState(() => _showUnitCircleCanvas = !_showUnitCircleCanvas);
                   },
                 ),
               // Vector Inking Canvas Quick Toggle Button
@@ -238,6 +253,11 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
               const Padding(
                 padding: EdgeInsets.all(12),
                 child: AlKhwarizmiCanvas(bCoefficient: 6.0),
+              ),
+            if (_showUnitCircleCanvas)
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: UnitCircleCanvas(),
               ),
             const Expanded(
               child: SessionScreen(),
