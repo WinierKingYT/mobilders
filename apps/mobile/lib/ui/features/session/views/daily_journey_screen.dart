@@ -9,6 +9,7 @@ import 'unit_circle_canvas.dart';
 import 'dynamic_tangent_canvas.dart';
 import 'riemann_integral_canvas.dart';
 import '../../scanner/math_scanner_view.dart';
+import '../../modeling/problem_modeling_view.dart';
 import '../../analytics/views/cognitive_health_atlas_screen.dart';
 import '../../../../core/localization.dart';
 import '../../../../core/services/haptic_feedback_service.dart';
@@ -211,6 +212,25 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                   );
                 },
               ),
+              // Story Problem Modeling & Socratic Scaffold (Hedef 9)
+              IconButton(
+                key: const Key('header_problem_modeling_button'),
+                icon: const Icon(
+                  Icons.auto_stories_outlined,
+                  color: Color(0xFFF59E0B),
+                ),
+                tooltip: "Yeni Nesil Hikayeli Problem Modelleme",
+                onPressed: () {
+                  HapticFeedbackService().selectionClick();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const Scaffold(
+                        body: SafeArea(child: ProblemModelingView()),
+                      ),
+                    ),
+                  );
+                },
+              ),
               // Accessibility & Curriculum Settings Button
               IconButton(
                 icon: const Icon(
@@ -326,6 +346,24 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
               color: const Color(0xFF0F172A),
               child: Row(
                 children: [
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFF59E0B),
+                      side: const BorderSide(color: Color(0xFFF59E0B)),
+                    ),
+                    onPressed: () {
+                      HapticFeedbackService().selectionClick();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const Scaffold(
+                            body: SafeArea(child: ProblemModelingView()),
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.auto_stories_outlined, size: 16),
+                    label: const Text("Modelleme İskelesi"),
+                  ),
                   const Spacer(),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
