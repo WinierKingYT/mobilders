@@ -184,4 +184,42 @@ void main() {
     await tester.pumpAndSettle();
     expect(sessionVm.isDyscalculiaHelper, isTrue);
   });
+
+  testWidgets('DailyJourneyScreen opens MistakeAutopsyView when vault button is tapped', (tester) async {
+    final apiService = EngineApiService();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<EngineApiService>.value(value: apiService),
+          ChangeNotifierProvider<SessionViewModel>(
+            create: (_) => SessionViewModel(
+              apiService: apiService,
+              sessionId: 'test-session-005',
+              targetEquation: 'x^2 + 6x - 2 = 0',
+            ),
+          ),
+          ChangeNotifierProvider<DiagnosticViewModel>(
+            create: (_) => DiagnosticViewModel(
+              apiService: apiService,
+              sessionId: 'test-cat-005',
+            ),
+          ),
+        ],
+        child: const MaterialApp(
+          home: DailyJourneyScreen(),
+        ),
+      ),
+    );
+
+    // Find and tap the Mistake Vault button
+    final vaultBtn = find.byKey(const Key('header_mistake_vault_button'));
+    expect(vaultBtn, findsOneWidget);
+    await tester.tap(vaultBtn);
+    await tester.pumpAndSettle();
+
+    // Verify that MistakeAutopsyView is pushed
+    expect(find.byKey(const Key('mistake_vault_view')), findsOneWidget);
+    expect(find.text('Bilişsel Hata Otopsisi Kasası'), findsOneWidget);
+  });
 }

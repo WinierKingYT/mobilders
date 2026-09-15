@@ -5,6 +5,8 @@ FSRS-4.5 aralıklı tekrar modeliyle entegre bilişsel hata hafızası ve telafi
 from __future__ import annotations
 import time
 import uuid
+import sqlite3
+import json
 from enum import Enum
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
@@ -60,14 +62,125 @@ class BossBattleState(BaseModel):
 class CognitiveMistakeVault:
     """
     Kişisel Bilişsel Hata Otopsisi Kasası.
-    Öğrencinin kavramsal yanılgılarını (misconceptions) kalıcı olarak saklar,
+    Öğrencinin kavramsal yanılgılarını (misconceptions) kalıcı olarak SQLite/Postgres tabanında saklar,
     FSRS-4.5 ile zamanlar ve unutma eğrisine göre telafi planlar.
     """
 
-    def __init__(self, fsrs_engine: Optional[FSRSEngine] = None):
+    def __init__(
+        self,
+        fsrs_engine: Optional[FSRSEngine] = None,
+        db_path: str = ":memory:",
+    ):
         self.fsrs = fsrs_engine or FSRSEngine()
-        # In-memory storage: mistake_id -> MistakeRecord
+        self.db_path = db_path
+        self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        self._init_db()
         self._records: Dict[str, MistakeRecord] = {}
+        self._load_all_from_db()
+
+    def _init_db(self) -> None:
+        """SQLite şemasını ve indekslerini başlatır."""
+        cursor = self._conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS mistake_records (
+                mistake_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                node_id TEXT NOT NULL,
+                bug_id TEXT NOT NULL,
+                problem_statement TEXT NOT NULL,
+                offending_step TEXT NOT NULL,
+                correct_principle TEXT NOT NULL,
+                remediation_directive TEXT NOT NULL,
+                created_at REAL NOT NULL,
+                last_reviewed_at REAL,
+                due_date REAL NOT NULL,
+                status TEXT NOT NULL,
+                dsr_stability REAL NOT NULL,
+                dsr_difficulty REAL NOT NULL,
+                dsr_retrievability REAL NOT NULL,
+                dsr_repetitions INTEGER NOT NULL,
+                dsr_lapses INTEGER NOT NULL,
+                self_correction_stage INTEGER NOT NULL,
+                consecutive_clean_solves INTEGER NOT NULL,
+                history_json TEXT NOT NULL
+            );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_mistakes_user_due ON mistake_records(user_id, status, due_date);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_mistakes_bug ON mistake_records(bug_id);")
+        self._conn.commit()
+
+    def _save_record_to_db(self, record: MistakeRecord) -> None:
+        """Kayıt kartını SQLite veritabanına yazar."""
+        cursor = self._conn.cursor()
+        cursor.execute("""
+            INSERT OR REPLACE INTO mistake_records VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            record.mistake_id,
+            record.user_id,
+            record.node_id,
+            record.bug_id,
+            record.problem_statement,
+            record.offending_step,
+            record.correct_principle,
+            record.remediation_directive,
+            record.created_at,
+            record.last_reviewed_at,
+            record.due_date,
+            record.status.value,
+            record.dsr_state.stability,
+            record.dsr_state.difficulty,
+            record.dsr_state.retrievability,
+            record.dsr_state.repetitions,
+            record.dsr_state.lapses,
+            record.self_correction_stage.value,
+            record.consecutive_clean_solves,
+            json.dumps(record.history),
+        ))
+        self._conn.commit()
+
+    def _row_to_record(self, row: tuple) -> MistakeRecord:
+        """Veritabanı satırını MistakeRecord nesnesine dönüştürür."""
+        (
+            mistake_id, user_id, node_id, bug_id, problem_statement,
+            offending_step, correct_principle, remediation_directive,
+            created_at, last_reviewed_at, due_date, status_val,
+            dsr_stability, dsr_difficulty, dsr_retrievability,
+            dsr_repetitions, dsr_lapses,
+            self_corr_stage_val, consec_clean, history_json
+        ) = row
+        dsr = DSRState(
+            stability=dsr_stability,
+            difficulty=dsr_difficulty,
+            retrievability=dsr_retrievability,
+            repetitions=dsr_repetitions,
+            lapses=dsr_lapses,
+        )
+        return MistakeRecord(
+            mistake_id=mistake_id,
+            user_id=user_id,
+            node_id=node_id,
+            bug_id=bug_id,
+            problem_statement=problem_statement,
+            offending_step=offending_step,
+            correct_principle=correct_principle,
+            remediation_directive=remediation_directive,
+            created_at=created_at,
+            last_reviewed_at=last_reviewed_at,
+            due_date=due_date,
+            status=MistakeStatus(status_val),
+            dsr_state=dsr,
+            self_correction_stage=SelfCorrectionStage(self_corr_stage_val),
+            consecutive_clean_solves=consec_clean,
+            history=json.loads(history_json) if history_json else [],
+        )
+
+    def _load_all_from_db(self) -> None:
+        """Veritabanındaki tüm kayıtları önbelleğe yükler."""
+        cursor = self._conn.cursor()
+        cursor.execute("SELECT * FROM mistake_records")
+        for row in cursor.fetchall():
+            rec = self._row_to_record(row)
+            self._records[rec.mistake_id] = rec
 
     def record_mistake(
         self,
@@ -80,11 +193,9 @@ class CognitiveMistakeVault:
         remediation_directive: str,
         timestamp: Optional[float] = None,
     ) -> MistakeRecord:
-        """Kavramsal bir hata yapıldığında kasaya yeni bir otopsi dosyası açar."""
+        """Kavramsal bir hata yapıldığında kasaya yeni bir otopsi dosyası açar ve SQLite'a yazar."""
         curr_time = timestamp if timestamp is not None else time.time()
-        # Yeni hata için FSRS başlangıç durumu: Rating.AGAIN
         init_dsr = self.fsrs.init_dsr(Rating.AGAIN)
-        # Hemen telafi edilmesi için due_date = curr_time
         due_date = curr_time
 
         record = MistakeRecord(
@@ -109,6 +220,7 @@ class CognitiveMistakeVault:
             }],
         )
         self._records[record.mistake_id] = record
+        self._save_record_to_db(record)
         return record
 
     def get_mistake(self, mistake_id: str) -> Optional[MistakeRecord]:
@@ -141,7 +253,30 @@ class CognitiveMistakeVault:
         return sorted(due, key=lambda x: x.due_date)
 
     def update_record(self, record: MistakeRecord) -> None:
+        """Kayıt kartını günceller ve SQLite'a yazar."""
         self._records[record.mistake_id] = record
+        self._save_record_to_db(record)
+
+    def delete_mistake(self, mistake_id: str) -> bool:
+        """Hata kaydını hem bellekten hem SQLite veritabanından siler."""
+        if mistake_id in self._records:
+            del self._records[mistake_id]
+            cursor = self._conn.cursor()
+            cursor.execute("DELETE FROM mistake_records WHERE mistake_id = ?", (mistake_id,))
+            self._conn.commit()
+            return True
+        return False
+
+    def query_sql(self, query: str, params: tuple = ()) -> List[tuple]:
+        """Doğrudan SQLite SQL sorgusu çalıştırır."""
+        cursor = self._conn.cursor()
+        cursor.execute(query, params)
+        return cursor.fetchall()
+
+    def close(self) -> None:
+        """Veritabanı bağlantısını kapatır."""
+        if self._conn:
+            self._conn.close()
 
     def get_vault_analytics(self, user_id: str) -> Dict[str, Any]:
         """Kasa analitiği: Açık, telafide, kür edilmiş oranları ve en sık yapılan yanılgılar."""

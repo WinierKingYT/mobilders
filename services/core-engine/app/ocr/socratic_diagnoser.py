@@ -8,13 +8,16 @@ Ref: Hedef 5.
 
 from __future__ import annotations
 import re
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, TYPE_CHECKING
 from app.cas.symbolic_engine import SymbolicEquivalenceEngine
 from app.misconceptions.detector import QuadraticMisconceptionDetector
 from app.graph.knowledge_dag import KnowledgeDAG
 from app.socratic.guardrail import ZeroLeakageGuardrail
 from app.ocr.models import ScannedStep, MathScanResponse
 from app.ocr.vision_pipeline import MathVisionPipeline
+
+if TYPE_CHECKING:
+    from app.vault.mistake_vault import CognitiveMistakeVault
 
 
 class SocraticNotebookDiagnoser:
@@ -30,17 +33,20 @@ class SocraticNotebookDiagnoser:
         detector: Optional[QuadraticMisconceptionDetector] = None,
         dag: Optional[KnowledgeDAG] = None,
         vision_pipeline: Optional[MathVisionPipeline] = None,
+        vault: Optional[CognitiveMistakeVault] = None,
     ):
         self.cas = cas or SymbolicEquivalenceEngine()
         self.detector = detector or QuadraticMisconceptionDetector(self.cas)
         self.dag = dag or KnowledgeDAG()
         self.vision = vision_pipeline or MathVisionPipeline(self.dag)
         self.guardrail = ZeroLeakageGuardrail()
+        self.vault = vault
 
     def diagnose_notebook_solution(
         self,
         segmented_lines: List[str],
         target_problem: Optional[str] = None,
+        user_id: str = "default_student",
     ) -> MathScanResponse:
         """
         Takes segmented lines from student notebook:
@@ -167,6 +173,23 @@ class SocraticNotebookDiagnoser:
             proposed_text=socratic_hint,
             language="tr",
         )
+
+        # 5. Auto-record to Cognitive Mistake Vault (Hedef 12 entegrasyonu)
+        if has_error and detected_bug and self.vault:
+            offending_content = (
+                steps_raw[first_error_index - 1]
+                if (first_error_index and 0 < first_error_index <= len(steps_raw))
+                else problem_raw
+            )
+            self.vault.record_mistake(
+                user_id=user_id,
+                node_id=node_id,
+                bug_id=detected_bug,
+                problem_statement=problem_raw,
+                offending_step=offending_content,
+                correct_principle=error_explanation or "Matematiksel kural ihlali",
+                remediation_directive=sanitized_hint,
+            )
 
         return MathScanResponse(
             problem_statement=problem_raw,

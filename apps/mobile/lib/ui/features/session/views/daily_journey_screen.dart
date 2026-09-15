@@ -13,6 +13,7 @@ import 'euclidean_canvas.dart';
 import '../../scanner/math_scanner_view.dart';
 import '../../modeling/problem_modeling_view.dart';
 import '../../analytics/views/cognitive_health_atlas_screen.dart';
+import '../../vault/mistake_autopsy_view.dart';
 import '../../../../core/localization.dart';
 import '../../../../core/services/haptic_feedback_service.dart';
 import '../../touchpad/math_touchpad.dart';
@@ -258,6 +259,62 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                     MaterialPageRoute(
                       builder: (_) => const Scaffold(
                         body: SafeArea(child: ProblemModelingView()),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              // Cognitive Mistake Vault & Weakness Hunter Button (Hedef 12)
+              IconButton(
+                key: const Key('header_mistake_vault_button'),
+                icon: const Icon(
+                  Icons.biotech_rounded,
+                  color: Color(0xFFF43F5E),
+                ),
+                tooltip: "Bilişsel Hata Kasası & Zaaf Avcısı",
+                onPressed: () {
+                  HapticFeedbackService().selectionClick();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => MistakeAutopsyView(
+                        mistakes: const [
+                          MistakeAutopsyItem(
+                            id: 'm1',
+                            bugId: 'BUG-FOUND-01',
+                            nodeId: 'N_ROOT_03',
+                            problem: '-(-4) ifadesinin değeri nedir?',
+                            offendingStep: '-(-4) = -4',
+                            correctPrinciple: '-(-x) = +x (Çift eksi artı yapar)',
+                            status: 'open',
+                            stabilityDays: 0.5,
+                            isDue: true,
+                          ),
+                          MistakeAutopsyItem(
+                            id: 'm2',
+                            bugId: 'BUG-EUC-04',
+                            nodeId: 'N165',
+                            problem: 'Dik üçgende hipotenüse inen dikme: p=4, k=9 ise h=?',
+                            offendingStep: 'h^2 = 4 + 9 = 13',
+                            correctPrinciple: 'h^2 = p * k = 36 => h = 6 (Öklid Bağıntısı)',
+                            status: 'in_remediation',
+                            stabilityDays: 1.5,
+                            isDue: true,
+                          ),
+                          MistakeAutopsyItem(
+                            id: 'm3',
+                            bugId: 'BUG-ANAG-01',
+                            nodeId: 'N143',
+                            problem: 'y = 2x + 1 doğrusuna dik olan doğrunun eğimi nedir?',
+                            offendingStep: 'm2 = 2',
+                            correctPrinciple: 'm1 * m2 = -1 => m2 = -1/2 (Dik Doğrular Bağıntısı)',
+                            status: 'open',
+                            stabilityDays: 0.8,
+                            isDue: true,
+                          ),
+                        ],
+                        onStartBossBattle: () {
+                          HapticFeedbackService().stepSuccess();
+                        },
                       ),
                     ),
                   );

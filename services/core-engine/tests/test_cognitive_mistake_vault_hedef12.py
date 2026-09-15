@@ -622,4 +622,190 @@ def test_boss_battle_state_schema():
     assert not b.is_defeated
 
 
+# ==============================================================================
+# 5. SQLITE DISK PERSISTENCE & DATABASE TESTS
+# ==============================================================================
+
+def test_sqlite_file_persistence(tmp_path):
+    """Verilerin SQLite dosyasında kalıcı olduğunu ve yeniden yükleme ile korunduğunu doğrular."""
+    db_file = str(tmp_path / "test_mistakes.db")
+    vault1 = CognitiveMistakeVault(db_path=db_file)
+
+    now = 123456.0
+    r1 = vault1.record_mistake(
+        user_id="user_disk",
+        node_id="N165",
+        bug_id="BUG-EUC-04",
+        problem_statement="h=6, p=4 ise k=?",
+        offending_step="h^2 = 4 + 9",
+        correct_principle="h^2 = p * k",
+        remediation_directive="Öklid kuralını hatırla",
+        timestamp=now,
+    )
+    vault1.close()
+
+    # Yeni bir vault örneği ile aynı dosyayı aç ve doğrula
+    vault2 = CognitiveMistakeVault(db_path=db_file)
+    r_loaded = vault2.get_mistake(r1.mistake_id)
+
+    assert r_loaded is not None
+    assert r_loaded.mistake_id == r1.mistake_id
+    assert r_loaded.user_id == "user_disk"
+    assert r_loaded.bug_id == "BUG-EUC-04"
+    assert r_loaded.status == MistakeStatus.OPEN
+    assert r_loaded.dsr_state.stability == r1.dsr_state.stability
+    assert len(r_loaded.history) >= 1
+    vault2.close()
+
+
+def test_sqlite_query_sql_and_delete(tmp_path):
+    """Doğrudan SQL sorgusu çalıştırma ve kayıt silme işlevlerini doğrular."""
+    db_file = str(tmp_path / "test_sql.db")
+    vault = CognitiveMistakeVault(db_path=db_file)
+
+    r = vault.record_mistake("u_sql", "N01", "BUG-FOUND-01", "P", "S", "C", "D")
+    rows = vault.query_sql("SELECT bug_id, status FROM mistake_records WHERE mistake_id = ?", (r.mistake_id,))
+    assert len(rows) == 1
+    assert rows[0][0] == "BUG-FOUND-01"
+    assert rows[0][1] == "open"
+
+    # Silme testi
+    assert vault.delete_mistake(r.mistake_id) is True
+    assert vault.get_mistake(r.mistake_id) is None
+
+    rows_after = vault.query_sql("SELECT * FROM mistake_records WHERE mistake_id = ?", (r.mistake_id,))
+    assert len(rows_after) == 0
+    vault.close()
+
+
+# ==============================================================================
+# 6. OCR SOCRATIC DIAGNOSER -> VAULT AUTO-RECORD TESTS
+# ==============================================================================
+
+def test_ocr_diagnoser_auto_records_to_vault():
+    """Hedef 8 Sokratik kamera teşhisinde hata saptandığında otomatik olarak Kasaya işlendiğini doğrular."""
+    from app.ocr.socratic_diagnoser import SocraticNotebookDiagnoser
+
+    vault = CognitiveMistakeVault()
+    diagnoser = SocraticNotebookDiagnoser(vault=vault)
+
+    # Hatalı defter çözümü: x^2 - 5x + 6 = 0 için (x - 2)(x - 3) = 0 yerine sahte adım
+    lines = [
+        "x^2 - 5*x + 6 = 0",
+        "x*(x - 5) + 6 = 0",
+        "x*(x - 5) = -6",
+        "x = -6",  # Sahte kök hatası
+    ]
+    resp = diagnoser.diagnose_notebook_solution(lines, user_id="student_ocr_1")
+
+    assert resp.has_error is True
+    # Kasaya otomatik işlenmiş olmalı
+    mistakes = vault.list_mistakes("student_ocr_1")
+    assert len(mistakes) == 1
+    m = mistakes[0]
+    assert m.user_id == "student_ocr_1"
+    assert m.status == MistakeStatus.OPEN
+    assert "x" in m.offending_step
+
+
+# ==============================================================================
+# 7. FASTAPI REST API INTEGRATION TESTS
+# ==============================================================================
+
+def test_fastapi_vault_endpoints():
+    """Hata kasası REST API rotalarının (record, list, due, analytics, self-correction, boss) çalıştığını doğrular."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+
+    # 1. Hata Kaydet
+    rec_payload = {
+        "user_id": "api_user",
+        "node_id": "N143",
+        "bug_id": "BUG-ANAG-01",
+        "problem_statement": "y = 2x + 1 doğrusuna dik doğrunun eğimi",
+        "offending_step": "m2 = 2",
+        "correct_principle": "m1 * m2 = -1",
+        "remediation_directive": "Dik doğrularda eğimler çarpımı -1 dir.",
+    }
+    r_resp = client.post("/api/v1/vault/record", json=rec_payload)
+    assert r_resp.status_code == 200
+    rec_data = r_resp.json()
+    mistake_id = rec_data["mistake_id"]
+    assert rec_data["bug_id"] == "BUG-ANAG-01"
+
+    # 2. Hataları Listele
+    l_resp = client.get("/api/v1/vault/list/api_user")
+    assert l_resp.status_code == 200
+    assert len(l_resp.json()) >= 1
+
+    # 3. Analitik
+    a_resp = client.get("/api/v1/vault/analytics/api_user")
+    assert a_resp.status_code == 200
+    assert a_resp.json()["total_mistakes"] >= 1
+
+    # 4. Kendi Hatasını Düzeltme: Başlat
+    s_resp = client.post("/api/v1/vault/self-correction/start", json={"mistake_id": mistake_id})
+    assert s_resp.status_code == 200
+    assert s_resp.json()["stage"] == 1
+
+    # 5. Aşama 1 Teşhis
+    d_resp = client.post("/api/v1/vault/self-correction/diagnose", json={"mistake_id": mistake_id, "is_identified": True})
+    assert d_resp.status_code == 200
+    assert d_resp.json()["stage"] == 2
+
+    # 6. Aşama 2 İlke
+    e_resp = client.post("/api/v1/vault/self-correction/explain", json={"mistake_id": mistake_id, "is_principle_correct": True})
+    assert e_resp.status_code == 200
+    assert e_resp.json()["stage"] == 3
+
+    # 7. Aşama 3 Temiz Çözüm
+    res_resp = client.post("/api/v1/vault/self-correction/resolve", json={"mistake_id": mistake_id, "is_correct": True})
+    assert res_resp.status_code == 200
+    assert res_resp.json()["stage"] == 4
+
+
+# ==============================================================================
+# 8. 30 GÜNLÜK FSRS BİLİŞSEL TELAFİ SİMÜLASYONU
+# ==============================================================================
+
+def test_30_day_fsrs_remediation_simulation():
+    """30 günlük simülasyonda öğrencinin periyodik temiz çözümlerle hatayı tamamen kür ettiğini doğrular."""
+    vault = CognitiveMistakeVault()
+    session = SelfCorrectionSessionManager(vault)
+
+    start_time = 1700000000.0  # Başlangıç zaman damgası
+    # Öğrenci 1. gün bir kök cebir hatası yaptı
+    r = vault.record_mistake(
+        "sim_student",
+        "N_ROOT_03",
+        "BUG-FOUND-01",
+        "-(-5) = ?",
+        "-(-5) = -5",
+        "-(-x) = +x",
+        "Çift eksi artı yapar",
+        timestamp=start_time,
+    )
+    assert r.status == MistakeStatus.OPEN
+
+    # 1. Gün: Kendi hatasını düzeltme seansı (Aşama 1, 2, 3 temiz)
+    session.submit_step_diagnosis(r.mistake_id, True)
+    session.submit_principle_explanation(r.mistake_id, True)
+    res1 = session.submit_clean_resolution(r.mistake_id, True, current_time=start_time + 1800.0)
+    assert res1["status"] == "in_remediation"
+    stab1 = res1["stability_days"]
+
+    # 3. Gün (due_date sonrasında): İkinci tekrar oturumu
+    next_due = res1["next_due_date"]
+    session.submit_step_diagnosis(r.mistake_id, True)
+    session.submit_principle_explanation(r.mistake_id, True)
+    res2 = session.submit_clean_resolution(r.mistake_id, True, current_time=next_due + 3600.0)
+    stab2 = res2["stability_days"]
+    assert stab2 > stab1
+    # 2 ardışık temiz çözüm ve stabilite >= 2.0 gün => CURED
+    assert res2["status"] == "cured"
+    assert vault.get_mistake(r.mistake_id).status == MistakeStatus.CURED
+
+
 
