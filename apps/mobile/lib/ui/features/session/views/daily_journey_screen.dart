@@ -6,6 +6,7 @@ import 'session_screen.dart';
 import 'scratchpad_overlay.dart';
 import 'al_khwarizmi_canvas.dart';
 import 'unit_circle_canvas.dart';
+import 'dynamic_tangent_canvas.dart';
 import '../../analytics/views/cognitive_health_atlas_screen.dart';
 import '../../../../core/localization.dart';
 import '../../../../core/services/haptic_feedback_service.dart';
@@ -32,6 +33,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   bool _showScratchpad = false;
   bool _showGeometricCanvas = false;
   bool _showUnitCircleCanvas = false;
+  bool _showTangentCanvas = false;
   double _confidenceLevel = 0.85;
   int? _selectedWarmupOption;
 
@@ -126,6 +128,19 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                   onPressed: () {
                     HapticFeedbackService().selectionClick();
                     setState(() => _showUnitCircleCanvas = !_showUnitCircleCanvas);
+                  },
+                ),
+              // Dynamic Tangent Canvas Toggle Button (Hedef 6)
+              if (_currentPhase == DailyPhase.problemBoard)
+                IconButton(
+                  icon: Icon(
+                    Icons.show_chart_rounded,
+                    color: _showTangentCanvas ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
+                  ),
+                  tooltip: "Dinamik Teğet Eğimi (Türev)",
+                  onPressed: () {
+                    HapticFeedbackService().selectionClick();
+                    setState(() => _showTangentCanvas = !_showTangentCanvas);
                   },
                 ),
               // Vector Inking Canvas Quick Toggle Button
@@ -258,6 +273,11 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
               const Padding(
                 padding: EdgeInsets.all(12),
                 child: UnitCircleCanvas(),
+              ),
+            if (_showTangentCanvas)
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: DynamicTangentCanvas(),
               ),
             const Expanded(
               child: SessionScreen(),
