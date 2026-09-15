@@ -9,6 +9,7 @@ import 'unit_circle_canvas.dart';
 import 'dynamic_tangent_canvas.dart';
 import 'riemann_integral_canvas.dart';
 import 'interactive_coordinate_canvas.dart';
+import 'euclidean_canvas.dart';
 import '../../scanner/math_scanner_view.dart';
 import '../../modeling/problem_modeling_view.dart';
 import '../../analytics/views/cognitive_health_atlas_screen.dart';
@@ -40,6 +41,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   bool _showTangentCanvas = false;
   bool _showRiemannCanvas = false;
   bool _showCoordinateCanvas = false;
+  bool _showEuclideanCanvas = false;
   double _confidenceLevel = 0.85;
   int? _selectedWarmupOption;
 
@@ -174,6 +176,20 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                   onPressed: () {
                     HapticFeedbackService().selectionClick();
                     setState(() => _showCoordinateCanvas = !_showCoordinateCanvas);
+                  },
+                ),
+              // Euclidean & Auxiliary Line Canvas Toggle Button (Hedef 11)
+              if (_currentPhase == DailyPhase.problemBoard)
+                IconButton(
+                  key: const Key('toggle_euclidean_canvas_button'),
+                  icon: Icon(
+                    Icons.architecture_rounded,
+                    color: _showEuclideanCanvas ? const Color(0xFFF43F5E) : const Color(0xFF94A3B8),
+                  ),
+                  tooltip: "Sentetik Öklid & Ek Çizim Kanvası",
+                  onPressed: () {
+                    HapticFeedbackService().selectionClick();
+                    setState(() => _showEuclideanCanvas = !_showEuclideanCanvas);
                   },
                 ),
               // Vector Inking Canvas Quick Toggle Button
@@ -358,6 +374,11 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
               const Padding(
                 padding: EdgeInsets.all(12),
                 child: InteractiveCoordinateCanvas(),
+              ),
+            if (_showEuclideanCanvas)
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: EuclideanCanvas(),
               ),
             const Expanded(
               child: SessionScreen(),
