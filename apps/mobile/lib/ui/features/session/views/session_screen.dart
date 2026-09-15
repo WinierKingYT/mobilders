@@ -12,6 +12,7 @@ import '../view_models/session_view_model.dart';
 import '../widgets/hesitation_whisper_bubble.dart';
 import '../widgets/socratic_hint_dialog.dart';
 import '../widgets/source_unpacker_widget.dart';
+import '../../notes/living_notes_drawer.dart';
 import 'zen_focus_overlay.dart';
 
 class SessionScreen extends StatefulWidget {
@@ -338,6 +339,12 @@ class _SessionScreenState extends State<SessionScreen> {
             tooltip: '💡 Takıldım (Sokratik İpucu)',
             onPressed: () => _showSocraticHint(context, viewModel),
           ),
+          IconButton(
+            key: const Key('open_living_notes_button'),
+            icon: const Icon(Icons.menu_book_rounded, color: Color(0xFF38BDF8)),
+            tooltip: '📚 Yaşayan Ders Notları',
+            onPressed: () => _openLivingNotes(context, viewModel),
+          ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(4),
@@ -510,6 +517,19 @@ class _SessionScreenState extends State<SessionScreen> {
       targetEquation: viewModel.targetEquation,
       onResolved: () {
         // Boost feedback
+      },
+    );
+  }
+
+  void _openLivingNotes(BuildContext context, SessionViewModel viewModel) {
+    LivingNotesDrawer.show(
+      context,
+      nodeId: viewModel.nodeId,
+      onResumeSession: () {
+        // Safe resume without losing draft
+      },
+      onNoteVisited: (visitedNodeId) {
+        // Track cognitive reinforcement needed nodes
       },
     );
   }
