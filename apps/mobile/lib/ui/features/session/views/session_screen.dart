@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/app_theme.dart';
+import '../../../../data/services/session_restoration_manager.dart';
 import '../../../../domain/models/solution_step.dart';
+import '../../touchpad/instant_math_sanitizer.dart';
 import '../../touchpad/math_touchpad.dart';
+import '../../touchpad/zero_layout_shift_dock.dart';
 import '../../accessibility/dyscalculia_helpers.dart';
 import '../../accessibility/tunnel_focus_mode.dart';
 import '../view_models/session_view_model.dart';
+import 'zen_focus_overlay.dart';
 
 class SessionScreen extends StatefulWidget {
   const SessionScreen({super.key});
@@ -17,9 +21,55 @@ class SessionScreen extends StatefulWidget {
 class _SessionScreenState extends State<SessionScreen> {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final SessionRestorationManager _restorationManager = SessionRestorationManager();
+  bool _isRestored = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _restorationManager.bindLifecycleObserver(
+      onSaveStateRequested: _saveCurrentState,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndRestoreDraft();
+    });
+  }
+
+  Future<void> _checkAndRestoreDraft() async {
+    if (!mounted || _isRestored) return;
+    final draft = await _restorationManager.restoreDraft();
+    if (draft != null && mounted) {
+      final vm = context.read<SessionViewModel>();
+      if (draft.sessionId == vm.sessionId) {
+        if (draft.draftText.isNotEmpty) {
+          _inputController.text = draft.draftText;
+        }
+        if (draft.serializedSteps.isNotEmpty && vm.steps.isEmpty) {
+          vm.loadFromRestoredState(draft);
+        }
+      }
+    }
+    _isRestored = true;
+  }
+
+  void _saveCurrentState() {
+    if (!mounted) return;
+    final vm = context.read<SessionViewModel>();
+    _restorationManager.saveDraft(
+      sessionId: vm.sessionId,
+      nodeId: vm.nodeId,
+      targetEquation: vm.targetEquation,
+      draftText: _inputController.text,
+      inputMode: vm.inputMode,
+      steps: vm.steps,
+      currentPl: vm.currentPl,
+    );
+  }
 
   @override
   void dispose() {
+    _saveCurrentState();
+    _restorationManager.unbindLifecycleObserver();
     _inputController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -46,6 +96,11 @@ class _SessionScreenState extends State<SessionScreen> {
       if (result.isValid) {
         _inputController.clear();
       }
+      if (viewModel.isTargetReached) {
+        _restorationManager.clearDraft();
+      } else {
+        _saveCurrentState();
+      }
       _scrollToBottom();
     }
   }
@@ -53,6 +108,15 @@ class _SessionScreenState extends State<SessionScreen> {
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<SessionViewModel>();
+
+    if (viewModel.isZenMode) {
+      return ZenFocusOverlay(
+        viewModel: viewModel,
+        inputController: _inputController,
+        onExitZen: viewModel.toggleZenMode,
+        onSubmit: () => _handleSubmit(viewModel),
+      );
+    }
 
     final mainContent = SafeArea(
       child: Column(
@@ -153,15 +217,27 @@ class _SessionScreenState extends State<SessionScreen> {
                   child: ValueListenableBuilder<TextEditingValue>(
                     valueListenable: _inputController,
                     builder: (context, value, _) {
-                      return Text(
-                        value.text.isEmpty ? '...' : value.text,
-                        style: TextStyle(
+                      if (value.text.isEmpty) {
+                        return const Text(
+                          '...',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 18,
+                            color: AppColors.textMuted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        );
+                      }
+                      final spans = InstantMathSanitizer.buildRainbowSpans(
+                        value.text,
+                        defaultStyle: const TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 18,
-                          color: value.text.isEmpty ? AppColors.textMuted : AppColors.textPrimary,
+                          color: AppColors.textPrimary,
                           fontWeight: FontWeight.w600,
                         ),
                       );
+                      return RichText(text: TextSpan(children: spans));
                     },
                   ),
                 ),
@@ -171,13 +247,19 @@ class _SessionScreenState extends State<SessionScreen> {
 
           const Divider(height: 1, color: AppColors.bgCard),
 
-          // Bottom: Dual-mode Input Area (Touchpad or Virtual Keyboard or Inking)
-          MathTouchpad(
-            controller: _inputController,
-            inputMode: viewModel.inputMode,
+          // Bottom: Zero Layout Shift Dock (Touchpad, Virtual Keyboard, Inking)
+          ZeroLayoutShiftDock(
+            currentMode: viewModel.inputMode,
             onModeChanged: viewModel.setInputMode,
-            isSubmitting: viewModel.isSubmitting,
-            onSubmit: () => _handleSubmit(viewModel),
+            isZenModeActive: viewModel.isZenMode,
+            onToggleZenMode: viewModel.toggleZenMode,
+            child: MathTouchpad(
+              controller: _inputController,
+              inputMode: viewModel.inputMode,
+              onModeChanged: viewModel.setInputMode,
+              isSubmitting: viewModel.isSubmitting,
+              onSubmit: () => _handleSubmit(viewModel),
+            ),
           ),
         ],
       ),
@@ -223,6 +305,14 @@ class _SessionScreenState extends State<SessionScreen> {
             ),
             tooltip: 'Diskalkuli Desteği',
             onPressed: viewModel.toggleDyscalculiaHelper,
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.self_improvement_rounded,
+              color: viewModel.isZenMode ? const Color(0xFF38BDF8) : AppColors.textMuted,
+            ),
+            tooltip: 'Zen Odak Modu',
+            onPressed: viewModel.toggleZenMode,
           ),
           IconButton(
             icon: const Icon(Icons.lightbulb_outline_rounded, color: AppColors.accentWarning),

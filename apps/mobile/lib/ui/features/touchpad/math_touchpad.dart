@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
+import '../../../core/services/haptic_feedback_service.dart';
+import 'instant_math_sanitizer.dart';
 import 'vector_inking_canvas.dart';
 
 enum InputMode {
@@ -26,11 +27,24 @@ class MathTouchpad extends StatelessWidget {
   });
 
   void _insertText(String text) {
-    HapticFeedback.lightImpact();
+    HapticFeedbackService().keyPress();
     final value = controller.value;
     final selection = value.selection;
     final start = selection.start >= 0 ? selection.start : value.text.length;
     final end = selection.end >= 0 ? selection.end : value.text.length;
+
+    // Check if inserting an operator or dot at the end
+    if (start == value.text.length && end == value.text.length) {
+      final sanitized = InstantMathSanitizer.sanitizeInput(
+        currentText: value.text,
+        incomingToken: text,
+      );
+      controller.value = TextEditingValue(
+        text: sanitized,
+        selection: TextSelection.collapsed(offset: sanitized.length),
+      );
+      return;
+    }
 
     final newText = value.text.replaceRange(start, end, text);
     controller.value = TextEditingValue(
@@ -40,7 +54,7 @@ class MathTouchpad extends StatelessWidget {
   }
 
   void _backspace() {
-    HapticFeedback.lightImpact();
+    HapticFeedbackService().keyPress();
     final value = controller.value;
     final selection = value.selection;
     final start = selection.start >= 0 ? selection.start : value.text.length;
@@ -62,6 +76,11 @@ class MathTouchpad extends StatelessWidget {
         deleteLength = 3;
       } else if (toDelete.endsWith(' = ')) {
         deleteLength = 3;
+      } else if (toDelete.endsWith(' + ') ||
+          toDelete.endsWith(' - ') ||
+          toDelete.endsWith(' * ') ||
+          toDelete.endsWith(' / ')) {
+        deleteLength = 3;
       }
 
       final newText = value.text.replaceRange(start - deleteLength, start, '');
@@ -73,7 +92,7 @@ class MathTouchpad extends StatelessWidget {
   }
 
   void _clear() {
-    HapticFeedback.mediumImpact();
+    HapticFeedbackService().clearAction();
     controller.clear();
   }
 
@@ -99,12 +118,18 @@ class MathTouchpad extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.grid_view_rounded, color: AppColors.accentPrimary),
                 tooltip: 'Matematik Touchpadine Geç',
-                onPressed: () => onModeChanged(InputMode.touchpad),
+                onPressed: () {
+                  HapticFeedbackService().modeSwitch();
+                  onModeChanged(InputMode.touchpad);
+                },
               ),
               IconButton(
                 icon: const Icon(Icons.keyboard_outlined, color: AppColors.textMuted),
                 tooltip: 'Klavyeye Geç',
-                onPressed: () => onModeChanged(InputMode.virtualKeyboard),
+                onPressed: () {
+                  HapticFeedbackService().modeSwitch();
+                  onModeChanged(InputMode.virtualKeyboard);
+                },
               ),
               const Spacer(),
             ],
@@ -134,12 +159,18 @@ class MathTouchpad extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.grid_view_rounded, color: AppColors.accentPrimary),
                 tooltip: 'Matematik Touchpadine Geç',
-                onPressed: () => onModeChanged(InputMode.touchpad),
+                onPressed: () {
+                  HapticFeedbackService().modeSwitch();
+                  onModeChanged(InputMode.touchpad);
+                },
               ),
               IconButton(
                 icon: const Icon(Icons.draw_rounded, color: Color(0xFF38BDF8)),
                 tooltip: 'El Yazısı Kanvasına Geç',
-                onPressed: () => onModeChanged(InputMode.inkingCanvas),
+                onPressed: () {
+                  HapticFeedbackService().modeSwitch();
+                  onModeChanged(InputMode.inkingCanvas);
+                },
               ),
               const SizedBox(width: 4),
               Expanded(
@@ -162,12 +193,20 @@ class MathTouchpad extends StatelessWidget {
                     ),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   ),
-                  onSubmitted: (_) => onSubmit(),
+                  onSubmitted: (_) {
+                    HapticFeedbackService().selectionClick();
+                    onSubmit();
+                  },
                 ),
               ),
               const SizedBox(width: 8),
               ElevatedButton(
-                onPressed: isSubmitting ? null : onSubmit,
+                onPressed: isSubmitting
+                    ? null
+                    : () {
+                        HapticFeedbackService().selectionClick();
+                        onSubmit();
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accentPrimary,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -191,29 +230,37 @@ class MathTouchpad extends StatelessWidget {
   Widget _buildTouchpadGrid(BuildContext context) {
     return Container(
       color: AppColors.bgSurface,
-      padding: const EdgeInsets.fromLTRB(10, 6, 10, 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Input Mode Quick Switch Bar
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton.icon(
-                onPressed: () => onModeChanged(InputMode.inkingCanvas),
-                icon: const Icon(Icons.draw_rounded, size: 16, color: Color(0xFF38BDF8)),
-                label: const Text("El Yazısı Kanvası", style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12)),
-              ),
-              const SizedBox(width: 8),
-              TextButton.icon(
-                onPressed: () => onModeChanged(InputMode.virtualKeyboard),
-                icon: const Icon(Icons.keyboard_outlined, size: 16, color: AppColors.textMuted),
-                label: const Text("Klavye", style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          // Row 1: Math Variables & Functions
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+      child: SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Input Mode Quick Switch Bar
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    HapticFeedbackService().modeSwitch();
+                    onModeChanged(InputMode.inkingCanvas);
+                  },
+                  icon: const Icon(Icons.draw_rounded, size: 16, color: Color(0xFF38BDF8)),
+                  label: const Text("El Yazısı Kanvası", style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12)),
+                ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: () {
+                    HapticFeedbackService().modeSwitch();
+                    onModeChanged(InputMode.virtualKeyboard);
+                  },
+                  icon: const Icon(Icons.keyboard_outlined, size: 16, color: AppColors.textMuted),
+                  label: const Text("Klavye", style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            // Row 1: Math Variables & Functions
           _buildRow([
             _key('x', () => _insertText('x'), flex: 1),
             _key('x²', () => _insertText('x^2'), flex: 1),
@@ -260,7 +307,10 @@ class MathTouchpad extends StatelessWidget {
             _key('3', () => _insertText('3')),
             _actionKey(
               '⌨',
-              () => onModeChanged(InputMode.virtualKeyboard),
+              () {
+                HapticFeedbackService().modeSwitch();
+                onModeChanged(InputMode.virtualKeyboard);
+              },
               icon: Icons.keyboard_outlined,
               tooltip: 'Serbest Klavyeye Geç',
             ),
@@ -268,14 +318,15 @@ class MathTouchpad extends StatelessWidget {
           ]),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildRow(List<Widget> children) {
     return Row(
       children: children
           .map((child) => Expanded(child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 2),
                 child: child,
               )))
           .toList(),
@@ -284,7 +335,7 @@ class MathTouchpad extends StatelessWidget {
 
   Widget _key(String label, VoidCallback onPressed, {int flex = 1, bool isOp = false}) {
     return SizedBox(
-      height: 48,
+      height: 42,
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
@@ -297,7 +348,7 @@ class MathTouchpad extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: isOp ? 18 : 20,
+            fontSize: isOp ? 17 : 19,
             fontWeight: FontWeight.w600,
             fontFamily: isOp ? null : 'monospace',
           ),
@@ -315,7 +366,7 @@ class MathTouchpad extends StatelessWidget {
     String? tooltip,
   }) {
     return SizedBox(
-      height: 48,
+      height: 42,
       child: Tooltip(
         message: tooltip ?? '',
         child: ElevatedButton(
@@ -328,10 +379,10 @@ class MathTouchpad extends StatelessWidget {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
           child: icon != null
-              ? Icon(icon, size: 20)
+              ? Icon(icon, size: 19)
               : Text(
                   label,
-                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
         ),
       ),
@@ -340,9 +391,14 @@ class MathTouchpad extends StatelessWidget {
 
   Widget _submitKey() {
     return SizedBox(
-      height: 48,
+      height: 42,
       child: ElevatedButton(
-        onPressed: isSubmitting ? null : onSubmit,
+        onPressed: isSubmitting
+            ? null
+            : () {
+                HapticFeedbackService().selectionClick();
+                onSubmit();
+              },
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.touchpadActionBg,
           foregroundColor: Colors.white,
@@ -356,7 +412,7 @@ class MathTouchpad extends StatelessWidget {
                 height: 18,
                 child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
               )
-            : const Icon(Icons.arrow_forward_rounded, size: 22),
+            : const Icon(Icons.arrow_forward_rounded, size: 21),
       ),
     );
   }

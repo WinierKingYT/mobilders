@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
+import '../../../../core/services/haptic_feedback_service.dart';
 import '../../../../data/services/engine_api_service.dart';
 import '../../../../data/services/offline_sync_queue.dart';
+import '../../../../data/services/session_restoration_manager.dart';
 import '../../../../domain/models/solution_step.dart';
 import '../../touchpad/math_touchpad.dart';
 
@@ -19,9 +21,10 @@ class SessionViewModel extends ChangeNotifier {
   InputMode _inputMode = InputMode.touchpad;
   DateTime _stepStartTime = DateTime.now();
 
-  // Accessibility States
+  // Accessibility & UX States
   bool _isTunnelFocusMode = false;
   bool _isDyscalculiaHelper = false;
+  bool _isZenMode = false;
 
   SessionViewModel({
     required EngineApiService apiService,
@@ -45,7 +48,22 @@ class SessionViewModel extends ChangeNotifier {
   OfflineSyncQueue get syncQueue => _syncQueue;
   bool get isTunnelFocusMode => _isTunnelFocusMode;
   bool get isDyscalculiaHelper => _isDyscalculiaHelper;
+  bool get isZenMode => _isZenMode;
   int get pendingOfflineCount => _syncQueue.pendingCount;
+
+  void toggleZenMode() {
+    _isZenMode = !_isZenMode;
+    notifyListeners();
+  }
+
+  void loadFromRestoredState(RestoredSessionState state) {
+    _steps.clear();
+    _steps.addAll(state.toSolutionSteps());
+    _inputMode = state.inputMode;
+    _currentPl = state.currentPl;
+    _isTargetReached = _steps.isNotEmpty && _steps.any((s) => s.isTargetReached);
+    notifyListeners();
+  }
 
   void setInputMode(InputMode mode) {
     _inputMode = mode;
@@ -92,12 +110,15 @@ class SessionViewModel extends ChangeNotifier {
       _steps.add(verifiedStep);
 
       if (verifiedStep.isValid) {
+        HapticFeedbackService().stepSuccess();
         if (verifiedStep.psychometrics != null) {
           _currentPl = verifiedStep.psychometrics!.bktPosteriorPl;
         }
         if (verifiedStep.isTargetReached) {
           _isTargetReached = true;
         }
+      } else {
+        HapticFeedbackService().stepError();
       }
 
       // Check if there are any pending offline steps to sync in the background
@@ -110,6 +131,7 @@ class SessionViewModel extends ChangeNotifier {
       notifyListeners();
       return verifiedStep;
     } catch (e) {
+      HapticFeedbackService().stepError();
       // Offline fallback: enqueue step into local persistent queue
       final offlineEvent = UnsyncedStepEvent(
         clientMsgId: clientMsgId,
