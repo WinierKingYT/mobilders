@@ -132,4 +132,56 @@ void main() {
     // Verify congratulatory feedback
     expect(find.textContaining('Harika! 3(8 - 4) = 3(4) = 12'), findsOneWidget);
   });
+
+  testWidgets('DailyJourneyScreen settings modal allows toggling input modes and accessibility features with haptics', (tester) async {
+    final apiService = EngineApiService();
+    final sessionVm = SessionViewModel(
+      apiService: apiService,
+      sessionId: 'test-session-004',
+      targetEquation: 'x^2 + 6x - 2 = 0',
+    );
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<EngineApiService>.value(value: apiService),
+          ChangeNotifierProvider<SessionViewModel>.value(value: sessionVm),
+          ChangeNotifierProvider<DiagnosticViewModel>(
+            create: (_) => DiagnosticViewModel(
+              apiService: apiService,
+              sessionId: 'test-cat-004',
+            ),
+          ),
+        ],
+        child: const MaterialApp(
+          home: DailyJourneyScreen(),
+        ),
+      ),
+    );
+
+    // Open settings modal
+    await tester.tap(find.byIcon(Icons.tune_rounded));
+    await tester.pumpAndSettle();
+
+    // Verify input mode options exist
+    expect(find.text('Girdi Modu & Çizim Tuvali'), findsOneWidget);
+    expect(find.text('Touchpad'), findsOneWidget);
+    expect(find.text('Klavye'), findsOneWidget);
+    expect(find.text('Çizim (İnk)'), findsOneWidget);
+
+    // Switch to inking mode
+    await tester.tap(find.text('Çizim (İnk)'));
+    await tester.pumpAndSettle();
+    expect(sessionVm.inputMode.name, 'inkingCanvas');
+
+    // Toggle ADHD mode
+    await tester.tap(find.text('DEHB Tünel Odak Modu'));
+    await tester.pumpAndSettle();
+    expect(sessionVm.isTunnelFocusMode, isTrue);
+
+    // Toggle Dyscalculia mode
+    await tester.tap(find.text('Diskalkuli Görsel Desteği'));
+    await tester.pumpAndSettle();
+    expect(sessionVm.isDyscalculiaHelper, isTrue);
+  });
 }

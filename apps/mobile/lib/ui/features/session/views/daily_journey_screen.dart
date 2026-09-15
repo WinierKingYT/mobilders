@@ -7,6 +7,8 @@ import 'scratchpad_overlay.dart';
 import 'al_khwarizmi_canvas.dart';
 import '../../analytics/views/cognitive_health_atlas_screen.dart';
 import '../../../../core/localization.dart';
+import '../../../../core/services/haptic_feedback_service.dart';
+import '../../touchpad/math_touchpad.dart';
 import '../view_models/session_view_model.dart';
 
 enum DailyPhase {
@@ -93,7 +95,10 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                     color: _showScratchpad ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
                   ),
                   tooltip: "Karalama Tuvali",
-                  onPressed: () => setState(() => _showScratchpad = !_showScratchpad),
+                  onPressed: () {
+                    HapticFeedbackService().selectionClick();
+                    setState(() => _showScratchpad = !_showScratchpad);
+                  },
                 ),
               // Al-Khwarizmi Tile Canvas Toggle Button
               if (_currentPhase == DailyPhase.problemBoard)
@@ -103,7 +108,28 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                     color: _showGeometricCanvas ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
                   ),
                   tooltip: "El-Harezmi Karoları",
-                  onPressed: () => setState(() => _showGeometricCanvas = !_showGeometricCanvas),
+                  onPressed: () {
+                    HapticFeedbackService().selectionClick();
+                    setState(() => _showGeometricCanvas = !_showGeometricCanvas);
+                  },
+                ),
+              // Vector Inking Canvas Quick Toggle Button
+              if (_currentPhase == DailyPhase.problemBoard)
+                Consumer<SessionViewModel>(
+                  builder: (context, vm, _) {
+                    final isInking = vm.inputMode == InputMode.inkingCanvas;
+                    return IconButton(
+                      icon: Icon(
+                        Icons.draw_rounded,
+                        color: isInking ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
+                      ),
+                      tooltip: "Vektör Çizim Tuvali",
+                      onPressed: () {
+                        HapticFeedbackService().modeSwitch();
+                        vm.setInputMode(isInking ? InputMode.touchpad : InputMode.inkingCanvas);
+                      },
+                    );
+                  },
                 ),
               // Cognitive Health & Atlas Button
               IconButton(
@@ -113,6 +139,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                 ),
                 tooltip: "Bilişsel Sağlık & Cebir Atlası",
                 onPressed: () {
+                  HapticFeedbackService().selectionClick();
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const CognitiveHealthAtlasScreen(),
@@ -127,7 +154,10 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                   color: Color(0xFF38BDF8),
                 ),
                 tooltip: "Erişilebilirlik & Müfredat Ayarları",
-                onPressed: () => _showSettingsModal(context),
+                onPressed: () {
+                  HapticFeedbackService().selectionClick();
+                  _showSettingsModal(context);
+                },
               ),
             ],
           ),
@@ -223,7 +253,10 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                       backgroundColor: const Color(0xFF10B981),
                       foregroundColor: Colors.white,
                     ),
-                    onPressed: () => setState(() => _currentPhase = DailyPhase.reflection),
+                    onPressed: () {
+                      HapticFeedbackService().selectionClick();
+                      setState(() => _currentPhase = DailyPhase.reflection);
+                    },
                     icon: const Icon(Icons.arrow_forward, size: 16),
                     label: const Text("Metabilişsel Kapanışa Geç"),
                   ),
@@ -306,7 +339,14 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(8),
-                    onTap: () => setState(() => _selectedWarmupOption = opt),
+                    onTap: () {
+                      if (opt == 8) {
+                        HapticFeedbackService().stepSuccess();
+                      } else {
+                        HapticFeedbackService().keyPress();
+                      }
+                      setState(() => _selectedWarmupOption = opt);
+                    },
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
@@ -371,7 +411,10 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
-            onPressed: () => setState(() => _currentPhase = DailyPhase.diagnostic),
+            onPressed: () {
+              HapticFeedbackService().selectionClick();
+              setState(() => _currentPhase = DailyPhase.diagnostic);
+            },
             child: const Text("Isınmayı Tamamla -> CAT Teşhise Başla"),
           ),
         ],
@@ -406,7 +449,10 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
-            onPressed: () => setState(() => _currentPhase = DailyPhase.problemBoard),
+            onPressed: () {
+              HapticFeedbackService().selectionClick();
+              setState(() => _currentPhase = DailyPhase.problemBoard);
+            },
             child: const Text("Çözüm Tahtasına İlerle (10 Dk)"),
           ),
         ],
@@ -458,7 +504,10 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                   divisions: 20,
                   activeColor: const Color(0xFF38BDF8),
                   inactiveColor: const Color(0xFF334155),
-                  onChanged: (val) => setState(() => _confidenceLevel = val),
+                  onChanged: (val) {
+                    HapticFeedbackService().selectionClick();
+                    setState(() => _confidenceLevel = val);
+                  },
                 ),
               ],
             ),
@@ -470,7 +519,10 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
-            onPressed: () => setState(() => _currentPhase = DailyPhase.completed),
+            onPressed: () {
+              HapticFeedbackService().stepSuccess();
+              setState(() => _currentPhase = DailyPhase.completed);
+            },
             child: const Text("Seansı Tamamla ve Kilitle"),
           ),
         ],
@@ -563,7 +615,10 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                       activeColor: const Color(0xFF38BDF8),
                       title: const Text("DEHB Tünel Odak Modu", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
                       subtitle: const Text("Obsidyen siyahı ve yüksek kontrast ile dikkat dağıtıcıları sıfırlar.", style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                      onChanged: (_) => sessionVm.toggleTunnelFocusMode(),
+                      onChanged: (_) {
+                        HapticFeedbackService().selectionClick();
+                        sessionVm.toggleTunnelFocusMode();
+                      },
                     ),
 
                     // Dyscalculia Visual Aids Toggle
@@ -572,7 +627,50 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                       activeColor: const Color(0xFF10B981),
                       title: const Text("Diskalkuli Görsel Desteği", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
                       subtitle: const Text("Uzamsal sayı çizgisi ve renk kodlu cebirsel terim rozetleri.", style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                      onChanged: (_) => sessionVm.toggleDyscalculiaHelper(),
+                      onChanged: (_) {
+                        HapticFeedbackService().selectionClick();
+                        sessionVm.toggleDyscalculiaHelper();
+                      },
+                    ),
+
+                    const SizedBox(height: 12),
+                    const Text("Girdi Modu & Çizim Tuvali", style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        _buildInputModeOption(
+                          label: "Touchpad",
+                          icon: Icons.grid_view_rounded,
+                          mode: InputMode.touchpad,
+                          selectedMode: sessionVm.inputMode,
+                          onSelect: () {
+                            HapticFeedbackService().modeSwitch();
+                            sessionVm.setInputMode(InputMode.touchpad);
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        _buildInputModeOption(
+                          label: "Klavye",
+                          icon: Icons.keyboard_outlined,
+                          mode: InputMode.virtualKeyboard,
+                          selectedMode: sessionVm.inputMode,
+                          onSelect: () {
+                            HapticFeedbackService().modeSwitch();
+                            sessionVm.setInputMode(InputMode.virtualKeyboard);
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        _buildInputModeOption(
+                          label: "Çizim (İnk)",
+                          icon: Icons.draw_rounded,
+                          mode: InputMode.inkingCanvas,
+                          selectedMode: sessionVm.inputMode,
+                          onSelect: () {
+                            HapticFeedbackService().modeSwitch();
+                            sessionVm.setInputMode(InputMode.inkingCanvas);
+                          },
+                        ),
+                      ],
                     ),
 
                     const SizedBox(height: 12),
@@ -648,6 +746,47 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildInputModeOption({
+    required String label,
+    required IconData icon,
+    required InputMode mode,
+    required InputMode selectedMode,
+    required VoidCallback onSelect,
+  }) {
+    final isSelected = mode == selectedMode;
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onSelect,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF38BDF8).withValues(alpha: 0.2) : const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF334155),
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, size: 18, color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8)),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
