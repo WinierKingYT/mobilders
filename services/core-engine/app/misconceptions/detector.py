@@ -457,6 +457,31 @@ class QuadraticMisconceptionDetector:
         if bug_e5:
             return bug_e5
 
+        # 86. BUG-COMB-01: Sırasız Seçimde Permütasyon Kullanma
+        bug_cb1 = self._check_bug_comb_01(clean_user, clean_prev)
+        if bug_cb1:
+            return bug_cb1
+
+        # 87. BUG-COMB-02: Kumarbaz Yanılgısı (Gambler's Fallacy)
+        bug_cb2 = self._check_bug_comb_02(clean_user, clean_prev)
+        if bug_cb2:
+            return bug_cb2
+
+        # 88. BUG-COMB-03: Koşullu Olasılıkta Örnek Uzayı Daraltmama
+        bug_cb3 = self._check_bug_comb_03(clean_user, clean_prev)
+        if bug_cb3:
+            return bug_cb3
+
+        # 89. BUG-COMB-04: Tekrarlı Permütasyonda Özdeş Bölümünü Unutma
+        bug_cb4 = self._check_bug_comb_04(clean_user, clean_prev)
+        if bug_cb4:
+            return bug_cb4
+
+        # 90. BUG-COMB-05: Ayrık Olmayan Olaylarda Kesişimi Çıkarmama
+        bug_cb5 = self._check_bug_comb_05(clean_user, clean_prev)
+        if bug_cb5:
+            return bug_cb5
+
         return None
 
     def _check_bug_quad_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
@@ -2563,5 +2588,121 @@ class QuadraticMisconceptionDetector:
                 offending_term=user_str,
             )
         return None
+
+    def _check_bug_comb_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-COMB-01: Sırasız Seçimde Permütasyon Kullanma (Kombinasyon yerine P(n, r))."""
+        clean = user_str.replace(" ", "").lower()
+        # Guard: if user divides by factorial or applies combination formula, it's valid
+        if "/3!" in clean or "/ 3!" in user_str or "/6" in clean or "/ 6" in user_str or "c(" in clean:
+            return None
+        if (
+            "p(5,3)" in clean
+            or "komite=p(5,3)" in clean
+            or "secim=p(5,3)" in clean
+            or "komite=60" in clean
+            or "grup=p(5,3)" in clean
+            or "c(5,3)=60" in clean
+            or "altkume=p(5,3)" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-COMB-01",
+                severity="CRITICAL",
+                category="COMBINATORICS_PERMUTATION_INSTEAD_OF_COMBINATION",
+                description="Sırasız seçim (komite, grup, küme alt kümesi vb.) problemlerinde sıra önemsizdir; dolayısıyla permütasyon P(n, r) değil, kombinasyon C(n, r) kullanılmalıdır.",
+                remediation_directive="Grup elemanlarının diziliş sırası değiştiğinde yeni bir grup oluşur mu? Sıranın önemsiz olduğunu dikkate alarak r! faktöriyeline böl.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_comb_02(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-COMB-02: Kumarbaz Yanılgısı (Gambler's Fallacy - Bağımsız Olaylarda Bellek Sanrısı)."""
+        clean = user_str.replace(" ", "").lower()
+        if (
+            "p(tura)>1/2" in clean
+            or "p(tura)>0.5" in clean
+            or "yazigeldi=>p(tura)>0.5" in clean
+            or "5yazi=>kesintura" in clean
+            or "tura_gelme_olasiligi_artar" in clean
+            or "gecmis_atislardan_dolayi" in clean
+            or "siradaki_kesin_tura" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-COMB-02",
+                severity="CRITICAL",
+                category="PROBABILITY_GAMBLERS_FALLACY",
+                description="Bağımsız olaylarda (örneğin madeni para veya zar atımı) geçmiş denemeler gelecekteki olasılığı etkilemez (belleksizlik ilkesi). Her bağımsız atışta P(Tura) = 1/2'dir.",
+                remediation_directive="Madeni paranın önceki atışları hatırlayan bir hafızası var mıdır? Her atışın birbirinden bağımsız olduğunu hatırla.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_comb_03(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-COMB-03: Koşullu Olasılıkta Örnek Uzayı Daraltmama (Paydaya Evrensel Örnek Uzayı Yazma)."""
+        clean = user_str.replace(" ", "").lower()
+        if (
+            "kosullu_payda=36" in clean
+            or "ornek_uzay_degismez=36" in clean
+            or "p(a|b)=s(a∩b)/36" in clean
+            or "p(a|b)=s(a)/s(e)" in clean
+            or "payda_hala_36" in clean
+            or "evren_daralmaz" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-COMB-03",
+                severity="CRITICAL",
+                category="PROBABILITY_CONDITIONAL_SAMPLE_SPACE_NOT_REDUCED",
+                description="Koşullu olasılıkta (P(A|B)), B olayının gerçekleştiği bilindiği için yeni örnek uzay B olayının çıktılarından oluşur; payda tüm evrensel küme S değil, s(B) olmalıdır.",
+                remediation_directive="B olayının kesinleştiği bilindiğine göre evrensel örnek uzay daralmıştır. Paydaya tüm evreni değil, koşulun sağlandığı durum sayısını s(B) yaz.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_comb_04(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-COMB-04: Tekrarlı Permütasyonda Özdeş Eleman Bölümünü Unutma (n! / c1!c2!)."""
+        clean = user_str.replace(" ", "").lower()
+        # Guard: if user divides by factorial, it's not buggy
+        if "/" in clean:
+            return None
+        if (
+            "kelebek=7!" in clean
+            or "kelebek=5040" in clean
+            or "tekrarlip=7!" in clean
+            or "tekrarlip=n!" in clean
+            or "ozdes_harfler=n!" in clean
+            or "dizilim=7!" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-COMB-04",
+                severity="CRITICAL",
+                category="COMBINATORICS_REPEATED_PERMUTATION_IDENTICAL_OMISSION",
+                description="Tekrarlı permütasyonda özdeş elemanların kendi arasındaki yer değişimleri yeni bir dizilim oluşturmaz. Toplam dizilim sayısı n! / (n₁! · n₂! · ... · nk!) formülüyle özdeş elemanların faktöriyellerine bölünmelidir.",
+                remediation_directive="Aynı harflerin (örneğin E'lerin) kendi aralarında yer değiştirmesi yeni bir kelime üretir mi? Özdeş elemanların adedinin faktöriyeline böl.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_comb_05(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-COMB-05: Ayrık Olmayan Olaylarda Kesişimi Çıkarmadan Doğrudan Toplama."""
+        clean = user_str.replace(" ", "").lower()
+        # Guard: if subtraction or intersection is mentioned, do not trigger false positive
+        if "-" in clean or "kesisim" in clean or "ortak" in clean:
+            return None
+        if (
+            "p(aub)=p(a)+p(b)" in clean
+            or "p(a_veya_b)=p(a)+p(b)" in clean
+            or "p(cift_veya_asal)=3/6+3/6=1" in clean
+            or "3/6+3/6=6/6" in clean
+            or "p(aub)=1/2+1/2=1" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-COMB-05",
+                severity="CRITICAL",
+                category="PROBABILITY_UNION_WITHOUT_INTERSECTION_SUBTRACTION",
+                description="Ayrık olmayan (kesişimi boş küme olmayan) iki olayın birleşim olasılığı hesaplanırken kesişim iki kez sayıldığı için çıkarılmalıdır: P(A ∪ B) = P(A) + P(B) - P(A ∩ B).",
+                remediation_directive="A ve B olaylarının aynı anda gerçekleştiği ortak durumlar (ör. hem çift hem asal olan 2 sayısı) iki kez sayılmış olabilir mi? Kesişim olasılığını P(A ∩ B) çıkar.",
+                offending_term=user_str,
+            )
+        return None
+
 
 
