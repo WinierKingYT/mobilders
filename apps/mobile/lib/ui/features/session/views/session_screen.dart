@@ -9,6 +9,8 @@ import '../../touchpad/zero_layout_shift_dock.dart';
 import '../../accessibility/dyscalculia_helpers.dart';
 import '../../accessibility/tunnel_focus_mode.dart';
 import '../view_models/session_view_model.dart';
+import '../widgets/hesitation_whisper_bubble.dart';
+import '../widgets/source_unpacker_widget.dart';
 import 'zen_focus_overlay.dart';
 
 class SessionScreen extends StatefulWidget {
@@ -30,6 +32,14 @@ class _SessionScreenState extends State<SessionScreen> {
     _restorationManager.bindLifecycleObserver(
       onSaveStateRequested: _saveCurrentState,
     );
+    _inputController.addListener(() {
+      if (_inputController.text.isNotEmpty && mounted) {
+        final vm = context.read<SessionViewModel>();
+        if (vm.hesitationWhisper != null) {
+          vm.dismissHesitationWhisper();
+        }
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndRestoreDraft();
     });
@@ -196,6 +206,14 @@ class _SessionScreenState extends State<SessionScreen> {
                   ),
                 ],
               ),
+            ),
+
+          // Cognitive Hesitation Whisper Bubble (Bölüm 1)
+          if (viewModel.hesitationWhisper != null)
+            HesitationWhisperBubble(
+              whisperMessage: viewModel.hesitationWhisper!,
+              onDismiss: () => viewModel.dismissHesitationWhisper(),
+              onTapAction: () => viewModel.dismissHesitationWhisper(),
             ),
 
           // Active Input Live Preview Strip
@@ -470,6 +488,13 @@ class _SessionScreenState extends State<SessionScreen> {
                   ),
                 ],
               ),
+            ),
+
+          // Source Unpacker Lineage ("Nereden Geldi Bu?") (Bölüm 1)
+          if (index > 0)
+            SourceUnpackerWidget(
+              currentStep: step.userExpression,
+              previousStep: viewModel.steps[index - 1].userExpression,
             ),
 
           const SizedBox(height: 6),

@@ -25,6 +25,7 @@ class SessionViewModel extends ChangeNotifier {
   bool _isTunnelFocusMode = false;
   bool _isDyscalculiaHelper = false;
   bool _isZenMode = false;
+  String? _hesitationWhisper;
 
   SessionViewModel({
     required EngineApiService apiService,
@@ -49,7 +50,18 @@ class SessionViewModel extends ChangeNotifier {
   bool get isTunnelFocusMode => _isTunnelFocusMode;
   bool get isDyscalculiaHelper => _isDyscalculiaHelper;
   bool get isZenMode => _isZenMode;
+  String? get hesitationWhisper => _hesitationWhisper;
   int get pendingOfflineCount => _syncQueue.pendingCount;
+
+  void setHesitationWhisper(String? whisper) {
+    _hesitationWhisper = whisper;
+    notifyListeners();
+  }
+
+  void dismissHesitationWhisper() {
+    _hesitationWhisper = null;
+    notifyListeners();
+  }
 
   void toggleZenMode() {
     _isZenMode = !_isZenMode;
