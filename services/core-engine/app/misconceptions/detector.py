@@ -482,6 +482,31 @@ class QuadraticMisconceptionDetector:
         if bug_cb5:
             return bug_cb5
 
+        # 91. BUG-LOGIC-01: İse Bağlacında Yanlış Öncül Yanılgısı
+        bug_l1 = self._check_bug_logic_01(clean_user, clean_prev)
+        if bug_l1:
+            return bug_l1
+
+        # 92. BUG-LOGIC-02: Ters ile Karşıt Tersin Karıştırılması
+        bug_l2 = self._check_bug_logic_02(clean_user, clean_prev)
+        if bug_l2:
+            return bug_l2
+
+        # 93. BUG-LOGIC-03: Niceleyici Değillemesinde Kapsam Hatası
+        bug_l3 = self._check_bug_logic_03(clean_user, clean_prev)
+        if bug_l3:
+            return bug_l3
+
+        # 94. BUG-LOGIC-04: Tümevarımda Taban Adımını Atlayarak Doğrulama Sanma
+        bug_l4 = self._check_bug_logic_04(clean_user, clean_prev)
+        if bug_l4:
+            return bug_l4
+
+        # 95. BUG-LOGIC-05: Çelişki İspatında Ters Varsayım Kurma Hatası
+        bug_l5 = self._check_bug_logic_05(clean_user, clean_prev)
+        if bug_l5:
+            return bug_l5
+
         return None
 
     def _check_bug_quad_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
@@ -2703,6 +2728,116 @@ class QuadraticMisconceptionDetector:
                 offending_term=user_str,
             )
         return None
+
+    def _check_bug_logic_01(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-LOGIC-01: İse Bağlacında Yanlış Öncül Yanılgısı (0 => 0 = 0 veya 0 => 1 = 0)."""
+        clean = user_str.replace(" ", "").lower()
+        if "sadece1=>0" in clean or "0=>0=1" in clean or "0=>1=1" in clean:
+            return None
+        if (
+            "0=>0=0" in clean
+            or "0=>1=0" in clean
+            or "0ise0=0" in clean
+            or "0ise1=0" in clean
+            or "yanlis=>dogru=yanlis" in clean
+            or "yanlis=>yanlis=yanlis" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-LOGIC-01",
+                severity="CRITICAL",
+                category="LOGIC_FALSE_ANTECEDENT_FALLACY",
+                description="Koşullu önermede (p ⇒ q), öncül p yanlış (0) olduğunda sonuç q ne olursa olsun önerme daima DOĞRUDUR (1). İse bağlacı yalnızca 1 ⇒ 0 durumunda 0 (yanlış) değerini alır.",
+                remediation_directive="Öncülün gerçekleşmediği bir taahhütte (ör. 'Yağmur yağarsa şemsiye açarım', ama yağmur yağmadı) söz bozulmuş sayılır mı? 0 ⇒ 0 ve 0 ⇒ 1 durumlarının daima 1 olduğunu hatırla.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_logic_02(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-LOGIC-02: Ters ile Karşıt Tersin Karıştırılması (p => q ≡ ¬p => ¬q)."""
+        clean = user_str.replace(" ", "").lower()
+        if "¬q=>¬p" in clean or "~q=>~p" in clean or "q'=>p'" in clean:
+            return None
+        if (
+            "p=>q≡¬p=>¬q" in clean
+            or "p=>q=¬p=>¬q" in clean
+            or "p=>q=~p=>~q" in clean
+            or "p=>q≡~p=>~q" in clean
+            or "tersi_dengidir" in clean
+            or "karsit_ters_yerine_ters" in clean
+            or "p=>qdenkp'=>q'" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-LOGIC-02",
+                severity="CRITICAL",
+                category="LOGIC_INVERSE_INSTEAD_OF_CONTRAPOSITIVE",
+                description="p ⇒ q koşullu önermesinin mantıksal dengi tersi (¬p ⇒ ¬q) değil, karşıt tersidir (¬q ⇒ ¬p). Bir önermenin tersi orijinal önermeye denk olmak zorunda değildir.",
+                remediation_directive="Önermenin hem yerlerini değiştirip hem değillemelerini aldın mı? p ⇒ q ≡ ¬q ⇒ ¬p karşıt ters denkliğini kullan.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_logic_03(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-LOGIC-03: Niceleyici Değillemesinde Kapsam Hatası (¬(∀x, P(x)) ≡ ∀x, ¬P(x))."""
+        clean = user_str.replace(" ", "").lower()
+        if "∃" in clean or "bazi" in clean or "enazbir" in clean:
+            return None
+        if (
+            "¬(herx,p(x))=herx,¬p(x)" in clean
+            or "~(herx,p(x))=herx,~p(x)" in clean
+            or "degil(her)=her" in clean
+            or "¬(∀x,p(x))≡∀x,¬p(x)" in clean
+            or "¬(∃x,p(x))≡∃x,¬p(x)" in clean
+            or "degil(bazi)=bazi" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-LOGIC-03",
+                severity="CRITICAL",
+                category="LOGIC_QUANTIFIER_NEGATION_SCOPE_FALLACY",
+                description="Evrensel niceleyicinin (∀ / Her) değillemesi varlıksal niceleyici (∃ / Bazı) üretir: ¬(∀x, P(x)) ≡ ∃x, ¬P(x). Niceleyicinin türü değişmeden sadece açık önerme değillenemez.",
+                remediation_directive="'Herkes sınavı geçti' cümlesinin değili 'Herkes sınavda kaldı' mıdır, yoksa 'En az bir kişi sınavı geçemedi' midir? Niceleyiciyi ∀ ise ∃, ∃ ise ∀'ye dönüştür.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_logic_04(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-LOGIC-04: Tümevarımda Taban Adımını Atlayarak Doğrulama Sanma."""
+        clean = user_str.replace(" ", "").lower()
+        if (
+            "taban_adimi_gerekmez" in clean
+            or "p(1)_bakmadan_ispat" in clean
+            or "sadece_p(k)=>p(k+1)_yeterli" in clean
+            or "taban_atlandi" in clean
+            or "p(1)=atla" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-LOGIC-04",
+                severity="CRITICAL",
+                category="PROOF_INDUCTION_BASE_CASE_OMISSION",
+                description="Matematiksel tümevarımda taban adımı P(1) (veya P(n₀)) ispatın başlangıç domino taşıdır. Taban adımı doğrulanmazsa, geçiş adımı P(k) ⇒ P(k+1) sağlansa bile zincirleme doğruluk kurulamaz.",
+                remediation_directive="İlk domino taşı devrilmeden sonraki taşların birbirini devirmesi bir anlam taşır mı? Mutlaka başlangıç değeri olan n=1 için P(1)'i doğrula.",
+                offending_term=user_str,
+            )
+        return None
+
+    def _check_bug_logic_05(self, user_str: str, prev_str: str) -> Optional[DiagnosticPayload]:
+        """BUG-LOGIC-05: Çelişki İspatında Ters Varsayım Kurma Hatası (¬P yerine P varsayma)."""
+        clean = user_str.replace(" ", "").lower()
+        if (
+            "celiski_icin_p_dogru_varsay" in clean
+            or "p_oldugunu_varsayalim=>p_dogrudur" in clean
+            or "varsayim_p" in clean
+            or "¬p_yerine_p_varsayildi" in clean
+        ):
+            return DiagnosticPayload(
+                bug_id="BUG-LOGIC-05",
+                severity="CRITICAL",
+                category="PROOF_CONTRADICTION_CIRCULAR_ASSUMPTION",
+                description="Çelişki ile ispat (olmayana ergi) yönteminde ispatlanmak istenen P önermesinin DEĞİLİ (¬P) doğru kabul edilir ve bu kabulden bir çelişkiye (r ∧ ¬r) varılır. P'nin kendisini varsaymak döngüsel kanıtlama hatasıdır.",
+                remediation_directive="Neyi çürütmek istiyoruz? İspatlamak istediğin hükmün değilini (¬P) varsayarak başla.",
+                offending_term=user_str,
+            )
+        return None
+
 
 
 
