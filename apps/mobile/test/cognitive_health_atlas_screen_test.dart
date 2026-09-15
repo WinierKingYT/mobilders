@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_learning_engine/ui/features/analytics/views/cognitive_health_atlas_screen.dart';
+import 'package:personal_learning_engine/ui/features/atlas/living_knowledge_atlas_view.dart';
 
 void main() {
   testWidgets('CognitiveHealthAtlasScreen renders tabs and switches views', (WidgetTester tester) async {
@@ -46,5 +47,12 @@ void main() {
 
     expect(find.text('Seviye 5 (Grup A): İkinci Dereceden Eşitsizlikler'), findsOneWidget);
     expect(find.text('N21'), findsOneWidget);
+
+    // Tap Tab 5 (Yaşayan Zihin Haritası - 246 Düğüm)
+    await tester.tap(find.text('Yaşayan Zihin Haritası (246)'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LivingKnowledgeAtlasView), findsOneWidget);
+    expect(find.text('Toplam Düğüm'), findsOneWidget);
   });
 }

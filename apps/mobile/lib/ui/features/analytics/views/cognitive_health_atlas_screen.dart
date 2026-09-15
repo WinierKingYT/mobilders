@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../ui/core/app_theme.dart';
+import '../../atlas/living_knowledge_atlas_view.dart';
 
 class CognitiveHealthAtlasScreen extends StatefulWidget {
   final String studentId;
@@ -20,7 +21,7 @@ class _CognitiveHealthAtlasScreenState extends State<CognitiveHealthAtlasScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -48,6 +49,7 @@ class _CognitiveHealthAtlasScreenState extends State<CognitiveHealthAtlasScreen>
             Tab(icon: Icon(Icons.speed), text: 'Paas Bilişsel Yük'),
             Tab(icon: Icon(Icons.timeline), text: 'FSRS 14 Gün Kalıcılık'),
             Tab(icon: Icon(Icons.account_tree_outlined), text: '26 Düğüm Atlası'),
+            Tab(icon: Icon(Icons.hub_outlined), text: 'Yaşayan Zihin Haritası (246)'),
           ],
         ),
       ),
@@ -58,6 +60,7 @@ class _CognitiveHealthAtlasScreenState extends State<CognitiveHealthAtlasScreen>
           _buildPaasEfficiencyTab(),
           _buildRetentionTab(),
           _buildAtlasTopologyTab(),
+          const LivingKnowledgeAtlasView(),
         ],
       ),
     );
