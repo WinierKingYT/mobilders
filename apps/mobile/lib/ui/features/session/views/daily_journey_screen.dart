@@ -8,6 +8,7 @@ import 'al_khwarizmi_canvas.dart';
 import 'unit_circle_canvas.dart';
 import 'dynamic_tangent_canvas.dart';
 import 'riemann_integral_canvas.dart';
+import 'interactive_coordinate_canvas.dart';
 import '../../scanner/math_scanner_view.dart';
 import '../../modeling/problem_modeling_view.dart';
 import '../../analytics/views/cognitive_health_atlas_screen.dart';
@@ -38,6 +39,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   bool _showUnitCircleCanvas = false;
   bool _showTangentCanvas = false;
   bool _showRiemannCanvas = false;
+  bool _showCoordinateCanvas = false;
   double _confidenceLevel = 0.85;
   int? _selectedWarmupOption;
 
@@ -158,6 +160,20 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                   onPressed: () {
                     HapticFeedbackService().selectionClick();
                     setState(() => _showRiemannCanvas = !_showRiemannCanvas);
+                  },
+                ),
+              // Interactive Coordinate Canvas Toggle Button (Hedef 10)
+              if (_currentPhase == DailyPhase.problemBoard)
+                IconButton(
+                  key: const Key('toggle_coordinate_canvas_button'),
+                  icon: Icon(
+                    Icons.grid_4x4_rounded,
+                    color: _showCoordinateCanvas ? const Color(0xFF6366F1) : const Color(0xFF94A3B8),
+                  ),
+                  tooltip: "Analitik Koordinat & Vektör Kanvası",
+                  onPressed: () {
+                    HapticFeedbackService().selectionClick();
+                    setState(() => _showCoordinateCanvas = !_showCoordinateCanvas);
                   },
                 ),
               // Vector Inking Canvas Quick Toggle Button
@@ -337,6 +353,11 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
               const Padding(
                 padding: EdgeInsets.all(12),
                 child: RiemannIntegralCanvas(),
+              ),
+            if (_showCoordinateCanvas)
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: InteractiveCoordinateCanvas(),
               ),
             const Expanded(
               child: SessionScreen(),
