@@ -8,6 +8,7 @@ import 'al_khwarizmi_canvas.dart';
 import 'unit_circle_canvas.dart';
 import 'dynamic_tangent_canvas.dart';
 import 'riemann_integral_canvas.dart';
+import '../../scanner/math_scanner_view.dart';
 import '../../analytics/views/cognitive_health_atlas_screen.dart';
 import '../../../../core/localization.dart';
 import '../../../../core/services/haptic_feedback_service.dart';
@@ -188,6 +189,24 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const CognitiveHealthAtlasScreen(),
+                    ),
+                  );
+                },
+              ),
+              // Math Scanner & Notebook Vision Camera Button (Hedef 8)
+              IconButton(
+                icon: const Icon(
+                  Icons.camera_alt_outlined,
+                  color: Color(0xFF38BDF8),
+                ),
+                tooltip: "Sokratik Defter & Soru Kamerası",
+                onPressed: () {
+                  HapticFeedbackService().selectionClick();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const Scaffold(
+                        body: SafeArea(child: MathScannerView()),
+                      ),
                     ),
                   );
                 },
