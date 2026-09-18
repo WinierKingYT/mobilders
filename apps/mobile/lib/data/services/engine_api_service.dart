@@ -154,6 +154,131 @@ class EngineApiService {
     }
   }
 
+  Future<Map<String, dynamic>> scanAndDiagnoseNotebook({
+    String? imageBase64,
+    String? rawTextOverride,
+    String? targetProblem,
+    String? studentId,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/scan/diagnose');
+    final payload = {
+      if (imageBase64 != null) 'image_base64': imageBase64,
+      if (rawTextOverride != null) 'raw_text_override': rawTextOverride,
+      if (targetProblem != null) 'target_problem': targetProblem,
+      'student_id': studentId ?? 'STU-SCAN-01',
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchModelingProblems() async {
+    final uri = Uri.parse('$baseUrl/api/v1/modeling/problems');
+    final response = await _client.get(uri).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      final List<dynamic> list = jsonDecode(response.body) as List<dynamic>;
+      return list.map((e) => e as Map<String, dynamic>).toList();
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchModelingProblem(String problemId) async {
+    final uri = Uri.parse('$baseUrl/api/v1/modeling/problem/$problemId');
+    final response = await _client.get(uri).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> submitModelingScaffoldStep({
+    required String sessionId,
+    required String problemId,
+    required String stage,
+    required String studentInput,
+    String? variableName,
+    String? studentId,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/modeling/scaffold/step');
+    final payload = {
+      'session_id': sessionId,
+      'problem_id': problemId,
+      'stage': stage,
+      'student_input': studentInput,
+      'variable_name': variableName ?? 'x',
+      'student_id': studentId ?? 'STU-MODEL-01',
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> solveAnalyticGeometry({
+    required String task,
+    required Map<String, dynamic> params,
+    String? studentId,
+    String? problemStatement,
+    String? studentStep,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/geometry/analytic/solve');
+    final payload = {
+      'task': task,
+      'params': params,
+      if (studentId != null) 'student_id': studentId,
+      if (problemStatement != null) 'problem_statement': problemStatement,
+      if (studentStep != null) 'student_step': studentStep,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
   void dispose() {
     _client.close();
   }

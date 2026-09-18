@@ -28,6 +28,17 @@ class Settings:
         )
         self.REDIS_URL: str = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
 
+        # Focus V1 Alpha remains default-off until explicitly enabled.
+        self.FOCUS_V1_ENABLED: bool = (
+            os.getenv("FOCUS_V1_ENABLED", "false").strip().lower() == "true"
+        )
+        # Canary routing percentage (0..100). If 0, only FOCUS_V1_ENABLED governs access.
+        self.FOCUS_CANARY_PERCENTAGE: int = int(os.getenv("FOCUS_CANARY_PERCENTAGE", "0"))
+        # Emergency kill switch: if true, immediately shuts off Focus V1 routes regardless of canary.
+        self.FOCUS_KILL_SWITCH: bool = (
+            os.getenv("FOCUS_KILL_SWITCH", "false").strip().lower() == "true"
+        )
+
         # Parse CORS Origins list
         cors_raw = os.getenv(
             "CORS_ORIGINS",

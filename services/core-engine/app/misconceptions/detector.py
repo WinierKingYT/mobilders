@@ -2084,9 +2084,13 @@ class QuadraticMisconceptionDetector:
             "t_birlikte=t1+t2" in clean_u
             or "tbirlikte=t1+t2" in clean_u
             or "6+3=9gun" in clean_u
+            or "6+3=9" in clean_u
+            or "6+12=18gun" in clean_u
+            or "6+12=18" in clean_u
             or "birlikte=6+3=9" in clean_u
             or "surelertoplanir" in clean_u
             or ("ikisi=9" in clean_u and "6" in clean_p and "3" in clean_p)
+            or ("ikisi=18" in clean_u)
         ):
             return DiagnosticPayload(
                 bug_id="BUG-PROB-06",

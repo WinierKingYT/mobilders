@@ -594,3 +594,102 @@ def test_upper_domain_bound_violation(scaffold_engine):
     assert res.is_valid is False
     assert res.domain_valid is False
     assert "maksimum" in res.socratic_feedback
+
+
+def test_modeling_scaffold_persists_to_cognitive_mistake_vault():
+    """Modelleme aşamasında oluşan BUG-PROB hataları Bilişsel Hata Kasasına otomatik kaydedilmelidir."""
+    from app.vault.mistake_vault import CognitiveMistakeVault
+    cas = SymbolicEquivalenceEngine()
+    detector = QuadraticMisconceptionDetector(cas)
+    vault = CognitiveMistakeVault()
+    engine = SocraticModelingScaffoldEngine(cas_engine=cas, detector=detector, vault=vault)
+
+    # Aşama 2: İşçi probleminde düz toplama hatası (BUG-PROB-06)
+    req = ScaffoldStepRequest(
+        session_id="vault-test-sess",
+        problem_id="PROB_WORK_01",
+        stage=ModelingStage.STAGE_2_EQUATION,
+        student_input="6 + 12 = 18 gun",
+        student_id="student_model_vault_99",
+    )
+    res = engine.evaluate_step(req)
+    assert res.is_valid is False
+    assert res.detected_bug is not None
+    assert res.detected_bug.bug_id == "BUG-PROB-06"
+
+    mistakes = vault.list_mistakes(user_id="student_model_vault_99")
+    assert len(mistakes) == 1
+    assert mistakes[0].bug_id == "BUG-PROB-06"
+    assert mistakes[0].node_id == "N04"
+    assert "1/t" in mistakes[0].remediation_directive or "kapasite" in mistakes[0].remediation_directive
+
+
+def test_modeling_scaffold_stage3_domain_violation_vault_record():
+    """Aşama 3'te gerçek dünya kısıtı ihlali (BUG-PROB-10) olduğunda kasaya kaydedilmelidir."""
+    from app.vault.mistake_vault import CognitiveMistakeVault
+    cas = SymbolicEquivalenceEngine()
+    detector = QuadraticMisconceptionDetector(cas)
+    vault = CognitiveMistakeVault()
+    engine = SocraticModelingScaffoldEngine(cas_engine=cas, detector=detector, vault=vault)
+
+    req = ScaffoldStepRequest(
+        session_id="vault-test-sess-dom",
+        problem_id="PROB_MOTION_01",
+        stage=ModelingStage.STAGE_3_SOLVE,
+        student_input="t = -4 saat",
+        student_id="student_domain_vault_01",
+    )
+    res = engine.evaluate_step(req)
+    assert res.is_valid is False
+    assert res.domain_valid is False
+
+    mistakes = vault.list_mistakes(user_id="student_domain_vault_01")
+    assert len(mistakes) == 1
+    assert mistakes[0].bug_id == "BUG-PROB-10"
+    assert "pozitif" in mistakes[0].remediation_directive.lower() or "negatif" in mistakes[0].remediation_directive.lower()
+
+
+def test_api_scaffold_step_with_student_id_vault_integration(client):
+    """API endpoint üzerinden gönderilen modelleme adımında oluşan hata kasaya işlenmelidir."""
+    from app.api.endpoints import cognitive_mistake_vault
+    payload = {
+        "session_id": "api-sess-vault-02",
+        "problem_id": "PROB_PERCENT_01",
+        "stage": "STAGE_2_EQUATION",
+        "student_input": "1.20*0.80 = 1",
+        "student_id": "STU_API_PERCENT_01",
+    }
+    resp = client.post("/api/v1/modeling/scaffold/step", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["is_valid"] is False
+    assert data["detected_bug"]["bug_id"] == "BUG-PROB-04"
+
+    # Vault kontrolü
+    user_mistakes = cognitive_mistake_vault.list_mistakes(user_id="STU_API_PERCENT_01")
+    matching = [m for m in user_mistakes if m.bug_id == "BUG-PROB-04"]
+    assert len(matching) >= 1
+    assert "çarpan" in matching[0].remediation_directive or "nötrlemez" in matching[0].correct_principle
+
+
+def test_scaffold_all_ten_bug_prob_remediations(scaffold_engine):
+    """Tüm 10 modelleme yanılgısı (BUG-PROB-01..10) için Sokratik rehberlik ve kural doğrulaması."""
+    test_cases = [
+        ("BUG-PROB-01", "x + 5 = 2y", "5 yil sonra", "(x+5)+(3x+5)=50", "eşit akar"),
+        ("BUG-PROB-02", "v1/v2 = t1/t2", "hareket", "v1*t1 = v2*t2", "ters orantılı"),
+        ("BUG-PROB-03", "vort = (60+40)/2 = 50", "ortalama hiz", "v_ort=48", "harmonik"),
+        ("BUG-PROB-04", "1.20*0.80 = 1", "yuzde", "1.30*0.80=1.04", "nötrlemez"),
+        ("BUG-PROB-05", "yuzde = tuz/su", "karisim", "40*20+60*50=100*x", "toplam"),
+        ("BUG-PROB-06", "6 + 3 = 9 gun", "isciler", "1/6+1/3=1/t", "toplanamaz"),
+        ("BUG-PROB-07", "karsilasma = (v1-v2)*t", "karsit yonlu", "(v1+v2)*t=x", "topla"),
+        ("BUG-PROB-08", "kar = satis * yuzde", "maliyet", "satis = maliyet*(1+kar)", "maliyet"),
+        ("BUG-PROB-09", "x = 60 * 20", "20 dakika 60 km/h", "x = 60 * (20/60)", "dakika"),
+        ("BUG-PROB-10", "x = -5", "yas", "10", "negatif"),
+    ]
+    for bug_id, student_in, prev_step, target_eq, keyword in test_cases:
+        bug = scaffold_engine.detector.detect(student_in, prev_step, target_eq)
+        assert bug is not None, f"Failed to detect {bug_id} for input '{student_in}'"
+        assert bug.bug_id == bug_id
+        combined = (bug.remediation_directive + " " + bug.description).lower()
+        assert keyword in combined, f"Keyword '{keyword}' not in combined text: {combined}"
+

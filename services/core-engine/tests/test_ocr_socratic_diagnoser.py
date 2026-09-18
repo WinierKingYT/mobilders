@@ -265,3 +265,80 @@ def test_api_scan_diagnose_valid_calculus_solution(client):
     data = res.json()
     assert data["has_error"] is False
     assert data["error_step_index"] is None
+
+
+def test_notebook_parabola_vertex_formula_sign_error(diagnoser):
+    """Parabol tepe noktası apsisi formülünde eksi işareti hatası (BUG-QUAD-08 / BUG-PARAB-01)."""
+    lines = [
+        "x**2 - 4*x + 3 = 0",
+        "r = -2",
+    ]
+    resp = diagnoser.diagnose_notebook_solution(lines)
+    assert resp.has_error is True
+    assert resp.detected_bug_id in ("BUG-QUAD-08", "BUG-PARAB-01")
+    assert "parabol" in resp.socratic_hint.lower() or "tepe" in resp.socratic_hint.lower()
+    assert "?" in resp.socratic_hint
+
+
+def test_notebook_inequality_direction_sign_reversal_error(diagnoser):
+    """Eşitsizlikte negatif katsayıya bölerken yönü değiştirmeme (BUG-QUAD-06 / BUG-FOUND-14)."""
+    lines = [
+        "-2*x < 6",
+        "x < -3",
+    ]
+    resp = diagnoser.diagnose_notebook_solution(lines)
+    assert resp.has_error is True
+    assert resp.detected_bug_id in ("BUG-QUAD-06", "BUG-FOUND-14")
+    assert "eşitsizlik" in resp.socratic_hint.lower() or "yön" in resp.socratic_hint.lower()
+    assert "?" in resp.socratic_hint
+
+
+def test_notebook_polynomial_remainder_theorem_sign_error(diagnoser):
+    """Polinom kalan teoreminde bölenin kök işaretini ters alma (BUG-POLY-01)."""
+    lines = [
+        "P(x) / (x - 2)",
+        "Kalan = P(-2)",
+    ]
+    resp = diagnoser.diagnose_notebook_solution(lines)
+    assert resp.has_error is True
+    assert resp.detected_bug_id == "BUG-POLY-01"
+    assert "kalan teorem" in resp.socratic_hint.lower() or "polinom" in resp.socratic_hint.lower()
+    assert "?" in resp.socratic_hint
+
+
+def test_notebook_diagnoser_persists_to_cognitive_mistake_vault(cas, detector, dag, vision):
+    """Hata yapıldığında Hedef 12 Bilişsel Hata Kasasına (Mistake Vault) otomatik kayıt yapılmalıdır."""
+    from app.vault.mistake_vault import CognitiveMistakeVault
+    vault = CognitiveMistakeVault()
+    diagnoser_with_vault = SocraticNotebookDiagnoser(
+        cas=cas,
+        detector=detector,
+        dag=dag,
+        vision_pipeline=vision,
+        vault=vault,
+    )
+    lines = [
+        "(x + 3)^2 = 25",
+        "x^2 + 9 = 25",
+    ]
+    resp = diagnoser_with_vault.diagnose_notebook_solution(lines, user_id="student_vault_hedef8")
+    assert resp.has_error is True
+
+    user_mistakes = vault.list_mistakes(user_id="student_vault_hedef8")
+    assert len(user_mistakes) == 1
+    assert user_mistakes[0].bug_id == "BUG-QUAD-03"
+    assert "tam kare" in user_mistakes[0].remediation_directive.lower() or "2ab" in user_mistakes[0].remediation_directive.lower()
+
+
+def test_api_scan_diagnose_vault_integration(client):
+    """HTTP API /api/v1/scan/diagnose üzerinden gelen hatalar da mistake vault'a kaydedilmelidir."""
+    payload = {
+        "raw_text_override": "(x + 3)^2 = 25\nx^2 + 9 = 25",
+        "student_id": "STU-API-VAULT-01",
+    }
+    res = client.post("/api/v1/scan/diagnose", json=payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["has_error"] is True
+    assert data["detected_bug_id"] == "BUG-QUAD-03"
+

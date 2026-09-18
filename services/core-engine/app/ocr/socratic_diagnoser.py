@@ -239,6 +239,34 @@ class SocraticNotebookDiagnoser:
             return (
                 f"{step_num}. adımda her iki tarafı x ile sadeleştirirken köklerden birini (x=0) kaybetmiş olabilir misin?"
             )
+        elif bug_id == "BUG-QUAD-05":
+            return (
+                f"{step_num}. adımda ikinci derece denklem formülünde (-b) teriminin işaretine dikkat ettin mi?"
+            )
+        elif bug_id == "BUG-QUAD-06" or bug_id == "BUG-FOUND-14":
+            return (
+                f"{step_num}. adımda eşitsizliğin her iki tarafını negatif bir sayıya bölerken eşitsizlik yönünün ne olması gerektiğini düşünelim mi?"
+            )
+        elif bug_id == "BUG-FOUND-15":
+            return (
+                f"{step_num}. adımda denklemin bir tarafına işlem yaparken terazi dengesini korumak için diğer tarafa da aynı işlemi uyguladın mı?"
+            )
+        elif bug_id == "BUG-PARAB-01" or bug_id == "BUG-QUAD-08":
+            return (
+                f"{step_num}. adımda parabolün tepe noktası apsisini bulurken r = -b / (2a) formülündeki eksi işaretini doğru uyguladın mı?"
+            )
+        elif bug_id == "BUG-PARAB-02":
+            return (
+                f"{step_num}. adımda simetri ekseni ile tepe noktasının ordinatını karıştırmış olabilir misin?"
+            )
+        elif bug_id == "BUG-POLY-01":
+            return (
+                f"{step_num}. adımda polinom kalan teoreminde (P(x)'in (x - a) ile bölümünden kalan için) böleni sıfıra eşitlerken x yerine ne koyman gerektiğini kontrol etmek ister misin?"
+            )
+        elif bug_id == "BUG-POLY-02":
+            return (
+                f"{step_num}. adımda katsayılar toplamı için x=1, sabit terim için x=0 yazma kuralını tekrar gözden geçirelim mi?"
+            )
         elif bug_id == "BUG-TRIG-01":
             return (
                 f"{step_num}. adımda sinüs fonksiyonunu parantez içine dağıtırken toplam-fark formülünü hatırlamaya ne dersin?"
@@ -251,6 +279,26 @@ class SocraticNotebookDiagnoser:
             return (
                 f"{step_num}. adımda bileşke fonksiyonun türevini alırken iç fonksiyonun türevini (zincir kuralı) çarpan olarak ekledin mi?"
             )
+        elif bug_id == "BUG-CALC-02":
+            return (
+                f"{step_num}. adımda bölümün türevini alırken paydaki çıkarma işleminde işaret sırasına dikkat ettin mi?"
+            )
+        elif bug_id == "BUG-CALC-03":
+            return (
+                f"{step_num}. adımda 0/0 belirsizliğiyle karşılaştığında ifadeyi sadeleştirerek belirsizliği gidermeyi denedin mi?"
+            )
+        elif bug_id == "BUG-CALC-05":
+            return (
+                f"{step_num}. adımda çarpımın türevini alırken (uv)' = u'v + uv' kuralı yerine doğrudan terimleri çarpmış olabilir misin?"
+            )
+        elif bug_id == "BUG-CALC-06":
+            return (
+                f"{step_num}. adımda sabit bir sayının türevini alırken sabit fonksiyonun eğiminin ne olduğunu hatırlar mısın?"
+            )
+        elif bug_id == "BUG-CALC-10":
+            return (
+                f"{step_num}. adımda teğet doğrusunun eğimini hesaplarken türev fonksiyonunda apsis değerini yerine koymak yerine fonksiyon değerini mi aldın?"
+            )
         elif bug_id == "BUG-INT-01":
             return (
                 f"{step_num}. adımda belirsiz integrali tamamlarken integrasyon sabiti olan (+ C)'yi eklemeyi unuttun mu?"
@@ -262,6 +310,26 @@ class SocraticNotebookDiagnoser:
         elif bug_id == "BUG-INT-03":
             return (
                 f"{step_num}. adımda belirli integralde sınırları yerine koyarken üst sınır ve alt sınır sırasını nasıl uyguladın?"
+            )
+        elif bug_id == "BUG-INT-04":
+            return (
+                f"{step_num}. adımda eğri altında kalan geometrik alanı hesaplarken negatif çıkan integral değerinin mutlak değerini almayı düşündün mü?"
+            )
+        elif bug_id == "BUG-INT-05":
+            return (
+                f"{step_num}. adımda kısmi integrasyon uygularken uv - int(v du) formülündeki işaret kuralına dikkat ettin mi?"
+            )
+        elif bug_id == "BUG-INT-06":
+            return (
+                f"{step_num}. adımda 1/x fonksiyonunun integralini alırken hangi fonksiyonun türevinin 1/x olduğunu hatırlar mısın?"
+            )
+        elif bug_id == "BUG-INT-07":
+            return (
+                f"{step_num}. adımda u-dönüşümü ile belirli integral çözerken integrasyon sınırlarını da u cinsine çevirdin mi?"
+            )
+        elif bug_id == "BUG-INT-08":
+            return (
+                f"{step_num}. adımda iki eğri arasında kalan alanı hesaplarken üstteki eğriden alttaki eğriyi çıkarma sırasını kontrol eder misin?"
             )
 
         return (

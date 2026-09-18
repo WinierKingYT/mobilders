@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_learning_engine/ui/features/modeling/problem_modeling_view.dart';
 import 'package:personal_learning_engine/ui/features/modeling/widgets/motion_diagram_widget.dart';
 import 'package:personal_learning_engine/ui/features/modeling/widgets/mixture_vessel_widget.dart';
+import 'package:personal_learning_engine/data/services/engine_api_service.dart';
 
 void main() {
   setUp(() {
@@ -228,4 +229,173 @@ void main() {
 
     expect(find.text('Bilişsel Yanılgı: BUG-PROB-07'), findsOneWidget);
   });
+
+  testWidgets('ProblemModelingView displays live API badge and consumes API responses', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1200, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final mockApi = _MockModelingEngineApiService(
+      onSubmit: ({
+        required String sessionId,
+        required String problemId,
+        required String stage,
+        required String studentInput,
+        String? variableName,
+        String? studentId,
+      }) async {
+        if (stage == 'STAGE_1_VARIABLE') {
+          return {
+            'problem_id': problemId,
+            'stage': stage,
+            'is_valid': true,
+            'stage_completed': true,
+            'next_stage': 'STAGE_2_EQUATION',
+            'socratic_feedback': 'API Doğrulandı: Değişken doğru tanımlandı.',
+          };
+        } else if (stage == 'STAGE_2_EQUATION') {
+          return {
+            'problem_id': problemId,
+            'stage': stage,
+            'is_valid': false,
+            'stage_completed': false,
+            'detected_bug': {'bug_id': 'BUG-PROB-02'},
+            'socratic_feedback': 'API Sokratik: Hız ile zaman ters orantılıdır.',
+          };
+        }
+        return {'is_valid': false};
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ProblemModelingView(apiService: mockApi),
+      ),
+    );
+
+    // Verify online badge
+    expect(find.text('Canlı API'), findsOneWidget);
+
+    // Stage 1 with mock API
+    await tester.enterText(find.byKey(const Key('modeling_input_field')), 'x');
+    await tester.tap(find.byKey(const Key('modeling_submit_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('API Doğrulandı: Değişken doğru tanımlandı.'), findsOneWidget);
+    expect(find.text('Aşama 2: Eşitliği Kur'), findsOneWidget);
+
+    // Stage 2 with mock API returning bug
+    await tester.enterText(find.byKey(const Key('modeling_input_field')), 'v1/v2 = t1/t2');
+    await tester.tap(find.byKey(const Key('modeling_submit_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bilişsel Yanılgı: BUG-PROB-02'), findsOneWidget);
+    expect(find.text('API Sokratik: Hız ile zaman ters orantılıdır.'), findsOneWidget);
+  });
+
+  testWidgets('ProblemModelingView falls back to offline local evaluation when API throws', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1200, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final mockApi = _MockModelingEngineApiService(
+      onSubmit: ({
+        required String sessionId,
+        required String problemId,
+        required String stage,
+        required String studentInput,
+        String? variableName,
+        String? studentId,
+      }) async {
+        throw Exception("Network connection timeout");
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ProblemModelingView(apiService: mockApi),
+      ),
+    );
+
+    // Stage 1 -> fallback to local
+    await tester.enterText(find.byKey(const Key('modeling_input_field')), 'x = oğlun yaşı');
+    await tester.tap(find.byKey(const Key('modeling_submit_button')));
+    await tester.pumpAndSettle();
+
+    // Stage 1 passed via local fallback
+    expect(find.text('Aşama 2: Eşitliği Kur'), findsOneWidget);
+  });
+
+  testWidgets('ProblemModelingView completes full flow for Optimization problem preset', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(2400, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ProblemModelingView(),
+      ),
+    );
+
+    // Ensure visible & Switch to Optimizasyon
+    await tester.ensureVisible(find.byKey(const Key('preset_chip_PROB_OPTIMIZATION_01')));
+    await tester.tap(find.byKey(const Key('preset_chip_PROB_OPTIMIZATION_01')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bahçe Alanını Maksimum Yapma'), findsOneWidget);
+    expect(find.text('Çevrimdışı'), findsOneWidget);
+
+    // Stage 1: x
+    await tester.enterText(find.byKey(const Key('modeling_input_field')), 'x = kenar');
+    await tester.tap(find.byKey(const Key('modeling_submit_button')));
+    await tester.pumpAndSettle();
+
+    // Stage 2: x * (30 - x) = 225
+    await tester.enterText(find.byKey(const Key('modeling_input_field')), 'x * (30 - x) = 225');
+    await tester.tap(find.byKey(const Key('modeling_submit_button')));
+    await tester.pumpAndSettle();
+
+    // Stage 3: 15
+    await tester.enterText(find.byKey(const Key('modeling_input_field')), '15');
+    await tester.tap(find.byKey(const Key('modeling_submit_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Modelleme Başarıyla Tamamlandı!'), findsOneWidget);
+  });
 }
+
+class _MockModelingEngineApiService extends Fake implements EngineApiService {
+  final Future<Map<String, dynamic>> Function({
+    required String sessionId,
+    required String problemId,
+    required String stage,
+    required String studentInput,
+    String? variableName,
+    String? studentId,
+  }) onSubmit;
+
+  _MockModelingEngineApiService({required this.onSubmit});
+
+  @override
+  Future<Map<String, dynamic>> submitModelingScaffoldStep({
+    required String sessionId,
+    required String problemId,
+    required String stage,
+    required String studentInput,
+    String? variableName,
+    String? studentId,
+  }) async {
+    return onSubmit(
+      sessionId: sessionId,
+      problemId: problemId,
+      stage: stage,
+      studentInput: studentInput,
+      variableName: variableName,
+      studentId: studentId,
+    );
+  }
+}
+

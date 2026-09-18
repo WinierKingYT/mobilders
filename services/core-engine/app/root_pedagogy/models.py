@@ -94,3 +94,6 @@ class SandboxSessionResponse(BaseModel):
     instruction: str
     expected_action: Dict[str, Any]
     is_resolved: bool = False
+    is_quarantined: bool = True
+    frozen_p_l: Optional[float] = None
+    frozen_theta: Optional[float] = None

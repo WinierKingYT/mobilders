@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_learning_engine/ui/features/scanner/math_scanner_view.dart';
+import 'package:personal_learning_engine/data/services/engine_api_service.dart';
 
 void main() {
   testWidgets('MathScannerView renders viewfinder with Anti-Photomath badge', (WidgetTester tester) async {
@@ -70,4 +71,144 @@ void main() {
     // Back to viewfinder
     expect(find.byIcon(Icons.camera_alt), findsOneWidget);
   });
+
+  testWidgets('MathScannerView switches preset scenario chips and reveals calculus integral error', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: MathScannerView(),
+          ),
+        ),
+      ),
+    );
+
+    // 1. Find and tap "İntegral +C" preset chip
+    final integralChip = find.text("İntegral +C");
+    expect(integralChip, findsOneWidget);
+    await tester.tap(integralChip);
+    await tester.pump();
+
+    // 2. Tap shutter button
+    final shutter = find.byIcon(Icons.camera_alt);
+    await tester.tap(shutter);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump();
+
+    // 3. Verify Integral problem and DAG node
+    expect(find.text("N111: Belirsiz İntegral"), findsOneWidget);
+    expect(find.text("BUG-INT-01"), findsOneWidget);
+    expect(find.textContaining("integrasyon sabiti"), findsOneWidget);
+  });
+
+  testWidgets('MathScannerView switches to valid scenario and shows celebration state', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: MathScannerView(),
+          ),
+        ),
+      ),
+    );
+
+    // 1. Find and tap "Hatasız Çözüm" preset chip
+    final cleanChip = find.text("Hatasız Çözüm");
+    expect(cleanChip, findsOneWidget);
+    await tester.tap(cleanChip);
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // 2. Tap shutter
+    await tester.tap(find.byIcon(Icons.camera_alt));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump();
+
+    // 3. Verify celebration bubble and valid check icons
+    expect(find.text("Harika Başarı!"), findsOneWidget);
+    expect(find.textContaining("matematiksel olarak tamamen doğru"), findsOneWidget);
+    expect(find.byIcon(Icons.check_circle), findsNWidgets(2));
+  });
+
+  testWidgets('MathScannerView live API service integration returns diagnosed steps', (WidgetTester tester) async {
+    final mockApi = _MockEngineApiService(
+      onScan: ({imageBase64, rawTextOverride, targetProblem, studentId}) {
+        return {
+          'problem_statement': '-3x ≤ 9',
+          'dag_node_id': 'N08',
+          'dag_node_title': 'Eşitsizlikler',
+          'segmented_steps': [
+            {
+              'step_index': 1,
+              'raw_text': 'x ≤ -3',
+              'latex': 'x ≤ -3',
+              'is_valid': false,
+              'diagnostic_bug_id': 'BUG-QUAD-06',
+              'error_reason': 'Negatif sayıya bölerken yön değişmedi',
+            },
+          ],
+          'has_error': true,
+          'error_step_index': 1,
+          'detected_bug_id': 'BUG-QUAD-06',
+          'socratic_hint': 'Negatif bir sayıya bölerken eşitsizlik yönü ne olmalı?',
+          'is_zero_leakage_sanitized': true,
+          'confidence': 0.98,
+        };
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: MathScannerView(apiService: mockApi),
+          ),
+        ),
+      ),
+    );
+
+    // Tap shutter
+    await tester.tap(find.byIcon(Icons.camera_alt));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump();
+
+    // Verify response rendered from API
+    expect(find.text("N08: Eşitsizlikler"), findsOneWidget);
+    expect(find.text("BUG-QUAD-06"), findsOneWidget);
+    expect(find.textContaining("eşitsizlik yönü ne olmalı?"), findsOneWidget);
+  });
 }
+
+class _MockEngineApiService extends Fake implements EngineApiService {
+  final Map<String, dynamic> Function({
+    String? imageBase64,
+    String? rawTextOverride,
+    String? targetProblem,
+    String? studentId,
+  }) onScan;
+
+  _MockEngineApiService({required this.onScan});
+
+  @override
+  Future<Map<String, dynamic>> scanAndDiagnoseNotebook({
+    String? imageBase64,
+    String? rawTextOverride,
+    String? targetProblem,
+    String? studentId,
+  }) async {
+    return onScan(
+      imageBase64: imageBase64,
+      rawTextOverride: rawTextOverride,
+      targetProblem: targetProblem,
+      studentId: studentId,
+    );
+  }
+}
+

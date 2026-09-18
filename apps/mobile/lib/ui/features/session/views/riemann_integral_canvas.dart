@@ -321,9 +321,11 @@ class _RiemannIntegralCanvasState extends State<RiemannIntegralCanvas> {
       ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             // Title & Convergence Badge
             Row(
               children: [
@@ -493,20 +495,21 @@ class _RiemannIntegralCanvasState extends State<RiemannIntegralCanvas> {
             ),
 
             // Quick Preset Chips (n = 4, 16, 64)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 6,
               children: [
                 _buildNPresetChip("n = 4 (Kaba)", 4),
-                const SizedBox(width: 8),
                 _buildNPresetChip("n = 16 (Dengeli)", 16),
-                const SizedBox(width: 8),
                 _buildNPresetChip("n = 64 (Limit)", 64),
               ],
             ),
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildFunctionChip(String label, IntegralFunctionType type) {

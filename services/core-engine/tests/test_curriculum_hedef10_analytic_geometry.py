@@ -442,3 +442,123 @@ def test_vector2d_zero_vector_exceptions():
     with pytest.raises(ValueError, match="Sıfır vektör üzerine izdüşüm yapılamaz"):
         v.orthogonal_projection_onto(u)
 
+
+# ==============================================================================
+# 10. COGNITIVE MISTAKE VAULT & API ENDPOINT INTEGRATION
+# ==============================================================================
+
+def test_cognitive_mistake_vault_records_bug_anag_01_to_05(detector):
+    """BUG-ANAG-01..05 tespit edildiğinde Bilişsel Hata Kasası'na (N136-N160) kaydedildiğini doğrular."""
+    from app.vault.mistake_vault import CognitiveMistakeVault, MistakeStatus
+
+    vault = CognitiveMistakeVault(db_path=":memory:")
+    student_id = "stu_anag_vault_01"
+
+    test_cases = [
+        ("BUG-ANAG-01", "m1*m2 = 1", "d1 ile d2 dik", "N147"),
+        ("BUG-ANAG-02", "tan(135) = 1", "Eğim açısı 135", "N141"),
+        ("BUG-ANAG-03", "M(-2, -3)", "(x - 2)^2 + (y - 3)^2 = 16", "N152"),
+        ("BUG-ANAG-04", "d = (x2 - x1)^2 + (y2 - y1)^2", "A ve B arası uzaklık", "N137"),
+        ("BUG-ANAG-05", "u.v = (u1*v1, u2*v2)", "u ve v iç çarpımı", "N158"),
+    ]
+
+    for bug_id, step, context, expected_node in test_cases:
+        diag = detector.detect(step, context, "")
+        assert diag is not None
+        assert diag.bug_id == bug_id
+
+        record = vault.record_mistake(
+            user_id=student_id,
+            node_id=expected_node,
+            bug_id=diag.bug_id,
+            problem_statement=context,
+            offending_step=step,
+            correct_principle=diag.description,
+            remediation_directive=diag.remediation_directive,
+        )
+        assert record.user_id == student_id
+        assert record.node_id == expected_node
+        assert record.bug_id == bug_id
+        assert record.status == MistakeStatus.OPEN
+        assert record.remediation_directive != ""
+
+    # Kasadaki tüm hataları listele
+    records = vault.list_mistakes(student_id)
+    assert len(records) == 5
+    bug_ids = {r.bug_id for r in records}
+    assert bug_ids == {"BUG-ANAG-01", "BUG-ANAG-02", "BUG-ANAG-03", "BUG-ANAG-04", "BUG-ANAG-05"}
+
+
+def test_api_solve_analytic_geometry_valid_distance():
+    """POST /api/v1/geometry/analytic/solve geçerli iki nokta uzaklık hesabı."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+    resp = client.post(
+        "/api/v1/geometry/analytic/solve",
+        json={
+            "task": "distance",
+            "params": {"x1": 0, "y1": 0, "x2": 3, "y2": 4},
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["task"] == "distance"
+    assert math.isclose(data["result_data"]["result"], 5.0)
+    assert data["detected_bug"] is None
+    assert data["vault_recorded"] is False
+
+
+def test_api_solve_analytic_geometry_with_misconception_and_vault():
+    """POST /api/v1/geometry/analytic/solve hata tespiti ve kasaya kayıt."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+    student_id = "stu_anag_api_001"
+
+    # BUG-ANAG-01 içeren öğrenci adımı
+    resp = client.post(
+        "/api/v1/geometry/analytic/solve",
+        json={
+            "task": "line_from_points",
+            "params": {"x1": 1, "y1": 2, "x2": 4, "y2": 8},
+            "student_id": student_id,
+            "problem_statement": "d1 ile d2 birbirine dik",
+            "student_step": "m1*m2 = 1",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["task"] == "line_from_points"
+    assert data["result_data"]["slope"] == 2.0
+    assert data["detected_bug"] is not None
+    assert data["detected_bug"]["bug_id"] == "BUG-ANAG-01"
+    assert data["vault_recorded"] is True
+
+    # Kasadan öğrencinin hatasını kontrol et
+    vault_resp = client.get(f"/api/v1/vault/list/{student_id}")
+    assert vault_resp.status_code == 200
+    vault_records = vault_resp.json()
+    assert len(vault_records) >= 1
+    assert any(r["bug_id"] == "BUG-ANAG-01" for r in vault_records)
+
+
+def test_api_solve_analytic_geometry_invalid_task():
+    """POST /api/v1/geometry/analytic/solve bilinmeyen görev için 400 döndürmeli."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+    resp = client.post(
+        "/api/v1/geometry/analytic/solve",
+        json={
+            "task": "unknown_hyperbola_task",
+            "params": {},
+        },
+    )
+    assert resp.status_code == 400
+    assert "Bilinmeyen analitik geometri görevi" in resp.json()["detail"]
+
+

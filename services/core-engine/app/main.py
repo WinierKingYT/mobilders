@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.logging_config import setup_logging
 from app.api.endpoints import router as session_router
+from app.focus_domain.api import install_focus_api
 
 # Yapılandırılmış JSON Loglama Kurulumu
 setup_logging(settings.LOG_LEVEL)
@@ -25,6 +26,15 @@ app.add_middleware(
 
 app.include_router(session_router)
 
+# Focus V1 Alpha is isolated behind a default-off feature flag.
+# When disabled, no /focus/v1 routes are registered.
+install_focus_api(
+    app,
+    enabled=settings.FOCUS_V1_ENABLED,
+    canary_percentage=settings.FOCUS_CANARY_PERCENTAGE,
+    kill_switch=settings.FOCUS_KILL_SWITCH,
+)
+
 
 @app.get("/health", tags=["Health"])
 async def health_check():
@@ -33,6 +43,9 @@ async def health_check():
         "service": "core-engine",
         "environment": settings.ENVIRONMENT,
         "cas_status": "ready",
+        "focus_v1_enabled": settings.FOCUS_V1_ENABLED,
+        "focus_canary_percentage": settings.FOCUS_CANARY_PERCENTAGE,
+        "focus_kill_switch": settings.FOCUS_KILL_SWITCH,
         "supported_misconceptions": [
             "BUG-QUAD-01",
             "BUG-QUAD-02",

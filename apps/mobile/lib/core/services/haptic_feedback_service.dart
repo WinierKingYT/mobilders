@@ -45,6 +45,18 @@ class HapticFeedbackService {
     await _trigger(HapticType.heavyImpact, HapticFeedback.heavyImpact);
   }
 
+  Future<void> lightImpact() async {
+    await _trigger(HapticType.lightImpact, HapticFeedback.lightImpact);
+  }
+
+  Future<void> mediumImpact() async {
+    await _trigger(HapticType.mediumImpact, HapticFeedback.mediumImpact);
+  }
+
+  Future<void> heavyImpact() async {
+    await _trigger(HapticType.heavyImpact, HapticFeedback.heavyImpact);
+  }
+
   Future<void> _trigger(HapticType type, Future<void> Function() hapticCall) async {
     if (!isEnabled) return;
     triggeredHistory.add(type);

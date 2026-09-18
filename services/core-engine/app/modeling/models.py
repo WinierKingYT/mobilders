@@ -62,6 +62,7 @@ class ScaffoldStepRequest(BaseModel):
     student_input: str = Field(..., description="Öğrencinin ilgili aşamada girdiği yanıt (değişken, denklem veya çözüm adımı)")
     variable_name: Optional[str] = Field("x", description="Öğrencinin seçtiği değişken adı")
     previous_steps: List[str] = Field(default_factory=list)
+    student_id: Optional[str] = Field("student_default", description="Öğrenci kimliği (Bilişsel Hata Kasası kaydı için)")
     client_timestamp: Optional[str] = None
 
 

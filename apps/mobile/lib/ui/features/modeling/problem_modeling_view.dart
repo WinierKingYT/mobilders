@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'widgets/motion_diagram_widget.dart';
 import 'widgets/mixture_vessel_widget.dart';
 import '../../../../core/services/haptic_feedback_service.dart';
+import '../../../../data/services/engine_api_service.dart';
 
 enum ModelingStageType {
   variable,
@@ -127,6 +128,8 @@ class ProblemModelingView extends StatefulWidget {
   final String? storyText;
   final String? targetUnknown;
   final String? schematicType; // 'MOTION_TIMELINE' | 'MIXTURE_VESSEL' | 'NONE'
+  final EngineApiService? apiService;
+  final String? studentId;
 
   const ProblemModelingView({
     super.key,
@@ -136,6 +139,8 @@ class ProblemModelingView extends StatefulWidget {
     this.storyText,
     this.targetUnknown,
     this.schematicType,
+    this.apiService,
+    this.studentId,
   });
 
   @override
@@ -146,6 +151,7 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
   late int _activePresetIndex;
   ModelingStageType _currentStage = ModelingStageType.variable;
   final TextEditingController _inputController = TextEditingController();
+  bool _isSubmitting = false;
 
   String? _socraticFeedback;
   String? _detectedBugId;
@@ -206,17 +212,82 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
     super.dispose();
   }
 
-  void _submitCurrentStep() {
+  Future<void> _submitCurrentStep() async {
     final input = _inputController.text.trim();
-    if (input.isEmpty) return;
+    if (input.isEmpty || _isSubmitting) return;
 
     final preset = _currentPreset;
 
     setState(() {
       _detectedBugId = null;
       _socraticFeedback = null;
+      _isSubmitting = true;
     });
 
+    // 1. Canlı API İstemcisi Entegrasyonu (Hedef 9)
+    if (widget.apiService != null) {
+      try {
+        final stageStr = _currentStage == ModelingStageType.variable
+            ? 'STAGE_1_VARIABLE'
+            : (_currentStage == ModelingStageType.equation
+                ? 'STAGE_2_EQUATION'
+                : 'STAGE_3_SOLVE');
+
+        final resp = await widget.apiService!.submitModelingScaffoldStep(
+          sessionId: 'modeling_sess_${preset.id}',
+          problemId: preset.id,
+          stage: stageStr,
+          studentInput: input,
+          variableName: _selectedVar,
+          studentId: widget.studentId ?? 'STU-MODEL-01',
+        );
+
+        final bool isValid = resp['is_valid'] == true;
+        final bool stageCompleted = resp['stage_completed'] == true;
+        final String feedback = (resp['socratic_feedback'] as String?) ?? '';
+        final Map<String, dynamic>? detectedBug = resp['detected_bug'] as Map<String, dynamic>?;
+        final String? bugId = detectedBug?['bug_id'] as String?;
+
+        if (mounted) {
+          if (isValid) {
+            HapticFeedbackService().stepSuccess();
+            setState(() {
+              _socraticFeedback = feedback;
+              _detectedBugId = null;
+              if (_currentStage == ModelingStageType.variable) {
+                _selectedVar = input.toLowerCase().contains(preset.canonicalVar.toLowerCase())
+                    ? preset.canonicalVar
+                    : input.trim();
+                _currentStage = ModelingStageType.equation;
+              } else if (_currentStage == ModelingStageType.equation) {
+                _currentStage = ModelingStageType.solve;
+              } else if (_currentStage == ModelingStageType.solve && stageCompleted) {
+                _isAllCompleted = true;
+              }
+              _inputController.clear();
+              _isSubmitting = false;
+            });
+            return;
+          } else {
+            HapticFeedbackService().stepError();
+            setState(() {
+              _socraticFeedback = feedback;
+              _detectedBugId = bugId;
+              _isSubmitting = false;
+            });
+            return;
+          }
+        }
+      } catch (_) {
+        // API hatasında kesintisiz çevrimdışı fallback'e geç
+      }
+    }
+
+    // 2. Çevrimdışı / Yerel İskele Değerlendirmesi (Fallback)
+    _executeOfflineStepEvaluation(input, preset);
+  }
+
+  void _executeOfflineStepEvaluation(String input, ProblemPreset preset) {
     if (_currentStage == ModelingStageType.variable) {
       // Aşama 1: Değişken Tanımla
       final clean = input.toLowerCase();
@@ -236,12 +307,14 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
               'Harika bir başlangıç! "$_selectedVar" değişkenini "${preset.targetUnknown}" olarak belirledik. Şimdi eşitliği kuralım.';
           _currentStage = ModelingStageType.equation;
           _inputController.clear();
+          _isSubmitting = false;
         });
       } else {
         HapticFeedbackService().stepError();
         setState(() {
           _socraticFeedback =
               'Seçtiğin değişken anlaşılamadı. Lütfen ${preset.canonicalVar} gibi tek bir cebirsel harf belirle.';
+          _isSubmitting = false;
         });
       }
     } else if (_currentStage == ModelingStageType.equation) {
@@ -255,6 +328,7 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
           _detectedBugId = 'BUG-PROB-01';
           _socraticFeedback =
               'Zaman herkes için eşit akar. Yıllar eklendiğinde denklemdeki her iki kişinin de yaşına aynı süre eklenmelidir: x + 5 = 2*(y + 5).';
+          _isSubmitting = false;
         });
       } else if (input.contains('v1/v2 = t1/t2') || input.contains('v1/v2=t1/t2')) {
         HapticFeedbackService().stepError();
@@ -262,6 +336,7 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
           _detectedBugId = 'BUG-PROB-02';
           _socraticFeedback =
               'Hız ile zaman doğru orantılı değil, ters orantılıdır! Sabit yolda hız arttıkça süre azalır: v1 * t1 = v2 * t2.';
+          _isSubmitting = false;
         });
       } else if (input.contains('(60+40)/2') || input.contains('vort = 50') || input.contains('(60 + 40)/2')) {
         HapticFeedbackService().stepError();
@@ -269,6 +344,7 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
           _detectedBugId = 'BUG-PROB-03';
           _socraticFeedback =
               'Ortalama hız hızların aritmetik ortalaması değildir! Toplam Yol / Toplam Zaman (harmonik ortalama) formülünü uygula.';
+          _isSubmitting = false;
         });
       } else if (input.contains('1.20*0.80 = 1') || input.contains('1.20*0.80=1')) {
         HapticFeedbackService().stepError();
@@ -276,6 +352,7 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
           _detectedBugId = 'BUG-PROB-04';
           _socraticFeedback =
               'Yüzde artış ve azalış birbirini sıfırlamaz! %20 zam ve %20 indirim: 1.20 * 0.80 = 0.96 (%4 zarar) olur.';
+          _isSubmitting = false;
         });
       } else if (input.contains('tuz/su') || input.contains('yuzde = tuz/su')) {
         HapticFeedbackService().stepError();
@@ -283,6 +360,7 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
           _detectedBugId = 'BUG-PROB-05';
           _socraticFeedback =
               'Karışım yüzdesi saf madde / su değil, Saf Madde / Toplam Karışım Hacmi oranıyla hesaplanır.';
+          _isSubmitting = false;
         });
       } else if (input.contains('6 + 12 = 18') || input.contains('6+12=18') || input.contains('6 + 3 = 9') || input.contains('6+3=9')) {
         HapticFeedbackService().stepError();
@@ -290,6 +368,7 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
           _detectedBugId = 'BUG-PROB-06';
           _socraticFeedback =
               'İki işçi birlikte çalışırken süreler toplanmaz, iş yapma kapasiteleri toplanır: 1/t1 + 1/t2 = 1/t_birlikte.';
+          _isSubmitting = false;
         });
       } else if (input.contains('(v1-v2)*t') || input.contains('(60 - 40) * t = 400') || input.contains('(60-40)*t=400')) {
         HapticFeedbackService().stepError();
@@ -297,6 +376,7 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
           _detectedBugId = 'BUG-PROB-07';
           _socraticFeedback =
               'Karşıt yönlü hareket eden araçlar birbirine yaklaşır; hızları toplanmalıdır: (v1 + v2) * t = Mesafe.';
+          _isSubmitting = false;
         });
       } else if (input.contains('kar = satis * yuzde') || input.contains('satis * yuzde')) {
         HapticFeedbackService().stepError();
@@ -304,6 +384,7 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
           _detectedBugId = 'BUG-PROB-08';
           _socraticFeedback =
               'Aksi belirtilmedikçe kâr marjı satış fiyatı üzerinden değil, maliyet tabanı üzerinden hesaplanır.';
+          _isSubmitting = false;
         });
       } else if (input.contains('60 * 20') || input.contains('60*20')) {
         HapticFeedbackService().stepError();
@@ -311,6 +392,7 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
           _detectedBugId = 'BUG-PROB-09';
           _socraticFeedback =
               'Birim uyuşmazlığı: Hız saatte km (km/h) olarak verilmişken süre dakika alınamaz; dakikayı 60\'a bölerek saate dönüştür.';
+          _isSubmitting = false;
         });
       }
       // 2. Geçerli Denklem Kontrolü
@@ -340,12 +422,14 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
                 'Mükemmel modelleme! Matematiksel eşitliğin problemi tam olarak modelliyor. Şimdi denklemi adım adım çözelim.';
             _currentStage = ModelingStageType.solve;
             _inputController.clear();
+            _isSubmitting = false;
           });
         } else {
           HapticFeedbackService().stepError();
           setState(() {
             _socraticFeedback =
                 'Kurduğun eşitlik problemdeki verilerle tam uyuşmuyor. Değerleri ve bağıntıları tekrar kontrol et.';
+            _isSubmitting = false;
           });
         }
       }
@@ -357,6 +441,7 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
           _detectedBugId = 'BUG-PROB-10';
           _socraticFeedback =
               'Gerçek hayatta yaş, hız, uzunluk veya zaman negatif olamaz. Lütfen pozitif kökü bul.';
+          _isSubmitting = false;
         });
       } else {
         bool isCorrect = false;
@@ -373,6 +458,7 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
             _isAllCompleted = true;
             _socraticFeedback =
                 'Tebrikler! Problemi 3 aşamalı modelleyip doğru ve gerçek hayata uygun çözüme ulaştın.';
+            _isSubmitting = false;
           });
         } else {
           // Zero Leakage: Doğru kök asla söylenmez
@@ -380,6 +466,7 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
           setState(() {
             _socraticFeedback =
                 'İşlemlerde bir hata görünüyor. Bilinen sabit terimleri bir tarafa, bilinmeyenleri diğer tarafa toplayıp sadeleştir.';
+            _isSubmitting = false;
           });
         }
       }
@@ -395,6 +482,46 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF161B22),
         elevation: 0,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: widget.apiService != null
+                      ? Colors.greenAccent.withValues(alpha: 0.15)
+                      : Colors.white10,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: widget.apiService != null
+                        ? Colors.greenAccent.withValues(alpha: 0.5)
+                        : Colors.white24,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      widget.apiService != null ? Icons.cloud_done : Icons.cloud_off,
+                      size: 12,
+                      color: widget.apiService != null ? Colors.greenAccent : Colors.white54,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      widget.apiService != null ? 'Canlı API' : 'Çevrimdışı',
+                      style: TextStyle(
+                        color: widget.apiService != null ? Colors.greenAccent : Colors.white54,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -635,14 +762,20 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
               const SizedBox(width: 8),
               ElevatedButton(
                 key: const Key('modeling_submit_button'),
-                onPressed: _isAllCompleted ? null : _submitCurrentStep,
+                onPressed: (_isAllCompleted || _isSubmitting) ? null : _submitCurrentStep,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.cyanAccent,
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: const Text('Onayla', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: _isSubmitting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                      )
+                    : const Text('Onayla', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ],
           ),

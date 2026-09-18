@@ -171,15 +171,18 @@ class _UnitCircleCanvasState extends State<UnitCircleCanvas> {
             children: [
               const Icon(Icons.circle_outlined, color: Color(0xFF38BDF8), size: 20),
               const SizedBox(width: 8),
-              const Text(
-                "İnteraktif Birim Çember Kanvası",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
+              const Expanded(
+                child: Text(
+                  "İnteraktif Birim Çember Kanvası",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(

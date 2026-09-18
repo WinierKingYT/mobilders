@@ -1,5 +1,5 @@
 import uuid
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from app.root_pedagogy.models import SandboxSessionRequest, SandboxSessionResponse
 
 
@@ -11,7 +11,12 @@ class InSituRemediationSandbox:
     kavramı pekiştirip öğrenciyi ana soruya geri döndürür.
     """
 
-    def create_sandbox(self, request: SandboxSessionRequest) -> SandboxSessionResponse:
+    def create_sandbox(
+        self,
+        request: SandboxSessionRequest,
+        current_p_l: Optional[float] = None,
+        current_theta: Optional[float] = None,
+    ) -> SandboxSessionResponse:
         s_id = str(uuid.uuid4())[:8]
         node = request.root_node_id
 
@@ -36,7 +41,25 @@ class InSituRemediationSandbox:
             instruction=instruction,
             expected_action=action,
             is_resolved=False,
+            is_quarantined=True,
+            frozen_p_l=current_p_l,
+            frozen_theta=current_theta,
         )
+
+    def compute_quarantined_update(
+        self,
+        current_p_l: float,
+        current_theta: float,
+        in_sandbox: bool,
+    ) -> tuple[float, float, bool]:
+        """
+        Ölçme Karantinası (PF Quarantine Invariant):
+        Mikro-kum havuzundayken öğrencinin yaptığı deneme yanılmalar
+        öğrencinin karne/ustalık (p_l) ve yetenek (theta) skorunu dondurur.
+        """
+        if in_sandbox:
+            return current_p_l, current_theta, True
+        return current_p_l, current_theta, False
 
     def verify_action(self, sandbox_id: str, tool_type: str, user_value: Any) -> bool:
         """Kullanıcının kum havuzundaki interaktif eylemini doğrular."""

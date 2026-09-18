@@ -95,6 +95,89 @@ class RestoredSessionState {
   }
 }
 
+/// Serializable focus session state for crash resistance and instant restoration
+class RestoredFocusSessionState {
+  final String episodeId;
+  final String topicId;
+  final int sequence;
+  final int a;
+  final int b;
+  final int c;
+  final String comparator;
+  final int? divisorRoot;
+  final String draftText;
+  final InputMode inputMode;
+  final bool isZenMode;
+  final String currentStage;
+  final String currentPhase;
+  final DateTime lastUpdated;
+
+  RestoredFocusSessionState({
+    required this.episodeId,
+    required this.topicId,
+    required this.sequence,
+    required this.a,
+    required this.b,
+    required this.c,
+    required this.comparator,
+    this.divisorRoot,
+    required this.draftText,
+    required this.inputMode,
+    required this.isZenMode,
+    required this.currentStage,
+    required this.currentPhase,
+    required this.lastUpdated,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'episodeId': episodeId,
+    'topicId': topicId,
+    'sequence': sequence,
+    'a': a,
+    'b': b,
+    'c': c,
+    'comparator': comparator,
+    if (divisorRoot != null) 'divisorRoot': divisorRoot,
+    'draftText': draftText,
+    'inputMode': inputMode.name,
+    'isZenMode': isZenMode,
+    'currentStage': currentStage,
+    'currentPhase': currentPhase,
+    'lastUpdated': lastUpdated.toIso8601String(),
+  };
+
+  factory RestoredFocusSessionState.fromJson(Map<String, dynamic> json) {
+    InputMode mode = InputMode.touchpad;
+    final modeStr = json['inputMode'] as String?;
+    if (modeStr != null) {
+      for (var m in InputMode.values) {
+        if (m.name == modeStr) {
+          mode = m;
+          break;
+        }
+      }
+    }
+    return RestoredFocusSessionState(
+      episodeId: json['episodeId'] as String? ?? '',
+      topicId: json['topicId'] as String? ?? 'CT-QF1',
+      sequence: json['sequence'] as int? ?? 0,
+      a: json['a'] as int? ?? 1,
+      b: json['b'] as int? ?? 5,
+      c: json['c'] as int? ?? 6,
+      comparator: json['comparator'] as String? ?? '<=',
+      divisorRoot: json['divisorRoot'] as int?,
+      draftText: json['draftText'] as String? ?? '',
+      inputMode: mode,
+      isZenMode: json['isZenMode'] as bool? ?? false,
+      currentStage: json['currentStage'] as String? ?? 'S1_FACTOR',
+      currentPhase: json['currentPhase'] as String? ?? 'WORKSPACE',
+      lastUpdated: json['lastUpdated'] != null
+          ? DateTime.tryParse(json['lastUpdated'] as String) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
+}
+
 /// Abstract storage interface for dependency injection & testing
 abstract class SessionStorageBackend {
   Future<void> write(String key, String data);
@@ -227,6 +310,59 @@ class SessionRestorationManager with WidgetsBindingObserver {
     _cachedState = null;
     try {
       await _storage.delete(defaultDraftKey);
+    } catch (_) {}
+  }
+
+  // ==========================================
+  // Focus Session Draft Persistence
+  // ==========================================
+  static const String defaultFocusDraftKey = 'ple_active_focus_draft';
+  RestoredFocusSessionState? _cachedFocusState;
+
+  RestoredFocusSessionState? get cachedFocusState => _cachedFocusState;
+
+  /// Saves the current Focus Session state atomically
+  Future<void> saveFocusDraft(RestoredFocusSessionState state) async {
+    _cachedFocusState = state;
+    try {
+      final jsonStr = jsonEncode(state.toJson());
+      await _storage.write(defaultFocusDraftKey, jsonStr);
+    } catch (_) {
+      // Storage error handled gracefully
+    }
+  }
+
+  /// Restores the last active Focus Session draft, returning null if missing, corrupt, or expired
+  Future<RestoredFocusSessionState?> restoreFocusDraft({Duration maxAge = defaultExpiry}) async {
+    try {
+      final raw = await _storage.read(defaultFocusDraftKey);
+      if (raw == null || raw.trim().isEmpty) {
+        return null;
+      }
+
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      final state = RestoredFocusSessionState.fromJson(map);
+
+      // Check expiration
+      if (DateTime.now().difference(state.lastUpdated) > maxAge) {
+        await clearFocusDraft();
+        return null;
+      }
+
+      _cachedFocusState = state;
+      return state;
+    } catch (_) {
+      // Corrupt state cleanup
+      await clearFocusDraft();
+      return null;
+    }
+  }
+
+  /// Clears persisted Focus Session draft upon completion or reset
+  Future<void> clearFocusDraft() async {
+    _cachedFocusState = null;
+    try {
+      await _storage.delete(defaultFocusDraftKey);
     } catch (_) {}
   }
 }

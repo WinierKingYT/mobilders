@@ -71,11 +71,62 @@ class UnsyncedStepEvent {
   );
 }
 
+/// Offline Focus Attempt event awaiting idempotent server synchronization.
+class UnsyncedFocusAttemptEvent {
+  final String clientMsgId;
+  final String episodeId;
+  final int expectedSequence;
+  final String rawAttempt;
+  final String inputKind;
+  final DateTime clientTimestamp;
+  int retryCount;
+  bool isSynced;
+  String? syncError;
+
+  UnsyncedFocusAttemptEvent({
+    required this.clientMsgId,
+    required this.episodeId,
+    required this.expectedSequence,
+    required this.rawAttempt,
+    this.inputKind = 'equation_rewrite',
+    required this.clientTimestamp,
+    this.retryCount = 0,
+    this.isSynced = false,
+    this.syncError,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'client_msg_id': clientMsgId,
+    'episode_id': episodeId,
+    'expected_sequence': expectedSequence,
+    'raw_attempt': rawAttempt,
+    'input_kind': inputKind,
+    'client_timestamp': clientTimestamp.toIso8601String(),
+    'retry_count': retryCount,
+    'is_synced': isSynced,
+    if (syncError != null) 'sync_error': syncError,
+  };
+
+  factory UnsyncedFocusAttemptEvent.fromJson(Map<String, dynamic> json) =>
+      UnsyncedFocusAttemptEvent(
+        clientMsgId: json['client_msg_id'] as String,
+        episodeId: json['episode_id'] as String,
+        expectedSequence: json['expected_sequence'] as int? ?? 0,
+        rawAttempt: json['raw_attempt'] as String,
+        inputKind: json['input_kind'] as String? ?? 'equation_rewrite',
+        clientTimestamp: DateTime.tryParse(json['client_timestamp'] as String? ?? '') ?? DateTime.now(),
+        retryCount: json['retry_count'] as int? ?? 0,
+        isSynced: json['is_synced'] as bool? ?? false,
+        syncError: json['sync_error'] as String?,
+      );
+}
+
 /// Offline Event Queue Manager.
 /// Stores unsynced steps locally, provides client-timestamp ordering,
 /// exponential backoff retry calculations, and idempotent batch replay.
 class OfflineSyncQueue extends ChangeNotifier {
   final List<UnsyncedStepEvent> _events = [];
+  final List<UnsyncedFocusAttemptEvent> _focusEvents = [];
   final String? storageFilePath;
   bool _isSyncing = false;
 
@@ -89,10 +140,27 @@ class OfflineSyncQueue extends ChangeNotifier {
   int get pendingCount => _events.where((e) => !e.isSynced).length;
   bool get isSyncing => _isSyncing;
 
+  List<UnsyncedFocusAttemptEvent> get pendingFocusEvents =>
+      List.unmodifiable(_focusEvents.where((e) => !e.isSynced).toList());
+
+  int get pendingFocusCount => _focusEvents.where((e) => !e.isSynced).length;
+
   /// Enqueue step to local storage and memory ledger.
   void enqueueStep(UnsyncedStepEvent event) {
     _events.add(event);
     _persistToDisk();
+    notifyListeners();
+  }
+
+  /// Enqueue a focus attempt for offline synchronization.
+  void enqueueFocusAttempt(UnsyncedFocusAttemptEvent event) {
+    _focusEvents.add(event);
+    notifyListeners();
+  }
+
+  /// Mark a focus attempt as synced and remove from pending queue.
+  void markFocusAttemptSynced(String clientMsgId) {
+    _focusEvents.removeWhere((e) => e.clientMsgId == clientMsgId);
     notifyListeners();
   }
 

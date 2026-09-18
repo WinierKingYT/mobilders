@@ -85,4 +85,58 @@ void main() {
     expect(find.text("u · v: 0.00"), findsOneWidget);
     expect(find.text("Dik Vektörler (u ⊥ v)"), findsOneWidget);
   });
+
+  testWidgets('InteractiveCoordinateCanvas displays undefined slope when line is vertical',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: InteractiveCoordinateCanvas(
+              initialPointA: Offset(3.0, 1.0),
+              initialPointB: Offset(3.0, 7.0),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Same x coordinate => slope is undefined
+    expect(find.text("Eğim: Tanımsız (Düşey)"), findsOneWidget);
+    expect(find.text("Uzaklık: 6.00"), findsOneWidget);
+  });
+
+  testWidgets('InteractiveCoordinateCanvas slider updates point B and fires onPointBChanged',
+      (WidgetTester tester) async {
+    Offset? updatedPointB;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: InteractiveCoordinateCanvas(
+              initialPointA: const Offset(0.0, 0.0),
+              initialPointB: const Offset(4.0, 3.0),
+              onPointBChanged: (p) => updatedPointB = p,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text("B(4.0, 3.0)"), findsOneWidget);
+    expect(find.text("Uzaklık: 5.00"), findsOneWidget);
+
+    // Find Slider widgets (first is x, second is y)
+    final sliders = find.byType(Slider);
+    expect(sliders, findsNWidgets(2));
+
+    // Drag the first slider (x) slightly
+    await tester.drag(sliders.first, const Offset(50, 0));
+    await tester.pumpAndSettle();
+
+    // Verify callback was invoked
+    expect(updatedPointB, isNotNull);
+  });
 }
+

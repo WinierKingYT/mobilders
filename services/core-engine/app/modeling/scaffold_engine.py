@@ -1,6 +1,6 @@
 import time
 import re
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, TYPE_CHECKING
 import sympy as sp
 from app.cas.symbolic_engine import SymbolicEquivalenceEngine
 from app.misconceptions.detector import QuadraticMisconceptionDetector
@@ -15,6 +15,9 @@ from app.modeling.models import (
     ScaffoldStepResponse,
 )
 
+if TYPE_CHECKING:
+    from app.vault.mistake_vault import CognitiveMistakeVault
+
 
 class SocraticModelingScaffoldEngine:
     """
@@ -27,9 +30,11 @@ class SocraticModelingScaffoldEngine:
         self,
         cas_engine: Optional[SymbolicEquivalenceEngine] = None,
         detector: Optional[QuadraticMisconceptionDetector] = None,
+        vault: Optional["CognitiveMistakeVault"] = None,
     ):
         self.cas = cas_engine or SymbolicEquivalenceEngine()
         self.detector = detector or QuadraticMisconceptionDetector(self.cas)
+        self.vault = vault
         self.problem_bank: Dict[str, ModelingProblemSpec] = self._init_problem_bank()
 
     def _init_problem_bank(self) -> Dict[str, ModelingProblemSpec]:
@@ -262,6 +267,19 @@ class SocraticModelingScaffoldEngine:
             target_equation_str=problem.canonical_equation_str,
         )
         if bug:
+            if self.vault and getattr(request, "student_id", None):
+                try:
+                    self.vault.record_mistake(
+                        user_id=request.student_id,
+                        node_id=problem.node_id,
+                        bug_id=bug.bug_id,
+                        problem_statement=problem.story_text,
+                        offending_step=raw_input,
+                        correct_principle=bug.description,
+                        remediation_directive=bug.remediation_directive,
+                    )
+                except Exception:
+                    pass
             return ScaffoldStepResponse(
                 problem_id=problem.id,
                 stage=ModelingStage.STAGE_2_EQUATION,
@@ -275,12 +293,15 @@ class SocraticModelingScaffoldEngine:
         is_equiv = False
         # Doğrudan kanonik denkleme veya alternatiflere denk mi?
         if "=" in raw_input and "=" in problem.canonical_equation_str:
-            is_equiv = self.cas.verify_equivalence(raw_input, problem.canonical_equation_str)
-            if not is_equiv:
-                for alt_eq in problem.alternative_equations:
-                    if self.cas.verify_equivalence(raw_input, alt_eq):
-                        is_equiv = True
-                        break
+            try:
+                is_equiv = self.cas.verify_equivalence(raw_input, problem.canonical_equation_str)
+                if not is_equiv:
+                    for alt_eq in problem.alternative_equations:
+                        if self.cas.verify_equivalence(raw_input, alt_eq):
+                            is_equiv = True
+                            break
+            except Exception:
+                is_equiv = False
         elif raw_input == problem.canonical_equation_str or raw_input in problem.alternative_equations:
             is_equiv = True
 
@@ -315,6 +336,19 @@ class SocraticModelingScaffoldEngine:
             target_equation_str=problem.canonical_solution_str,
         )
         if bug:
+            if self.vault and getattr(request, "student_id", None):
+                try:
+                    self.vault.record_mistake(
+                        user_id=request.student_id,
+                        node_id=problem.node_id,
+                        bug_id=bug.bug_id,
+                        problem_statement=problem.story_text,
+                        offending_step=raw_input,
+                        correct_principle=bug.description,
+                        remediation_directive=bug.remediation_directive,
+                    )
+                except Exception:
+                    pass
             return ScaffoldStepResponse(
                 problem_id=problem.id,
                 stage=ModelingStage.STAGE_3_SOLVE,
@@ -367,6 +401,19 @@ class SocraticModelingScaffoldEngine:
                 schematic_state_update={"completed": True},
             )
         elif not domain_ok:
+            if self.vault and getattr(request, "student_id", None):
+                try:
+                    self.vault.record_mistake(
+                        user_id=request.student_id,
+                        node_id=problem.node_id,
+                        bug_id="BUG-PROB-10",
+                        problem_statement=problem.story_text,
+                        offending_step=raw_input,
+                        correct_principle="Gerçek dünya kısıtı ihlali (pozitiflik/tamsayılık)",
+                        remediation_directive=domain_msg or "Gerçek dünyada yaş, hız ve zaman negatif olamaz.",
+                    )
+                except Exception:
+                    pass
             return ScaffoldStepResponse(
                 problem_id=problem.id,
                 stage=ModelingStage.STAGE_3_SOLVE,

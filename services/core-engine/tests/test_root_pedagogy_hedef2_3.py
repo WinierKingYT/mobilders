@@ -205,8 +205,17 @@ def test_insitu_sandbox_creation_and_resolution():
     assert res_pie.tool_type == "PIE_FRACTION"
 
     req_bal = SandboxSessionRequest(student_id="st3", root_node_id="N_ROOT_15", trigger_error_step="2x+3=11")
-    res_bal = sandbox.create_sandbox(req_bal)
+    res_bal = sandbox.create_sandbox(req_bal, current_p_l=0.45, current_theta=0.85)
     assert res_bal.tool_type == "BALANCE_SCALE"
+    assert res_bal.is_quarantined is True
+    assert res_bal.frozen_p_l == 0.45
+    assert res_bal.frozen_theta == 0.85
+
+    # Verify quarantine invariant: scores cannot mutate during sandbox trial & error
+    p_l, theta, quarantined = sandbox.compute_quarantined_update(0.45, 0.85, in_sandbox=True)
+    assert quarantined is True
+    assert p_l == 0.45
+    assert theta == 0.85
 
 
 # ==========================================
