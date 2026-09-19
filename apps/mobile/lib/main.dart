@@ -5,6 +5,7 @@ import 'ui/core/app_theme.dart';
 import 'ui/features/session/view_models/session_view_model.dart';
 import 'ui/features/session/views/daily_journey_screen.dart';
 import 'ui/features/diagnostic/view_models/diagnostic_view_model.dart';
+import 'ui/features/navigation/main_navigation_shell.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -57,7 +58,7 @@ class PersonalLearningEngineApp extends StatelessWidget {
         title: 'Kişisel Öğrenme Motoru',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
-        home: const DailyJourneyScreen(),
+        home: const MainNavigationShell(),
       ),
     );
   }

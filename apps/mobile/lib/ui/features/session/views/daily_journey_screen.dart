@@ -23,6 +23,9 @@ import 'focus_session_screen.dart';
 import '../view_models/focus_session_view_model.dart';
 import '../../../../data/services/focus_api_service.dart';
 
+import '../../atlas/living_knowledge_atlas_view.dart';
+import '../../math_lab/views/math_lab_hub_screen.dart';
+
 enum DailyPhase {
   warmup,      // Phase 1: 3 min (Spaced Retrieval)
   diagnostic,  // Phase 2: 4 min (CAT ZPD Placement)
@@ -32,7 +35,9 @@ enum DailyPhase {
 }
 
 class DailyJourneyScreen extends StatefulWidget {
-  const DailyJourneyScreen({super.key});
+  final void Function(int tabIndex)? onNavigateToTab;
+
+  const DailyJourneyScreen({super.key, this.onNavigateToTab});
 
   @override
   State<DailyJourneyScreen> createState() => _DailyJourneyScreenState();
@@ -103,217 +108,228 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const Spacer(),
-              // Scratchpad Trigger Button
-              if (_currentPhase == DailyPhase.problemBoard)
-                IconButton(
-                  icon: Icon(
-                    Icons.edit_note,
-                    color: _showScratchpad ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
-                  ),
-                  tooltip: "Karalama Tuvali",
-                  onPressed: () {
-                    HapticFeedbackService().selectionClick();
-                    setState(() => _showScratchpad = !_showScratchpad);
-                  },
-                ),
-              // Al-Khwarizmi Tile Canvas Toggle Button
-              if (_currentPhase == DailyPhase.problemBoard)
-                IconButton(
-                  icon: Icon(
-                    Icons.architecture,
-                    color: _showGeometricCanvas ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
-                  ),
-                  tooltip: "El-Harezmi Karoları",
-                  onPressed: () {
-                    HapticFeedbackService().selectionClick();
-                    setState(() => _showGeometricCanvas = !_showGeometricCanvas);
-                  },
-                ),
-              // Unit Circle Canvas Toggle Button (Hedef 5)
-              if (_currentPhase == DailyPhase.problemBoard)
-                IconButton(
-                  icon: Icon(
-                    Icons.change_circle_outlined,
-                    color: _showUnitCircleCanvas ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8),
-                  ),
-                  tooltip: "Birim Çember Kanvası",
-                  onPressed: () {
-                    HapticFeedbackService().selectionClick();
-                    setState(() => _showUnitCircleCanvas = !_showUnitCircleCanvas);
-                  },
-                ),
-              // Dynamic Tangent Canvas Toggle Button (Hedef 6)
-              if (_currentPhase == DailyPhase.problemBoard)
-                IconButton(
-                  icon: Icon(
-                    Icons.show_chart_rounded,
-                    color: _showTangentCanvas ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
-                  ),
-                  tooltip: "Dinamik Teğet Eğimi (Türev)",
-                  onPressed: () {
-                    HapticFeedbackService().selectionClick();
-                    setState(() => _showTangentCanvas = !_showTangentCanvas);
-                  },
-                ),
-              // Riemann Integral Canvas Toggle Button (Hedef 7)
-              if (_currentPhase == DailyPhase.problemBoard)
-                IconButton(
-                  icon: Icon(
-                    Icons.area_chart_rounded,
-                    color: _showRiemannCanvas ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
-                  ),
-                  tooltip: "Riemann İntegral Kanvası",
-                  onPressed: () {
-                    HapticFeedbackService().selectionClick();
-                    setState(() => _showRiemannCanvas = !_showRiemannCanvas);
-                  },
-                ),
-              // Interactive Coordinate Canvas Toggle Button (Hedef 10)
-              if (_currentPhase == DailyPhase.problemBoard)
-                IconButton(
-                  key: const Key('toggle_coordinate_canvas_button'),
-                  icon: Icon(
-                    Icons.grid_4x4_rounded,
-                    color: _showCoordinateCanvas ? const Color(0xFF6366F1) : const Color(0xFF94A3B8),
-                  ),
-                  tooltip: "Analitik Koordinat & Vektör Kanvası",
-                  onPressed: () {
-                    HapticFeedbackService().selectionClick();
-                    setState(() => _showCoordinateCanvas = !_showCoordinateCanvas);
-                  },
-                ),
-              // Euclidean & Auxiliary Line Canvas Toggle Button (Hedef 11)
-              if (_currentPhase == DailyPhase.problemBoard)
-                IconButton(
-                  key: const Key('toggle_euclidean_canvas_button'),
-                  icon: Icon(
-                    Icons.architecture_rounded,
-                    color: _showEuclideanCanvas ? const Color(0xFFF43F5E) : const Color(0xFF94A3B8),
-                  ),
-                  tooltip: "Sentetik Öklid & Ek Çizim Kanvası",
-                  onPressed: () {
-                    HapticFeedbackService().selectionClick();
-                    setState(() => _showEuclideanCanvas = !_showEuclideanCanvas);
-                  },
-                ),
-              // Vector Inking Canvas Quick Toggle Button
-              if (_currentPhase == DailyPhase.problemBoard)
-                Consumer<SessionViewModel>(
-                  builder: (context, vm, _) {
-                    final isInking = vm.inputMode == InputMode.inkingCanvas;
-                    return IconButton(
-                      icon: Icon(
-                        Icons.draw_rounded,
-                        color: isInking ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
-                      ),
-                      tooltip: "Vektör Çizim Tuvali",
-                      onPressed: () {
-                        HapticFeedbackService().modeSwitch();
-                        vm.setInputMode(isInking ? InputMode.touchpad : InputMode.inkingCanvas);
-                      },
-                    );
-                  },
-                ),
-              // Cognitive Health & Atlas Button
-              IconButton(
-                icon: const Icon(
-                  Icons.account_tree_outlined,
-                  color: Color(0xFF10B981),
-                ),
-                tooltip: "Bilişsel Sağlık & Cebir Atlası",
-                onPressed: () {
-                  HapticFeedbackService().selectionClick();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const CognitiveHealthAtlasScreen(),
-                    ),
-                  );
-                },
-              ),
-              // Math Scanner & Notebook Vision Camera Button (Hedef 8)
-              IconButton(
-                icon: const Icon(
-                  Icons.camera_alt_outlined,
-                  color: Color(0xFF38BDF8),
-                ),
-                tooltip: "Sokratik Defter & Soru Kamerası",
-                onPressed: () {
-                  HapticFeedbackService().selectionClick();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const Scaffold(
-                        body: SafeArea(child: MathScannerView()),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              // Story Problem Modeling & Socratic Scaffold (Hedef 9)
-              IconButton(
-                key: const Key('header_problem_modeling_button'),
-                icon: const Icon(
-                  Icons.auto_stories_outlined,
-                  color: Color(0xFFF59E0B),
-                ),
-                tooltip: "Yeni Nesil Hikayeli Problem Modelleme",
-                onPressed: () {
-                  HapticFeedbackService().selectionClick();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const Scaffold(
-                        body: SafeArea(child: ProblemModelingView()),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              // Cognitive Mistake Vault & Weakness Hunter Button (Hedef 12)
-              IconButton(
-                key: const Key('header_mistake_vault_button'),
-                icon: const Icon(
-                  Icons.biotech_rounded,
-                  color: Color(0xFFF43F5E),
-                ),
-                tooltip: "Bilişsel Hata Kasası & Zaaf Avcısı",
-                onPressed: () {
-                  HapticFeedbackService().selectionClick();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => MistakeAutopsyView(
-                        mistakes: MistakeVaultService.instance.mistakes,
-                        onStartBossBattle: () {
-                          HapticFeedbackService().stepSuccess();
+              const SizedBox(width: 8),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  reverse: true,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Scratchpad Trigger Button
+                      if (_currentPhase == DailyPhase.problemBoard)
+                        IconButton(
+                          icon: Icon(
+                            Icons.edit_note,
+                            color: _showScratchpad ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
+                          ),
+                          tooltip: "Karalama Tuvali",
+                          onPressed: () {
+                            HapticFeedbackService().selectionClick();
+                            setState(() => _showScratchpad = !_showScratchpad);
+                          },
+                        ),
+                      // Al-Khwarizmi Tile Canvas Toggle Button
+                      if (_currentPhase == DailyPhase.problemBoard)
+                        IconButton(
+                          icon: Icon(
+                            Icons.architecture,
+                            color: _showGeometricCanvas ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                          ),
+                          tooltip: "El-Harezmi Karoları",
+                          onPressed: () {
+                            HapticFeedbackService().selectionClick();
+                            setState(() => _showGeometricCanvas = !_showGeometricCanvas);
+                          },
+                        ),
+                      // Unit Circle Canvas Toggle Button (Hedef 5)
+                      if (_currentPhase == DailyPhase.problemBoard)
+                        IconButton(
+                          icon: Icon(
+                            Icons.change_circle_outlined,
+                            color: _showUnitCircleCanvas ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8),
+                          ),
+                          tooltip: "Birim Çember Kanvası",
+                          onPressed: () {
+                            HapticFeedbackService().selectionClick();
+                            setState(() => _showUnitCircleCanvas = !_showUnitCircleCanvas);
+                          },
+                        ),
+                      // Dynamic Tangent Canvas Toggle Button (Hedef 6)
+                      if (_currentPhase == DailyPhase.problemBoard)
+                        IconButton(
+                          icon: Icon(
+                            Icons.show_chart_rounded,
+                            color: _showTangentCanvas ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
+                          ),
+                          tooltip: "Dinamik Teğet Eğimi (Türev)",
+                          onPressed: () {
+                            HapticFeedbackService().selectionClick();
+                            setState(() => _showTangentCanvas = !_showTangentCanvas);
+                          },
+                        ),
+                      // Riemann Integral Canvas Toggle Button (Hedef 7)
+                      if (_currentPhase == DailyPhase.problemBoard)
+                        IconButton(
+                          icon: Icon(
+                            Icons.area_chart_rounded,
+                            color: _showRiemannCanvas ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                          ),
+                          tooltip: "Riemann İntegral Kanvası",
+                          onPressed: () {
+                            HapticFeedbackService().selectionClick();
+                            setState(() => _showRiemannCanvas = !_showRiemannCanvas);
+                          },
+                        ),
+                      // Interactive Coordinate Canvas Toggle Button (Hedef 10)
+                      if (_currentPhase == DailyPhase.problemBoard)
+                        IconButton(
+                          key: const Key('toggle_coordinate_canvas_button'),
+                          icon: Icon(
+                            Icons.grid_4x4_rounded,
+                            color: _showCoordinateCanvas ? const Color(0xFF6366F1) : const Color(0xFF94A3B8),
+                          ),
+                          tooltip: "Analitik Koordinat & Vektör Kanvası",
+                          onPressed: () {
+                            HapticFeedbackService().selectionClick();
+                            setState(() => _showCoordinateCanvas = !_showCoordinateCanvas);
+                          },
+                        ),
+                      // Euclidean & Auxiliary Line Canvas Toggle Button (Hedef 11)
+                      if (_currentPhase == DailyPhase.problemBoard)
+                        IconButton(
+                          key: const Key('toggle_euclidean_canvas_button'),
+                          icon: Icon(
+                            Icons.architecture_rounded,
+                            color: _showEuclideanCanvas ? const Color(0xFFF43F5E) : const Color(0xFF94A3B8),
+                          ),
+                          tooltip: "Sentetik Öklid & Ek Çizim Kanvası",
+                          onPressed: () {
+                            HapticFeedbackService().selectionClick();
+                            setState(() => _showEuclideanCanvas = !_showEuclideanCanvas);
+                          },
+                        ),
+                      // Vector Inking Canvas Quick Toggle Button
+                      if (_currentPhase == DailyPhase.problemBoard)
+                        Consumer<SessionViewModel>(
+                          builder: (context, vm, _) {
+                            final isInking = vm.inputMode == InputMode.inkingCanvas;
+                            return IconButton(
+                              icon: Icon(
+                                Icons.draw_rounded,
+                                color: isInking ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
+                              ),
+                              tooltip: "Vektör Çizim Tuvali",
+                              onPressed: () {
+                                HapticFeedbackService().modeSwitch();
+                                vm.setInputMode(isInking ? InputMode.touchpad : InputMode.inkingCanvas);
+                              },
+                            );
+                          },
+                        ),
+                      // Cognitive Health & Atlas Button
+                      IconButton(
+                        icon: const Icon(
+                          Icons.account_tree_outlined,
+                          color: Color(0xFF10B981),
+                        ),
+                        tooltip: "Bilişsel Sağlık & Cebir Atlası",
+                        onPressed: () {
+                          HapticFeedbackService().selectionClick();
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const CognitiveHealthAtlasScreen(),
+                            ),
+                          );
                         },
                       ),
-                    ),
-                  );
-                },
-              ),
-              // Focus Kernel Multi-Topic Cognitive Session Button
-              IconButton(
-                key: const Key('header_focus_session_button'),
-                icon: const Icon(
-                  Icons.psychology_outlined,
-                  color: Color(0xFF38BDF8),
+                      // Math Scanner & Notebook Vision Camera Button (Hedef 8)
+                      IconButton(
+                        icon: const Icon(
+                          Icons.camera_alt_outlined,
+                          color: Color(0xFF38BDF8),
+                        ),
+                        tooltip: "Sokratik Defter & Soru Kamerası",
+                        onPressed: () {
+                          HapticFeedbackService().selectionClick();
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const Scaffold(
+                                body: SafeArea(child: MathScannerView()),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      // Story Problem Modeling & Socratic Scaffold (Hedef 9)
+                      IconButton(
+                        key: const Key('header_problem_modeling_button'),
+                        icon: const Icon(
+                          Icons.auto_stories_outlined,
+                          color: Color(0xFFF59E0B),
+                        ),
+                        tooltip: "Yeni Nesil Hikayeli Problem Modelleme",
+                        onPressed: () {
+                          HapticFeedbackService().selectionClick();
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const Scaffold(
+                                body: SafeArea(child: ProblemModelingView()),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      // Cognitive Mistake Vault & Weakness Hunter Button (Hedef 12)
+                      IconButton(
+                        key: const Key('header_mistake_vault_button'),
+                        icon: const Icon(
+                          Icons.biotech_rounded,
+                          color: Color(0xFFF43F5E),
+                        ),
+                        tooltip: "Bilişsel Hata Kasası & Zaaf Avcısı",
+                        onPressed: () {
+                          HapticFeedbackService().selectionClick();
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => MistakeAutopsyView(
+                                mistakes: MistakeVaultService.instance.mistakes,
+                                onStartBossBattle: () {
+                                  HapticFeedbackService().stepSuccess();
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      // Focus Kernel Multi-Topic Cognitive Session Button
+                      IconButton(
+                        key: const Key('header_focus_session_button'),
+                        icon: const Icon(
+                          Icons.psychology_outlined,
+                          color: Color(0xFF38BDF8),
+                        ),
+                        tooltip: "Focus Kernel: Bilişsel Seanslar",
+                        onPressed: () {
+                          HapticFeedbackService().selectionClick();
+                          _showFocusTopicSelectionModal(context);
+                        },
+                      ),
+                      // Accessibility & Curriculum Settings Button
+                      IconButton(
+                        icon: const Icon(
+                          Icons.tune_rounded,
+                          color: Color(0xFF38BDF8),
+                        ),
+                        tooltip: "Erişilebilirlik & Müfredat Ayarları",
+                        onPressed: () {
+                          HapticFeedbackService().selectionClick();
+                          _showSettingsModal(context);
+                        },
+                      ),
+                    ],
+                  ),
                 ),
-                tooltip: "Focus Kernel: Bilişsel Seanslar",
-                onPressed: () {
-                  HapticFeedbackService().selectionClick();
-                  _showFocusTopicSelectionModal(context);
-                },
-              ),
-              // Accessibility & Curriculum Settings Button
-              IconButton(
-                icon: const Icon(
-                  Icons.tune_rounded,
-                  color: Color(0xFF38BDF8),
-                ),
-                tooltip: "Erişilebilirlik & Müfredat Ayarları",
-                onPressed: () {
-                  HapticFeedbackService().selectionClick();
-                  _showSettingsModal(context);
-                },
               ),
             ],
           ),
@@ -744,7 +760,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   }
 
   Widget _buildCircadianLockView() {
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -782,7 +798,138 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 32),
+          const Text(
+            "Seans kilitli olsa da diğer bilişsel merkezleri serbestçe keşfedebilirsiniz:",
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+          // Hub Navigation Action Buttons
+          _buildCircadianActionTile(
+            key: const Key('circadian_to_atlas_button'),
+            title: "Zihin Atlasını İncele (246 Düğüm)",
+            subtitle: "Öğrenme rotanı, ZPD sınırlarını ve düğüm ustalıklarını keşfet.",
+            icon: Icons.hub_outlined,
+            accentColor: const Color(0xFF10B981),
+            onTap: () {
+              HapticFeedbackService().selectionClick();
+              if (widget.onNavigateToTab != null) {
+                widget.onNavigateToTab!(1);
+              } else {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const Scaffold(body: SafeArea(child: LivingKnowledgeAtlasView()))),
+                );
+              }
+            },
+          ),
+          const SizedBox(height: 10),
+          _buildCircadianActionTile(
+            key: const Key('circadian_to_math_lab_button'),
+            title: "Matematik Laboratuvarında Çalış",
+            subtitle: "El-Harezmi, Birim Çember, Türev ve Riemann kanvaslarını serbestçe dene.",
+            icon: Icons.architecture,
+            accentColor: const Color(0xFF38BDF8),
+            onTap: () {
+              HapticFeedbackService().selectionClick();
+              if (widget.onNavigateToTab != null) {
+                widget.onNavigateToTab!(2);
+              } else {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const MathLabHubScreen()),
+                );
+              }
+            },
+          ),
+          const SizedBox(height: 10),
+          _buildCircadianActionTile(
+            key: const Key('circadian_to_vault_button'),
+            title: "Hata Kasası & Bilişsel Analiz",
+            subtitle: "Geçmiş hata otopsilerini incele ve Paas bilişsel yük eğrilerini gör.",
+            icon: Icons.biotech_rounded,
+            accentColor: const Color(0xFFF43F5E),
+            onTap: () {
+              HapticFeedbackService().selectionClick();
+              if (widget.onNavigateToTab != null) {
+                widget.onNavigateToTab!(3);
+              } else {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => MistakeAutopsyView(
+                      mistakes: MistakeVaultService.instance.mistakes,
+                      onStartBossBattle: () => HapticFeedbackService().stepSuccess(),
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCircadianActionTile({
+    required Key key,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color accentColor,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: key,
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: accentColor, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios, color: Color(0xFF64748B), size: 14),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
