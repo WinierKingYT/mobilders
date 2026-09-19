@@ -844,6 +844,120 @@ class EngineApiService {
     }
   }
 
+  Future<Map<String, dynamic>> fetchAtlasSummary() async {
+    final uri = Uri.parse('$baseUrl/api/v1/atlas/summary');
+    final response = await _client.get(uri).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchAtlasPayload({
+    List<String>? masteredIds,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/atlas/payload');
+    final payload = {
+      'mastered_ids': masteredIds ?? [],
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchAtlasBottlenecks({
+    List<String>? masteredIds,
+    int topK = 5,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/atlas/bottlenecks');
+    final payload = {
+      'mastered_ids': masteredIds ?? [],
+      'top_k': topK,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      final list = jsonDecode(response.body) as List<dynamic>;
+      return list.map((e) => e as Map<String, dynamic>).toList();
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<List<String>> fetchAtlasZpd({
+    List<String>? masteredIds,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/atlas/zpd');
+    final payload = {
+      'mastered_ids': masteredIds ?? [],
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      final list = jsonDecode(response.body) as List<dynamic>;
+      return list.map((e) => e.toString()).toList();
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchAtlasProgress({
+    List<String>? masteredIds,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/atlas/progress');
+    final payload = {
+      'mastered_ids': masteredIds ?? [],
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
   void dispose() {
     _client.close();
   }

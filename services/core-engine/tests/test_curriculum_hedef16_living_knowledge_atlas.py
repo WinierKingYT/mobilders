@@ -375,3 +375,71 @@ def test_atlas_zpd_empty_when_all_mastered(atlas):
     zpd = atlas.compute_zpd_frontier(all_ids)
     assert len(zpd) == 0
 
+
+# =====================================================================
+# 5. FASTAPI REST API ENDPOINT TESTLERİ
+# =====================================================================
+
+from fastapi.testclient import TestClient
+from app.main import app
+
+
+def test_fastapi_atlas_summary():
+    client = TestClient(app)
+    resp = client.get("/api/v1/atlas/summary")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total_nodes"] == 246
+    assert len(data["domains"]) >= 9
+
+
+def test_fastapi_atlas_payload():
+    client = TestClient(app)
+    resp = client.post(
+        "/api/v1/atlas/payload",
+        json={"mastered_ids": ["N_ROOT_01", "N01"]},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["meta"]["total_nodes"] == 246
+    assert data["meta"]["mastered_count"] == 2
+    assert len(data["nodes"]) == 246
+    assert len(data["edges"]) > 0
+
+
+def test_fastapi_atlas_bottlenecks():
+    client = TestClient(app)
+    resp = client.post(
+        "/api/v1/atlas/bottlenecks",
+        json={"mastered_ids": [], "top_k": 3},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 3
+    assert "node_id" in data[0]
+    assert "blocked_dependents_count" in data[0]
+
+
+def test_fastapi_atlas_zpd():
+    client = TestClient(app)
+    resp = client.post(
+        "/api/v1/atlas/zpd",
+        json={"mastered_ids": ["N_ROOT_01"]},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+
+
+def test_fastapi_atlas_progress():
+    client = TestClient(app)
+    resp = client.post(
+        "/api/v1/atlas/progress",
+        json={"mastered_ids": ["N01", "N02", "N03"]},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["mastered_count"] == 3
+    assert "domain_stats" in data
+
+

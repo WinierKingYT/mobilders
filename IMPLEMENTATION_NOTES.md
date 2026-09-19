@@ -680,3 +680,37 @@ Total Verified Passing Tests: 1,137 (0 regressions, 0 failures)
    - Mobile: 196 test geçti (7 test `proof_canvas_test.dart`).
    - Genel Toplam: 1,212 test %100 başarılı, 0 regresyon, 0 hata.
 
+---
+
+# MOBILDERS Focus Kernel — Implementation Checkpoint Round 32 (Hedef 16: Yaşayan Kişisel Matematik Atlası ve Zihin Haritası Gezgini)
+
+## Scope & Implementation Details
+1. **246 Düğümlü Bütünleşik Zihin Ağı (`LivingKnowledgeAtlasEngine`)**:
+   - `services/core-engine/app/graph/knowledge_atlas_engine.py`:
+     * 16 Kök Düğüm (`N_ROOT_01 - N_ROOT_16`) + 230 Müfredat Düğümü (`N01 - N230`) = 246 Düğüm.
+     * 9 Temel Alan Kümesi (`DomainCluster`): Temel Kökler, Cebir & Polinomlar, Trigonometri & Fonksiyonlar, Türev, İntegral, Analitik Geometri, Sentetik Öklid, Olasılık & İstatistik, Mantık & İspat.
+     * 3B Uzaysal Koordinat Projeksiyonu: Bilişsel seviye tabanlı $z$ ekseni ve radyal alan açısı tabanlı $(x, y)$ dağılımı.
+2. **Topolojik Analiz, ZPD ve Darboğaz Tespiti**:
+   - `compute_zpd_frontier`: Öğrencinin posterior ustalığına göre açılmaya hazır Yakınsak Gelişim Alanı (ZPD) düğümleri.
+   - `find_critical_bottlenecks`: Henüz öğrenilmemiş ve arkasında en çok kilitli düğüm tutan kritik tıkanıklık noktaları.
+   - `calculate_curriculum_progress`: Genel ve alan bazlı yüzde tamamlama istatistikleri.
+   - `generate_atlas_payload`: Mobil ve 3B Atlas görselleştiricisi için düğüm durumları (`MASTERED`, `IN_ZPD`, `LOCKED`) ve aktif/pasif yönlü kenarlar (`edges`).
+3. **REST API Endpoint'leri (`endpoints.py`)**:
+   - `GET /api/v1/atlas/summary`: 246 düğümlü zihin ağı alan özeti.
+   - `POST /api/v1/atlas/payload`: Öğrencinin posterior ustalığına göre ZPD, Mastered ve Locked durumlu tam graf payload'u.
+   - `POST /api/v1/atlas/bottlenecks`: Kritik darboğaz düğümleri listesi.
+   - `POST /api/v1/atlas/zpd`: ZPD sınırındaki hazır düğümler.
+   - `POST /api/v1/atlas/progress`: Genel ve alan bazlı müfredat tamamlama oranları.
+4. **Mobil Arayüz & İstemci Entegrasyonu (`LivingKnowledgeAtlasView` & `EngineApiService`)**:
+   - `apps/mobile/lib/ui/features/atlas/living_knowledge_atlas_view.dart`:
+     * İstatistik çubuğu (Toplam Düğüm, Usta Olunan, ZPD Hazır).
+     * Alan filtreleme çipleri ve canlı metin arama çubuğu.
+     * Düğüm kartı detay sayfası ve öğrenme yolunu başlatma modalı.
+   - `apps/mobile/lib/data/services/engine_api_service.dart`:
+     * `fetchAtlasSummary`, `fetchAtlasPayload`, `fetchAtlasBottlenecks`, `fetchAtlasZpd`, `fetchAtlasProgress`.
+5. **Doğrulama & Test Kapsamı**:
+   - Backend: 1,021 test geçti (47 test `test_curriculum_hedef16_living_knowledge_atlas.py`).
+   - Mobile: 200 test geçti (7 test `living_knowledge_atlas_view_test.dart` + 1 test `cognitive_health_atlas_screen_test.dart`).
+   - Genel Toplam: 1,221 test %100 başarılı, 0 regresyon, 0 hata.
+
+

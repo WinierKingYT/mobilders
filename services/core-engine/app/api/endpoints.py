@@ -1550,4 +1550,66 @@ async def simulate_induction_endpoint(req: InductionSimulateRequest) -> Dict[str
     )
 
 
+# =====================================================================
+# HEDEF 16: YAŞAYAN KİŞİSEL MATEMATİK ATLASI ENDPOINTS
+# =====================================================================
+
+from app.graph.knowledge_atlas_engine import LivingKnowledgeAtlasEngine
+
+atlas_engine = LivingKnowledgeAtlasEngine()
+
+
+class AtlasPayloadRequest(BaseModel):
+    mastered_ids: List[str] = []
+
+
+class AtlasBottlenecksRequest(BaseModel):
+    mastered_ids: List[str] = []
+    top_k: int = 5
+
+
+@router.get("/api/v1/atlas/summary")
+async def get_atlas_summary_endpoint() -> Dict[str, Any]:
+    """
+    Hedef 16: 246 Düğümlü Bütünleşik Zihin Ağı alan özeti ve toplam düğüm sayısı.
+    """
+    return {
+        "total_nodes": atlas_engine.get_total_nodes(),
+        "domains": atlas_engine.get_domain_summary(),
+    }
+
+
+@router.post("/api/v1/atlas/payload")
+async def get_atlas_payload_endpoint(req: AtlasPayloadRequest) -> Dict[str, Any]:
+    """
+    Hedef 16: Öğrencinin posterior ustalığına göre ZPD, Mastered ve Locked durumlu tam graf payload'u.
+    """
+    return atlas_engine.generate_atlas_payload(set(req.mastered_ids))
+
+
+@router.post("/api/v1/atlas/bottlenecks")
+async def get_atlas_bottlenecks_endpoint(req: AtlasBottlenecksRequest) -> List[Dict[str, Any]]:
+    """
+    Hedef 16: Öğrencinin ilerlemesini tıkayan kritik darboğaz (bottleneck) düğümleri tespiti.
+    """
+    return atlas_engine.find_critical_bottlenecks(set(req.mastered_ids), top_k=req.top_k)
+
+
+@router.post("/api/v1/atlas/zpd")
+async def get_atlas_zpd_endpoint(req: AtlasPayloadRequest) -> List[str]:
+    """
+    Hedef 16: Öğrencinin Yakınsak Gelişim Alanı (ZPD) sınırındaki hazır düğümler.
+    """
+    return atlas_engine.compute_zpd_frontier(set(req.mastered_ids))
+
+
+@router.post("/api/v1/atlas/progress")
+async def get_atlas_progress_endpoint(req: AtlasPayloadRequest) -> Dict[str, Any]:
+    """
+    Hedef 16: Müfredatın genel ve alan bazlı yüzde tamamlama oranları.
+    """
+    return atlas_engine.calculate_curriculum_progress(set(req.mastered_ids))
+
+
+
 

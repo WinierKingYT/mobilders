@@ -1,5 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:personal_learning_engine/data/services/engine_api_service.dart';
 import 'package:personal_learning_engine/ui/features/atlas/living_knowledge_atlas_view.dart';
 
 void main() {
@@ -69,5 +73,91 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('btn_start_learning_path')), findsNothing);
+  });
+
+  group('EngineApiService - Living Knowledge Atlas API Client Tests', () {
+    test('fetchAtlasSummary returns total nodes and domains', () async {
+      final mockClient = MockClient((request) async {
+        expect(request.url.path, '/api/v1/atlas/summary');
+        final responseJson = {
+          'total_nodes': 246,
+          'domains': {'Temel Kökler & Sezgi': 16, 'Cebir & Polinomlar': 50},
+        };
+        return http.Response(
+          jsonEncode(responseJson),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+
+      final api = EngineApiService(client: mockClient);
+      final result = await api.fetchAtlasSummary();
+
+      expect(result['total_nodes'], 246);
+      expect(result['domains']['Temel Kökler & Sezgi'], 16);
+    });
+
+    test('fetchAtlasPayload sends mastered_ids and returns nodes and edges', () async {
+      final mockClient = MockClient((request) async {
+        expect(request.url.path, '/api/v1/atlas/payload');
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['mastered_ids'], ['N_ROOT_01']);
+
+        final responseJson = {
+          'meta': {'total_nodes': 246, 'mastered_count': 1, 'zpd_count': 3},
+          'nodes': [{'id': 'N_ROOT_01', 'title': 'Sayı Doğrusu', 'status': 'MASTERED'}],
+          'edges': [{'source': 'N_ROOT_01', 'target': 'N01', 'active': true}],
+        };
+        return http.Response(
+          jsonEncode(responseJson),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+
+      final api = EngineApiService(client: mockClient);
+      final payload = await api.fetchAtlasPayload(masteredIds: ['N_ROOT_01']);
+
+      expect(payload['meta']['total_nodes'], 246);
+      expect(payload['nodes'], hasLength(1));
+      expect(payload['edges'], hasLength(1));
+    });
+
+    test('fetchAtlasBottlenecks returns list of bottlenecks', () async {
+      final mockClient = MockClient((request) async {
+        expect(request.url.path, '/api/v1/atlas/bottlenecks');
+        final responseJson = [
+          {'node_id': 'N01', 'title': 'Temel Dört İşlem', 'blocked_dependents_count': 60},
+        ];
+        return http.Response(
+          jsonEncode(responseJson),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+
+      final api = EngineApiService(client: mockClient);
+      final bottlenecks = await api.fetchAtlasBottlenecks(masteredIds: []);
+
+      expect(bottlenecks, hasLength(1));
+      expect(bottlenecks[0]['node_id'], 'N01');
+    });
+
+    test('fetchAtlasZpd returns list of ready node IDs', () async {
+      final mockClient = MockClient((request) async {
+        expect(request.url.path, '/api/v1/atlas/zpd');
+        final responseJson = ['N_ROOT_01', 'N_ROOT_02'];
+        return http.Response(
+          jsonEncode(responseJson),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+
+      final api = EngineApiService(client: mockClient);
+      final zpd = await api.fetchAtlasZpd();
+
+      expect(zpd, ['N_ROOT_01', 'N_ROOT_02']);
+    });
   });
 }
