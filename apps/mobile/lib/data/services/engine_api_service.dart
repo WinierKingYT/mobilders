@@ -311,6 +311,246 @@ class EngineApiService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> fetchVaultMistakes(
+    String userId, {
+    String? status,
+  }) async {
+    final query = status != null ? '?status=$status' : '';
+    final uri = Uri.parse('$baseUrl/api/v1/vault/list/$userId$query');
+    final response = await _client.get(uri).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      final List<dynamic> list = jsonDecode(response.body) as List<dynamic>;
+      return list.map((e) => e as Map<String, dynamic>).toList();
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchDueVaultMistakes(String userId) async {
+    final uri = Uri.parse('$baseUrl/api/v1/vault/due/$userId');
+    final response = await _client.get(uri).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      final List<dynamic> list = jsonDecode(response.body) as List<dynamic>;
+      return list.map((e) => e as Map<String, dynamic>).toList();
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> fetchVaultAnalytics(String userId) async {
+    final uri = Uri.parse('$baseUrl/api/v1/vault/analytics/$userId');
+    final response = await _client.get(uri).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> recordVaultMistake({
+    required String userId,
+    required String nodeId,
+    required String bugId,
+    required String problemStatement,
+    required String offendingStep,
+    required String correctPrinciple,
+    required String remediationDirective,
+    double? timestamp,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/vault/record');
+    final payload = {
+      'user_id': userId,
+      'node_id': nodeId,
+      'bug_id': bugId,
+      'problem_statement': problemStatement,
+      'offending_step': offendingStep,
+      'correct_principle': correctPrinciple,
+      'remediation_directive': remediationDirective,
+      if (timestamp != null) 'timestamp': timestamp,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> startSelfCorrection(String mistakeId) async {
+    final uri = Uri.parse('$baseUrl/api/v1/vault/self-correction/start');
+    final payload = {'mistake_id': mistakeId};
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> submitSelfCorrectionDiagnosis({
+    required String mistakeId,
+    required bool isIdentified,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/vault/self-correction/diagnose');
+    final payload = {
+      'mistake_id': mistakeId,
+      'is_identified': isIdentified,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> submitSelfCorrectionExplanation({
+    required String mistakeId,
+    required bool isPrincipleCorrect,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/vault/self-correction/explain');
+    final payload = {
+      'mistake_id': mistakeId,
+      'is_principle_correct': isPrincipleCorrect,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> submitSelfCorrectionResolve({
+    required String mistakeId,
+    required bool isCorrect,
+    double? currentTime,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/vault/self-correction/resolve');
+    final payload = {
+      'mistake_id': mistakeId,
+      'is_correct': isCorrect,
+      if (currentTime != null) 'current_time': currentTime,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> spawnBossBattle({
+    required String userId,
+    double? currentTime,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/vault/boss-battle/spawn');
+    final payload = {
+      'user_id': userId,
+      if (currentTime != null) 'current_time': currentTime,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> submitBossBattleTurn({
+    required String battleId,
+    required bool isCleanSolve,
+    double? currentTime,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/vault/boss-battle/turn');
+    final payload = {
+      'battle_id': battleId,
+      'is_clean_solve': isCleanSolve,
+      if (currentTime != null) 'current_time': currentTime,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
   void dispose() {
     _client.close();
   }

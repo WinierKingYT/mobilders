@@ -510,10 +510,44 @@ Total Verified Passing Tests: 1,137 (0 regressions, 0 failures)
    - Backend: 970 test geçti (45 test `test_curriculum_hedef11_euclidean_geometry.py`).
    - Mobile: 180 test geçti (4 test `euclidean_canvas_test.dart`).
    - Genel Toplam: 1,150 test %100 başarılı, 0 regresyon, 0 hata.
+---
 
+# MOBILDERS Focus Kernel — Implementation Checkpoint Round 28 (Hedef 12: Kişisel Hata Otopsisi Kasası ve Akıllı Zaaf Avcısı)
 
-
-
-
-
-
+## Scope & Implementation Details
+1. **Bilişsel Hata Kasası Veri Modeli (`CognitiveMistakeVault`)**:
+   - SQLite tabanlı kalıcı veri saklama (`mistake_records` tablosu, `idx_mistakes_user_due` ve `idx_mistakes_bug` indeksleri).
+   - FSRS-4.5 aralıklı tekrar parametreleri (`DSRState`: stability, difficulty, retrievability, repetitions, lapses).
+   - Hata yaşam döngüsü durumları (`MistakeStatus`: `OPEN`, `IN_REMEDIATION`, `CURED`).
+   - Zaman damgalı işlem geçmişi (`history` JSON ledger) ile bilişsel adımların tam takibi.
+2. **3 Aşamalı Kendi Hatasını Düzeltme Seansı (`SelfCorrectionSessionManager`)**:
+   - Aşama 1 (`STAGE_1_IDENTIFY`): Öğrencinin kendi yazdığı adımdaki mantıksal kırılmayı ve bozuk kuralı teşhis etmesi.
+   - Aşama 2 (`STAGE_2_EXPLAIN`): Doğru matematiksel ilkeyi kendi cümleleriyle ifade etmesi (sıfır sızıntı yönergesiyle).
+   - Aşama 3 (`STAGE_3_RESOLVE`): Eşyapılı (isomorphic) taze soruyu temiz çözmesi; FSRS `Rating.GOOD` veya `Rating.AGAIN` güncellemesi.
+   - 2 ardışık temiz çözüm ve stabilite $\ge 2.0$ gün şartı sağlandığında hatanın `CURED` statüsüne terfisi.
+3. **FSRS-4.5 Zaaf Adaptasyonu & Boss Battle (`BossBattleEngine`)**:
+   - Unutma eğrisi motorunu en sık yapılan bozuk kurallarla eşleştirme.
+   - En az 3 tekrarı gelmiş (due) hata biriktiğinde epik Kavram Canavarı Boss Battle'ı başlatma (`can_spawn_boss`, `spawn_boss_battle`).
+   - Kombo hasar çarpanı, hatasız çözümlerde boss canının düşmesi ve stabilite katlanması, hatalı adımda boss karşı saldırısı.
+4. **REST API Endpoint'leri (`endpoints.py`)**:
+   - `POST /api/v1/vault/record`: Hata kaydı oluşturma.
+   - `GET /api/v1/vault/list/{user_id}`: Hata listesi çekme (isteğe bağlı durum filtresiyle).
+   - `GET /api/v1/vault/due/{user_id}`: Tekrarı gelmiş hataları listeleme.
+   - `GET /api/v1/vault/analytics/{user_id}`: Zaaf ve kür oranı analitiği.
+   - `POST /api/v1/vault/self-correction/start`: Düzeltme seansı başlatma.
+   - `POST /api/v1/vault/self-correction/diagnose`: 1. aşama teşhis bildirimi.
+   - `POST /api/v1/vault/self-correction/explain`: 2. aşama ilke açıklaması.
+   - `POST /api/v1/vault/self-correction/resolve`: 3. aşama temiz çözüm ve FSRS güncellemesi.
+   - `POST /api/v1/vault/boss-battle/spawn`: Boss savaşı tetikleme.
+   - `POST /api/v1/vault/boss-battle/turn`: Boss savaşı tur hamlesi.
+5. **Mobil Arayüz & İstemci Servisi (`MistakeAutopsyView` & `EngineApiService`)**:
+   - `apps/mobile/lib/ui/features/vault/mistake_autopsy_view.dart`:
+     * İstatistik çubuğu (toplam, açık, telafide, kür edilmiş, kür oranı).
+     * Filtreleme çipleri (Tümü, Açık, Telafide, Kür Edildi).
+     * $\ge 3$ due hata durumunda otomatik beliren epik Boss Battle afişi.
+     * 3 aşamalı interaktif düzeltme akışı kartı.
+   - `EngineApiService`: 10 yeni Vault & Boss Battle HTTP istemci metodu eklendi.
+6. **Doğrulama & Test Kapsamı**:
+   - Backend: 970 test geçti (45 test `test_cognitive_mistake_vault_hedef12.py`).
+   - Mobile: 185 test geçti (8 test `mistake_autopsy_view_test.dart`).
+   - Genel Toplam: 1,155 test %100 başarılı, 0 regresyon, 0 hata.
