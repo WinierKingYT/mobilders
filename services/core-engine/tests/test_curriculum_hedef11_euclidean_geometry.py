@@ -9,6 +9,7 @@ from app.geometry.synthetic_geometry import (
     Triangle2D,
     EuclideanRelations,
     AuxiliaryConstructionAdvisor,
+    solve_synthetic_geometry,
 )
 from app.misconceptions.detector import QuadraticMisconceptionDetector
 
@@ -407,4 +408,147 @@ def test_circle_inscribed_right_triangle_on_diameter():
     center_angle = 180.0
     inscribed_angle = center_angle / 2.0
     assert inscribed_angle == 90.0
+
+
+# ==============================================================================
+# 8. SOLVE PIPELINE, COGNITIVE MISTAKE VAULT & API ENDPOINTS
+# ==============================================================================
+
+def test_solve_synthetic_geometry_pipeline():
+    """solve_synthetic_geometry fonksiyonunun tüm görevleri başarıyla çalıştırdığını doğrular."""
+    # 1. triangle_solve
+    res_tri = solve_synthetic_geometry("triangle_solve", a=3.0, b=4.0, c=5.0)
+    assert res_tri["is_right_angled"] is True
+    assert math.isclose(res_tri["area"], 6.0)
+    assert math.isclose(res_tri["perimeter"], 12.0)
+
+    # 2. euclidean_height
+    res_h = solve_synthetic_geometry("euclidean_height", p=4.0, k=9.0)
+    assert math.isclose(res_h["height"], 6.0)
+
+    # 3. euclidean_leg
+    res_leg = solve_synthetic_geometry("euclidean_leg", segment=9.0, hypotenuse=25.0)
+    assert math.isclose(res_leg["leg"], 15.0)
+
+    # 4. auxiliary_advisor
+    res_adv = solve_synthetic_geometry(
+        "auxiliary_advisor",
+        configuration={"type": "triangle", "properties": ["ikizkenar"]},
+    )
+    assert res_adv["action"] == "TABANA_DIKME_INDIR"
+
+
+def test_cognitive_mistake_vault_records_bug_euc_01_to_05(detector):
+    """BUG-EUC-01..05 tespit edildiğinde Bilişsel Hata Kasası'na (N161-N185) kaydedildiğini doğrular."""
+    from app.vault.mistake_vault import CognitiveMistakeVault, MistakeStatus
+
+    vault = CognitiveMistakeVault(db_path=":memory:")
+    student_id = "stu_euc_vault_01"
+
+    test_cases = [
+        ("BUG-EUC-01", "kenarlar = 3, 4, 8", "Üçgen oluşturma", "N162"),
+        ("BUG-EUC-02", "cevre_aci = merkez_aci", "Çemberde açılar", "N178"),
+        ("BUG-EUC-03", "k = 2 => alan_orani = 2", "Benzer üçgenlerde alan", "N169"),
+        ("BUG-EUC-04", "h^2 = b * c", "Öklid bağıntıları", "N165"),
+        ("BUG-EUC-05", "aciortay => taban_esit", "Açıortay teoremi", "N167"),
+    ]
+
+    for bug_id, step, context, expected_node in test_cases:
+        diag = detector.detect(step, context, "")
+        assert diag is not None
+        assert diag.bug_id == bug_id
+
+        record = vault.record_mistake(
+            user_id=student_id,
+            node_id=expected_node,
+            bug_id=diag.bug_id,
+            problem_statement=context,
+            offending_step=step,
+            correct_principle=diag.description,
+            remediation_directive=diag.remediation_directive,
+        )
+        assert record.user_id == student_id
+        assert record.node_id == expected_node
+        assert record.bug_id == bug_id
+        assert record.status == MistakeStatus.OPEN
+        assert record.remediation_directive != ""
+
+    records = vault.list_mistakes(student_id)
+    assert len(records) == 5
+    bug_ids = {r.bug_id for r in records}
+    assert bug_ids == {"BUG-EUC-01", "BUG-EUC-02", "BUG-EUC-03", "BUG-EUC-04", "BUG-EUC-05"}
+
+
+def test_api_solve_synthetic_geometry_valid_triangle():
+    """POST /api/v1/geometry/synthetic/solve geçerli üçgen çözümü."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+    resp = client.post(
+        "/api/v1/geometry/synthetic/solve",
+        json={
+            "task": "triangle_solve",
+            "params": {"a": 3.0, "b": 4.0, "c": 5.0},
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["task"] == "triangle_solve"
+    assert data["result_data"]["is_right_angled"] is True
+    assert math.isclose(data["result_data"]["area"], 6.0)
+    assert data["detected_bug"] is None
+    assert data["vault_recorded"] is False
+
+
+def test_api_solve_synthetic_geometry_with_misconception_and_vault():
+    """POST /api/v1/geometry/synthetic/solve hata tespiti ve kasaya kayıt."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+    student_id = "stu_euc_api_001"
+
+    resp = client.post(
+        "/api/v1/geometry/synthetic/solve",
+        json={
+            "task": "euclidean_height",
+            "params": {"p": 4.0, "k": 9.0},
+            "student_id": student_id,
+            "problem_statement": "Öklid bağıntıları",
+            "student_step": "h^2 = b * c",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["task"] == "euclidean_height"
+    assert math.isclose(data["result_data"]["height"], 6.0)
+    assert data["detected_bug"] is not None
+    assert data["detected_bug"]["bug_id"] == "BUG-EUC-04"
+    assert data["vault_recorded"] is True
+
+    # Kasadan kontrol et
+    vault_resp = client.get(f"/api/v1/vault/list/{student_id}")
+    assert vault_resp.status_code == 200
+    vault_records = vault_resp.json()
+    assert len(vault_records) >= 1
+    assert any(r["bug_id"] == "BUG-EUC-04" for r in vault_records)
+
+
+def test_api_solve_synthetic_geometry_invalid_task():
+    """POST /api/v1/geometry/synthetic/solve bilinmeyen görev için 400."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+    resp = client.post(
+        "/api/v1/geometry/synthetic/solve",
+        json={
+            "task": "unknown_parabola_task",
+            "params": {},
+        },
+    )
+    assert resp.status_code == 400
+    assert "Bilinmeyen sentetik geometri görevi" in resp.json()["detail"]
+
 

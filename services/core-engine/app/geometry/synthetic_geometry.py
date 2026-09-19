@@ -318,3 +318,48 @@ class AuxiliaryConstructionAdvisor:
             "visual_type": "perpendicular_to_special_angle",
             "rationale": "Özel açılarda (30-60-90, 45-45-90) kenar oranlarını doğrudan kullanma imkanı sunar.",
         }
+
+
+def solve_synthetic_geometry(task: str, **kwargs: Any) -> Dict[str, Any]:
+    """
+    Sentetik Öklid geometrisi ve akıllı ek çizim problemlerini çözen motor arayüzü.
+    """
+    if task == "triangle_solve":
+        t = Triangle2D(
+            a=kwargs.get("a"),
+            b=kwargs.get("b"),
+            c=kwargs.get("c"),
+            angle_A=kwargs.get("angle_A"),
+            angle_B=kwargs.get("angle_B"),
+            angle_C=kwargs.get("angle_C"),
+        )
+        return {
+            "a": t.a,
+            "b": t.b,
+            "c": t.c,
+            "angle_A": t.angle_A,
+            "angle_B": t.angle_B,
+            "angle_C": t.angle_C,
+            "is_right_angled": t.is_right_angled,
+            "is_isosceles": t.is_isosceles,
+            "is_equilateral": t.is_equilateral,
+            "perimeter": t.perimeter if (t.a and t.b and t.c) else None,
+            "area": t.area if (t.a and t.b and (t.c or t.angle_C)) else None,
+        }
+    elif task == "euclidean_height":
+        h = EuclideanRelations.height_from_segments(kwargs["p"], kwargs["k"])
+        return {
+            "height": h,
+            "formula": "h^2 = p * k",
+        }
+    elif task == "euclidean_leg":
+        leg = EuclideanRelations.leg_from_segment_and_hypotenuse(kwargs["segment"], kwargs["hypotenuse"])
+        return {
+            "leg": leg,
+            "formula": "leg^2 = segment * hypotenuse",
+        }
+    elif task == "auxiliary_advisor":
+        config = kwargs.get("configuration", kwargs)
+        return AuxiliaryConstructionAdvisor.suggest_construction(config)
+    raise ValueError(f"Bilinmeyen sentetik geometri görevi: {task}")
+

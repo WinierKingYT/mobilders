@@ -279,6 +279,38 @@ class EngineApiService {
     }
   }
 
+  Future<Map<String, dynamic>> solveSyntheticGeometry({
+    required String task,
+    required Map<String, dynamic> params,
+    String? studentId,
+    String? problemStatement,
+    String? studentStep,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/geometry/synthetic/solve');
+    final payload = {
+      'task': task,
+      'params': params,
+      if (studentId != null) 'student_id': studentId,
+      if (problemStatement != null) 'problem_statement': problemStatement,
+      if (studentStep != null) 'student_step': studentStep,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
   void dispose() {
     _client.close();
   }

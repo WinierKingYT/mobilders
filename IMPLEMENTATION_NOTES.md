@@ -475,6 +475,43 @@ Total Verified Passing Tests: 1,137 (0 regressions, 0 failures)
    - Mobile: 178 test geçti (5 test `interactive_coordinate_canvas_test.dart`).
    - Genel Toplam: 1,143 test %100 başarılı, 0 regresyon, 0 hata.
 
+---
+
+# MOBILDERS Focus Kernel — Implementation Checkpoint Round 27 (Hedef 11: Sentetik Öklid Geometrisi ve Akıllı Ek Çizim Motoru)
+
+## Scope & Implementation Details
+1. **Knowledge DAG Genişlemesi (N161 - N185)**:
+   - Seviye 17 (N161 - N185):
+     * Üçgen Geometrisi: Üçgende açılar (N161), üçgen eşitsizliği (N162), ikizkenar ve eşkenar üçgen (N163), dik üçgen ve Pisagor (N164), Öklid bağıntıları (N165), kenarortay ve ağırlık merkezi (N166), açıortay teoremleri (N167).
+     * Benzerlik ve Alan: Üçgenlerde benzerlik (N168), benzerlik oranı ve alan ilişkisi $k \to k^2$ (N169), Thales ve Kelebek teoremleri (N170), alan bağıntıları ve sinüslü alan (N171).
+     * Çokgenler ve Dörtgenler: Düzgün çokgenler (N172), dörtgenler (N173), paralelkenar ve eşkenar dörtgen (N174), dikdörtgen ve kare (N175), yamuk ve ikizkenar yamuk (N176), deltoid (N177).
+     * Çember ve Katı Cisimler: Çemberde açılar (N178), kiriş özellikleri (N179), teğet özellikleri (N180), çevre ve yay uzunluğu (N181), daire dilim alanı (N182), prizmalar ve silindir (N183), piramitler ve koni (N184), küre (N185).
+2. **Yanılgı Kataloğu (`BUG-EUC-01..05`) & Bilişsel Hata Kasası Entegrasyonu**:
+   - `BUG-EUC-01`: Üçgen eşitsizliği ihlali ($a \ge b + c$) $\to$ Düğüm `N162`.
+   - `BUG-EUC-02`: Çevre açıyı merkez açıya eşit sayma hatası $\to$ Düğüm `N178`.
+   - `BUG-EUC-03`: Benzerlikte alan oranını $k^2$ yerine $k$ kabul etme hatası $\to$ Düğüm `N169`.
+   - `BUG-EUC-04`: Öklid bağıntısında $h^2 = b \cdot c$ sanma hatası $\to$ Düğüm `N165`.
+   - `BUG-EUC-05`: Genel üçgende açıortayın tabanı eşit böldüğü yanılgısı $\to$ Düğüm `N167`.
+   - Tüm yanılgılar `CognitiveMistakeVault` SQLite kasasına kaydedilmekte ve FSRS-4.5 aralıklı tekrar sırasına beslenmektedir.
+3. **Sentetik Geometri Çözücü ve Sokratik Ek Çizim Motoru (`synthetic_geometry.py`)**:
+   - `Triangle2D`: Üçgen eşitsizliği denetimi, açı toplamı, Kosinüs/Sinüs teoremleriyle çözüm, Heron alan, iç teğet/çevrel çember yarıçapları, kenarortay ve yükseklik bağıntıları.
+   - `EuclideanRelations`: $h^2 = p \cdot k$, $b^2 = k \cdot a$, $b \cdot c = a \cdot h$ çift alan denetimi.
+   - `AuxiliaryConstructionAdvisor`: İkizkenar üçgende tabana dikme, dik üçgende hipotenüs kenarortayı (Muhteşem Üçlü), orta taban birleştirme, yamukta paralel veya dikme inme, çemberde merkeze teğet veya kiriş dikmesi inme stratejilerini Sokratik olarak sunan ve asla cevabı sızdırmayan ek çizim iskelesi.
+   - `solve_synthetic_geometry`: Genel arayüz fonksiyonu.
+4. **Sentetik Geometri API Endpoint (`POST /api/v1/geometry/synthetic/solve`)**:
+   - Üçgen kısıt çözümü, Öklid bağıntıları ve Sokratik ek çizim stratejileri için REST API desteği.
+   - Gelen öğrenci adımlarını `misconception_detector` ile denetleyerek `BUG-EUC-01..05` tespitinde otomatik kasaya işleme.
+5. **Mobil Serbest Dokunmatik Geometri Kanvası (`EuclideanCanvas`)**:
+   - `apps/mobile/lib/ui/features/session/views/euclidean_canvas.dart`:
+     * 4 Preset: İkizkenar Üçgen, Dik Üçgen, Yamuk, Çember & Teğet.
+     * Sokratik ek çizim butonu (`btn_toggle_auxiliary`): Yükseklik, Muhteşem Üçlü, paralel kenar ve teğet yarıçap çizgilerinin dinamik gösterimi/gizlenmesi.
+   - `EngineApiService.solveSyntheticGeometry(...)` mobil istemci çağrısı.
+6. **Doğrulama & Test Kapsamı**:
+   - Backend: 970 test geçti (45 test `test_curriculum_hedef11_euclidean_geometry.py`).
+   - Mobile: 180 test geçti (4 test `euclidean_canvas_test.dart`).
+   - Genel Toplam: 1,150 test %100 başarılı, 0 regresyon, 0 hata.
+
+
 
 
 

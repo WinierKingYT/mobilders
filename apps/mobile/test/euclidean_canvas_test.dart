@@ -64,4 +64,54 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining("r ⊥ d"), findsOneWidget);
   });
+
+  testWidgets('EuclideanCanvas renders with initialShowAuxiliary true and toggles off',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: EuclideanCanvas(
+              initialPreset: EuclideanShapePreset.rightTriangle,
+              initialShowAuxiliary: true,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Verify initial auxiliary state is shown
+    expect(find.text("Ek Çizimi Gizle"), findsOneWidget);
+    expect(find.textContaining("Muhteşem Üçlü"), findsOneWidget);
+
+    // Toggle off
+    await tester.tap(find.byKey(const Key('btn_toggle_auxiliary')));
+    await tester.pumpAndSettle();
+    expect(find.text("Ek Çizimi Göster"), findsOneWidget);
+  });
+
+  testWidgets('EuclideanCanvas trapezoid preset renders title and toggles auxiliary parallel line',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: EuclideanCanvas(
+              initialPreset: EuclideanShapePreset.trapezoid,
+              initialShowAuxiliary: false,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text("Yamuk"), findsWidgets);
+    expect(find.textContaining("paralelkenar ve üçgene"), findsOneWidget);
+
+    // Toggle auxiliary
+    await tester.tap(find.byKey(const Key('btn_toggle_auxiliary')));
+    await tester.pumpAndSettle();
+    expect(find.text("Ek Çizimi Gizle"), findsOneWidget);
+  });
 }
+
