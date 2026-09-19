@@ -592,5 +592,44 @@ Total Verified Passing Tests: 1,137 (0 regressions, 0 failures)
 7. **Doğrulama & Test Kapsamı**:
    - Backend: 971 test geçti (49 test `test_trap_question_factory_hedef13.py` + 500 soru sentetik batch testi).
    - Mobile: 189 test geçti (6 test `dynamic_exam_view_test.dart`).
-   - Genel Toplam: 1,160 test %100 başarılı, 0 regresyon, 0 hata.
 
+---
+
+# MOBILDERS Focus Kernel — Implementation Checkpoint Round 30 (Hedef 14: Olasılık, Kombinatorik ve İstatistik Motoru, Monte Carlo, Sayma Ağacı & Venn Şeması ve REST API Entegrasyonu)
+
+## Scope & Implementation Details
+1. **Kombinatorik, Olasılık ve İstatistik Motoru (`CombinatoricsEngine`)**:
+   - `services/core-engine/app/probability/combinatorics_engine.py`:
+     * Faktöriyel, Doğrusal/Dairesel/Tekrarlı Permütasyon ($P(n,r)$, $P_{\text{dairesel}}(n) = (n-1)!$, $\frac{n!}{n_1! \cdots n_k!}$).
+     * Kombinasyon ($C(n,r)$), Pascal Üçgeni özdeşlikleri, Binom açılımı terim analizi, Düzlemde Geometrik Kombinasyon (doğrusal olmayan noktalardan üçgen/doğru sayısı).
+     * Klasik ve Tümleyen Olasılık ($P(E) = |E|/|S|$, $P(E') = 1 - P(E)$).
+     * Birleşim Olasılığı ($P(A \cup B) = P(A) + P(B) - P(A \cap B)$).
+     * Koşullu Olasılık ($P(A|B) = \frac{P(A \cap B)}{P(B)}$) ve Bayes Teoremi (2 olaylı ve çoklu hipotezli toplam olasılık).
+     * Ayrık Rastgele Değişken Beklenen Değeri ve Varyansı ($E[X]$, $\text{Var}(X)$).
+     * Betimsel İstatistik: Ortalama, Medyan, Mod, Varyans, Standart Sapma, Kartiller ($Q_1, Q_2, Q_3$), IQR ve Aykırı Değer (Outlier) analizi.
+     * Z-skoru, T-skoru ve Normal Dağılım Ampirik Kuralı ($68\% - 95\% - 99.7\%$).
+2. **Canlı Monte Carlo Simülasyon Doğrulayıcısı**:
+   - 100.000 sanal deney ile Büyük Sayılar Yasası (LLN) yakınsaması ve %95 Güven Aralığı ($\hat{p} \pm 1.96 \sqrt{\hat{p}(1-\hat{p})/N}$).
+   - Para atışı ve yerine koyarak/koymayarak torba çekilişi simülasyonları.
+3. **Bilgi Grafı (DAG) & Bilişsel Hata Dedektörleri (`BUG-COMB-01..05`)**:
+   - Seviye 18 Düğümleri (`N186 - N210`): Faktöriyelden Monte Carlo'ya 25 ileri düzey müfredat kavramı.
+   - Dedektörler:
+     * `BUG-COMB-01`: Sırasız seçimde permütasyon kullanma hatası $\to$ `N191`.
+     * `BUG-COMB-02`: Kumarbaz yanılgısı (bağımsız denemelerde geçmişe bağlama) $\to$ `N200`.
+     * `BUG-COMB-03`: Koşullu olasılıkta örnek uzayın daraltılmaması $\to$ `N202`.
+     * `BUG-COMB-04`: Tekrarlı permütasyonda özdeş eleman faktöriyellerine bölmeme $\to$ `N189`.
+     * `BUG-COMB-05`: Birleşim olasılığında kesişimin çıkarılmaması (çift sayma) $\to$ `N199`.
+     * Hata tespitinde `CognitiveMistakeVault` SQLite kaydı ve FSRS-4.5 aralıklı tekrar entegrasyonu.
+4. **REST API Endpoint'leri (`endpoints.py`)**:
+   - `POST /api/v1/probability/solve`: Kombinatorik ve olasılık adımlı çözüm, Sokratik ipucu ve bilişsel hata teşhisi.
+   - `POST /api/v1/probability/monte-carlo`: Büyük ölçekli Monte Carlo simülasyonu ve ampirik/teorik yakınsama hesabı.
+5. **Mobil Arayüz & İstemci Entegrasyonu (`CountingTreeVennCanvas` & `EngineApiService`)**:
+   - `apps/mobile/lib/ui/features/session/views/counting_tree_venn_canvas.dart`:
+     * Venn Şeması, Sayma Ağacı (Çarpma Kuralı) ve Canlı Monte Carlo simülasyonu modları.
+     * İnteraktif Venn etiketleri ve dinamik formül gösterimi.
+   - `apps/mobile/lib/data/services/engine_api_service.dart`:
+     * `solveProbabilityOrCombinatorics(...)` ve `simulateMonteCarlo(...)` istemci metotları.
+6. **Doğrulama & Test Kapsamı**:
+   - Backend: 973 test geçti (44 test `test_curriculum_hedef14_probability_combinatorics.py`).
+   - Mobile: 192 test geçti (6 test `counting_tree_venn_canvas_test.dart`).
+   - Genel Toplam: 1,165 test %100 başarılı, 0 regresyon, 0 hata.

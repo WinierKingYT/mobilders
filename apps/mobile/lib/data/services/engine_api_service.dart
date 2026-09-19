@@ -681,6 +681,66 @@ class EngineApiService {
     }
   }
 
+  Future<Map<String, dynamic>> solveProbabilityOrCombinatorics({
+    required String problemType,
+    required Map<String, dynamic> params,
+    String? studentId,
+    String? problemStatement,
+    String? studentStep,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/probability/solve');
+    final payload = {
+      'problem_type': problemType,
+      'params': params,
+      if (studentId != null) 'student_id': studentId,
+      if (problemStatement != null) 'problem_statement': problemStatement,
+      if (studentStep != null) 'student_step': studentStep,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> simulateMonteCarlo({
+    required String experimentType,
+    required Map<String, dynamic> params,
+    int numTrials = 100000,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/probability/monte-carlo');
+    final payload = {
+      'experiment_type': experimentType,
+      'params': params,
+      'num_trials': numTrials,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
   void dispose() {
     _client.close();
   }

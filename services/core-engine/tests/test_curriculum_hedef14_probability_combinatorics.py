@@ -422,3 +422,91 @@ def test_bayes_invalid_parameters_raises():
     with pytest.raises(IndexError):
         bayes_multi_hypothesis([0.5, 0.5], [0.1, 0.2], target_index=5)
 
+
+# =====================================================================
+# 8. FASTAPI REST API INTEGRATION TESTS
+# =====================================================================
+
+def test_fastapi_probability_solve_and_vault():
+    """Olasılık / Kombinatorik çözücü ve Bilişsel Hata Kasası REST API entegrasyonunu doğrular."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+
+    # 1. Normal Çözüm
+    payload = {
+        "problem_type": "combination_selection",
+        "params": {"n": 5, "r": 2},
+    }
+    resp = client.post("/api/v1/probability/solve", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["problem_type"] == "combination_selection"
+    assert data["result_data"]["target_value"] == 10
+    assert data["vault_recorded"] is False
+
+    # 2. Hatalı Adım ve Kasaya Otomatik Kayıt (BUG-COMB-01)
+    student_id = "student_prob_1"
+    err_payload = {
+        "problem_type": "combination_selection",
+        "params": {"n": 5, "r": 3},
+        "student_id": student_id,
+        "problem_statement": "5 kişiden 3 kişilik komite kaç farklı şekilde seçilir?",
+        "student_step": "komite = P(5, 3)",
+    }
+    err_resp = client.post("/api/v1/probability/solve", json=err_payload)
+    assert err_resp.status_code == 200
+    err_data = err_resp.json()
+    assert err_data["detected_bug"] is not None
+    assert err_data["detected_bug"]["bug_id"] == "BUG-COMB-01"
+    assert err_data["vault_recorded"] is True
+
+    # 3. Kasadan kontrol et
+    v_resp = client.get(f"/api/v1/vault/list/{student_id}")
+    assert v_resp.status_code == 200
+    v_list = v_resp.json()
+    assert len(v_list) >= 1
+    assert any(m["bug_id"] == "BUG-COMB-01" for m in v_list)
+
+
+def test_fastapi_monte_carlo_api():
+    """Canlı Monte Carlo Olasılık Simülatörü REST API rotasını doğrular."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+
+    # 1. Para Atışı Simülasyonu (10.000 deneme)
+    flip_payload = {
+        "experiment_type": "coin_flip",
+        "params": {"prob": 0.5, "seed": 42},
+        "num_trials": 10_000,
+    }
+    f_resp = client.post("/api/v1/probability/monte-carlo", json=flip_payload)
+    assert f_resp.status_code == 200
+    f_data = f_resp.json()
+    assert f_data["num_trials"] == 10_000
+    assert f_data["theoretical_probability"] == 0.5
+    assert abs(f_data["observed_probability"] - 0.5) < 0.02
+    assert f_data["converged"] is True
+
+    # 2. Torba Çekim Simülasyonu
+    urn_payload = {
+        "experiment_type": "urn_draw",
+        "params": {
+            "red_count": 4,
+            "blue_count": 6,
+            "draw_count": 2,
+            "target_reds": 2,
+            "with_replacement": False,
+            "seed": 999,
+        },
+        "num_trials": 10_000,
+    }
+    u_resp = client.post("/api/v1/probability/monte-carlo", json=urn_payload)
+    assert u_resp.status_code == 200
+    u_data = u_resp.json()
+    assert u_data["theoretical_probability"] == pytest.approx(2 / 15)
+    assert abs(u_data["observed_probability"] - (2 / 15)) < 0.02
+

@@ -70,6 +70,10 @@ from app.modeling.models import (
 from app.modeling.scaffold_engine import SocraticModelingScaffoldEngine
 from app.geometry.analytic_geometry import solve_analytic_geometry
 from app.geometry.synthetic_geometry import solve_synthetic_geometry
+from app.probability.combinatorics_engine import (
+    solve_combinatorics_or_probability,
+    MonteCarloProbabilitySimulator,
+)
 from app.root_pedagogy.models import (
     ZeroBaselineEvaluationRequest,
     ZeroBaselineEvaluationResponse,
@@ -1278,5 +1282,104 @@ async def generate_targeted_trap_question(req: TargetedQuestionRequest) -> TrapQ
 async def verify_trap_question_formally(req: QuestionVerifyRequest) -> Dict[str, Any]:
     """SymPy ile sorunun köklerini, analitik türev/çözüm geçerliliğini ve çeldirici tutarlılığını formel olarak ispatlar."""
     return FormalQuestionVerifier.verify_formally(req.question)
+
+
+# ==============================================================================
+# HEDEF 14: Olasılık, Kombinatorik ve İstatistik Motoru (Monte Carlo)
+# ==============================================================================
+
+class ProbabilitySolveRequest(BaseModel):
+    problem_type: str  # "combination_selection", "linear_permutation", "conditional_probability", vb.
+    params: Dict[str, Any]
+    student_id: Optional[str] = None
+    problem_statement: Optional[str] = None
+    student_step: Optional[str] = None
+
+
+class ProbabilitySolveResponse(BaseModel):
+    problem_type: str
+    result_data: Dict[str, Any]
+    detected_bug: Optional[Dict[str, Any]] = None
+    vault_recorded: bool = False
+
+
+class MonteCarloSimulateRequest(BaseModel):
+    experiment_type: str = "coin_flip"  # "coin_flip", "urn_draw"
+    params: Dict[str, Any] = {}
+    num_trials: int = 100_000
+
+
+@router.post("/api/v1/probability/solve", response_model=ProbabilitySolveResponse)
+async def solve_probability_endpoint(req: ProbabilitySolveRequest) -> ProbabilitySolveResponse:
+    """
+    Hedef 14: Olasılık ve Kombinatorik Sokratik Çözücü API'si.
+    Permütasyon, kombinasyon veya koşullu olasılık problemlerini sıfır sızıntı ile iskeletlendirir;
+    varsa öğrenci yanılgılarını (BUG-COMB-01..05) tespit edip Bilişsel Hata Kasası'na kaydeder.
+    """
+    try:
+        res = solve_combinatorics_or_probability(req.problem_type, req.params)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    detected_diag = None
+    vault_recorded = False
+
+    if req.student_step:
+        diag = misconception_detector.detect(req.student_step, req.problem_statement or "", "")
+        if diag:
+            detected_diag = diag.model_dump()
+            if req.student_id:
+                node_map = {
+                    "BUG-COMB-01": "N191",
+                    "BUG-COMB-02": "N200",
+                    "BUG-COMB-03": "N202",
+                    "BUG-COMB-04": "N189",
+                    "BUG-COMB-05": "N199",
+                }
+                node_id = node_map.get(diag.bug_id, "N186")
+                cognitive_mistake_vault.record_mistake(
+                    user_id=req.student_id,
+                    node_id=node_id,
+                    bug_id=diag.bug_id,
+                    problem_statement=req.problem_statement or f"Olasılık/Kombinatorik: {req.problem_type}",
+                    offending_step=req.student_step,
+                    correct_principle=diag.description,
+                    remediation_directive=diag.remediation_directive,
+                )
+                vault_recorded = True
+
+    return ProbabilitySolveResponse(
+        problem_type=req.problem_type,
+        result_data=res,
+        detected_bug=detected_diag,
+        vault_recorded=vault_recorded,
+    )
+
+
+@router.post("/api/v1/probability/monte-carlo")
+async def simulate_monte_carlo_endpoint(req: MonteCarloSimulateRequest) -> Dict[str, Any]:
+    """
+    Canlı Monte Carlo Olasılık Simülatörü API'si.
+    100.000 sanal deney ile büyük sayılar yasasını deneysel olarak doğrular.
+    """
+    sim = MonteCarloProbabilitySimulator(seed=req.params.get("seed", 42))
+
+    if req.experiment_type == "urn_draw":
+        return sim.simulate_urn_draw(
+            red_count=req.params.get("red_count", 4),
+            blue_count=req.params.get("blue_count", 6),
+            draw_count=req.params.get("draw_count", 2),
+            target_reds=req.params.get("target_reds", 2),
+            with_replacement=req.params.get("with_replacement", False),
+            num_trials=req.num_trials,
+        )
+    else:
+        # Default: coin_flip / Bernoulli event
+        prob = req.params.get("prob", 0.5)
+        return sim.simulate_event(
+            trial_func=lambda rng: rng.random() < prob,
+            num_trials=req.num_trials,
+            theoretical_prob=prob,
+        )
 
 

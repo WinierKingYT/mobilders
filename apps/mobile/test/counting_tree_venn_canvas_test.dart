@@ -1,5 +1,10 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:personal_learning_engine/data/services/engine_api_service.dart';
 import 'package:personal_learning_engine/ui/features/session/views/counting_tree_venn_canvas.dart';
 
 void main() {
@@ -86,5 +91,92 @@ void main() {
 
     // Verify simulation output
     expect(find.textContaining("Fark (Sapma)"), findsOneWidget);
+  });
+
+  group('EngineApiService - Probability & Monte Carlo API Client Tests', () {
+    test('solveProbabilityOrCombinatorics sends payload and parses response', () async {
+      final mockClient = MockClient((request) async {
+        expect(request.url.path, '/api/v1/probability/solve');
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['problem_type'], 'combination');
+        expect(body['params']['n'], 5);
+        expect(body['params']['r'], 3);
+        expect(body['student_id'], 'STU-001');
+
+        final responseJson = {
+          'problem_type': 'combination',
+          'result_data': {'value': 10, 'formula': 'C(5,3) = 10'},
+          'detected_bug': null,
+          'vault_recorded': false,
+        };
+        return http.Response(
+          jsonEncode(responseJson),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+
+      final api = EngineApiService(client: mockClient);
+      final result = await api.solveProbabilityOrCombinatorics(
+        problemType: 'combination',
+        params: {'n': 5, 'r': 3},
+        studentId: 'STU-001',
+      );
+
+      expect(result['problem_type'], 'combination');
+      expect(result['result_data']['value'], 10);
+      expect(result['vault_recorded'], false);
+    });
+
+    test('simulateMonteCarlo sends payload and parses convergence data', () async {
+      final mockClient = MockClient((request) async {
+        expect(request.url.path, '/api/v1/probability/monte-carlo');
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['experiment_type'], 'coin_flip');
+        expect(body['num_trials'], 50000);
+
+        final responseJson = {
+          'experiment_type': 'coin_flip',
+          'num_trials': 50000,
+          'empirical_probability': 0.5012,
+          'theoretical_probability': 0.5,
+          'error': 0.0012,
+          'confidence_interval_95': [0.4968, 0.5056],
+        };
+        return http.Response(
+          jsonEncode(responseJson),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+
+      final api = EngineApiService(client: mockClient);
+      final result = await api.simulateMonteCarlo(
+        experimentType: 'coin_flip',
+        params: {'p_success': 0.5},
+        numTrials: 50000,
+      );
+
+      expect(result['experiment_type'], 'coin_flip');
+      expect(result['num_trials'], 50000);
+      expect(result['empirical_probability'], 0.5012);
+      expect(result['theoretical_probability'], 0.5);
+      expect(result['confidence_interval_95'], hasLength(2));
+    });
+
+    test('solveProbabilityOrCombinatorics throws HttpException on non-200', () async {
+      final mockClient = MockClient((request) async {
+        return http.Response('Internal Server Error', 500);
+      });
+
+      final api = EngineApiService(client: mockClient);
+      expect(
+        () => api.solveProbabilityOrCombinatorics(
+          problemType: 'linear_permutation',
+          params: {'n': -1},
+        ),
+        throwsA(isA<HttpException>()),
+      );
+    });
   });
 }
