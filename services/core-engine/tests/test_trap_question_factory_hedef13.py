@@ -571,4 +571,75 @@ def test_500_synthetic_trap_questions_batch_production_and_verification():
     assert valid_count == 500
 
 
+# ==============================================================================
+# 12. FASTAPI REST API INTEGRATION TESTS
+# ==============================================================================
+
+def test_fastapi_exam_endpoints():
+    """Hedef 13 REST API rotalarının (generate, grade, export, targeted, verify) çalıştığını doğrular."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    client = TestClient(app)
+
+    # 1. Dinamik Sınav Oluştur
+    gen_payload = {
+        "section": "TYT_MATEMATIK",
+        "question_count": 4,
+        "target_theta": 0.5,
+    }
+    g_resp = client.post("/api/v1/exam/generate", json=gen_payload)
+    assert g_resp.status_code == 200
+    exam_data = g_resp.json()
+    assert len(exam_data["questions"]) == 4
+    assert exam_data["section"] == "TYT_MATEMATIK"
+    assert "TYT_MATEMATIK" in exam_data["title"]
+
+    # 2. Sınavı Puanla (Doğru ve Çeldiricili)
+    q0 = exam_data["questions"][0]
+    answers = {0: q0["correct_choice_index"]}
+    # Soru 1'e ilk yanlış şıkkı ver
+    q1 = exam_data["questions"][1]
+    wrong_idx = [i for i, c in enumerate(q1["choices"]) if not c["is_correct"]][0]
+    answers[1] = wrong_idx
+
+    grade_payload = {
+        "exam": exam_data,
+        "answers": answers,
+    }
+    gr_resp = client.post("/api/v1/exam/grade", json=grade_payload)
+    assert gr_resp.status_code == 200
+    gr_data = gr_resp.json()
+    assert gr_data["total_questions"] == 4
+    assert gr_data["correct"] == 1
+    assert gr_data["incorrect"] == 1
+    assert gr_data["empty"] == 2
+    assert len(gr_data["traps_triggered"]) == 1
+
+    # 3. HTML Olarak Dışa Aktar
+    exp_html = client.post("/api/v1/exam/export", json={"exam": exam_data, "format": "html", "include_solutions": True})
+    assert exp_html.status_code == 200
+    assert "<!DOCTYPE html>" in exp_html.json()["content"]
+
+    # 4. LaTeX Olarak Dışa Aktar
+    exp_tex = client.post("/api/v1/exam/export", json={"exam": exam_data, "format": "latex", "include_solutions": True})
+    assert exp_tex.status_code == 200
+    assert r"\documentclass" in exp_tex.json()["content"]
+
+    # 5. Hedefli Zaaf Sorusu Üret
+    t_resp = client.post("/api/v1/exam/question/targeted", json={"bug_id": "BUG-CALC-01", "seed": 42})
+    assert t_resp.status_code == 200
+    t_data = t_resp.json()
+    assert t_data["type"] == "calculus"
+    assert any(c["bug_id"] == "BUG-CALC-01" for c in t_data["choices"])
+
+    # 6. Formel İspat Denetimi
+    v_resp = client.post("/api/v1/exam/question/verify", json={"question": t_data})
+    assert v_resp.status_code == 200
+    v_data = v_resp.json()
+    assert v_data["is_valid"] is True
+    assert v_data["has_formal_proof"] is True
+    assert v_data["zero_false_positives"] is True
+
+
 

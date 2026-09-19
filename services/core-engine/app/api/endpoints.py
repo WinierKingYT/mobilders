@@ -48,6 +48,15 @@ from app.lti.service import LTI13Service
 from app.voice.service import VoiceSocraticEngine
 from app.curriculum_generator.dag_synthesizer import AutonomousCurriculumSynthesizer
 from app.simulation.cohort_factory import VectorizedCohortSimulationFactory
+from app.curriculum_generator.trap_question_factory import (
+    TrapQuestionGenerator,
+    DynamicExamFactory,
+    FormalQuestionVerifier,
+    ExamDocumentExporter,
+    ExamSection,
+    TrapQuestion,
+    DynamicExam,
+)
 from app.research.dp_exporter import DifferentialPrivacyExporter
 from app.research.leaderboard import CognitiveModelBenchmark
 from app.ocr.models import MathScanRequest, MathScanResponse
@@ -128,6 +137,8 @@ zero_baseline_diagnostic = ZeroBaselineDiagnostic()
 weakness_ledger = CognitiveWeaknessLedger(root_dag)
 active_cosolver = ActiveCoSolverEngine(cas_engine)
 insitu_sandbox = InSituRemediationSandbox()
+trap_question_generator = TrapQuestionGenerator()
+dynamic_exam_factory = DynamicExamFactory(trap_question_generator)
 
 
 # Idempotency Cache for offline event replay and network duplicate protection
@@ -1193,5 +1204,79 @@ async def solve_synthetic_geometry_endpoint(req: SyntheticGeometrySolveRequest) 
         detected_bug=detected_diag,
         vault_recorded=vault_recorded,
     )
+
+
+# ==============================================================================
+# HEDEF 13: Bilişsel Tuzaklı Sonsuz Soru Üretim Fabrikası & Dinamik Deneme Sınavı
+# ==============================================================================
+
+class ExamGenerateRequest(BaseModel):
+    section: ExamSection = ExamSection.TYT_MATEMATIK
+    question_count: int = 10
+    target_theta: float = 0.0
+
+
+class ExamGradeRequest(BaseModel):
+    exam: DynamicExam
+    answers: Dict[int, int]
+
+
+class ExamExportRequest(BaseModel):
+    exam: DynamicExam
+    format: str = "html"  # "html" veya "latex"
+    include_solutions: bool = True
+
+
+class TargetedQuestionRequest(BaseModel):
+    bug_id: str
+    seed: Optional[int] = None
+
+
+class QuestionVerifyRequest(BaseModel):
+    question: TrapQuestion
+
+
+@router.post("/api/v1/exam/generate", response_model=DynamicExam)
+async def generate_dynamic_exam(req: ExamGenerateRequest) -> DynamicExam:
+    """Belirtilen sınav tipine, soru adedine ve hedef teta düzeyine göre bilişsel tuzaklı deneme sınavı üretir."""
+    return dynamic_exam_factory.assemble_exam(
+        section=req.section,
+        question_count=req.question_count,
+        target_theta=req.target_theta,
+    )
+
+
+@router.post("/api/v1/exam/grade")
+async def grade_dynamic_exam(req: ExamGradeRequest) -> Dict[str, Any]:
+    """Dinamik deneme sınavını puanlar ve tetiklenen bilişsel tuzakları (BUG-ID) raporlar."""
+    return dynamic_exam_factory.grade_exam(
+        exam=req.exam,
+        answers=req.answers,
+    )
+
+
+@router.post("/api/v1/exam/export")
+async def export_dynamic_exam(req: ExamExportRequest) -> Dict[str, Any]:
+    """Deneme sınavını derlenebilir LaTeX veya yazdırılabilir HTML / PDF formatında dışa aktarır."""
+    if req.format.lower() == "latex":
+        content = ExamDocumentExporter.export_to_latex(req.exam, include_solutions=req.include_solutions)
+    else:
+        content = ExamDocumentExporter.export_to_html_printable(req.exam, include_solutions=req.include_solutions)
+    return {
+        "format": req.format.lower(),
+        "content": content,
+    }
+
+
+@router.post("/api/v1/exam/question/targeted", response_model=TrapQuestion)
+async def generate_targeted_trap_question(req: TargetedQuestionRequest) -> TrapQuestion:
+    """Öğrencinin geçmiş zaafında yer alan belirli bir BUG-ID'yi hedefleyen çeldiricili soru sentezler."""
+    return trap_question_generator.generate_targeted_bug(bug_id=req.bug_id, seed=req.seed)
+
+
+@router.post("/api/v1/exam/question/verify")
+async def verify_trap_question_formally(req: QuestionVerifyRequest) -> Dict[str, Any]:
+    """SymPy ile sorunun köklerini, analitik türev/çözüm geçerliliğini ve çeldirici tutarlılığını formel olarak ispatlar."""
+    return FormalQuestionVerifier.verify_formally(req.question)
 
 

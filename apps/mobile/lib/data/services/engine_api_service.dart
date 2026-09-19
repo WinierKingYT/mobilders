@@ -551,6 +551,136 @@ class EngineApiService {
     }
   }
 
+  Future<Map<String, dynamic>> generateDynamicExam({
+    String section = 'TYT_MATEMATIK',
+    int questionCount = 10,
+    double targetTheta = 0.0,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/exam/generate');
+    final payload = {
+      'section': section,
+      'question_count': questionCount,
+      'target_theta': targetTheta,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> gradeDynamicExam({
+    required Map<String, dynamic> exam,
+    required Map<int, int> answers,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/exam/grade');
+    // JSON keys for answers must be stringified in HTTP body
+    final stringKeyAnswers = answers.map((k, v) => MapEntry(k.toString(), v));
+    final payload = {
+      'exam': exam,
+      'answers': stringKeyAnswers,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> exportDynamicExam({
+    required Map<String, dynamic> exam,
+    String format = 'html',
+    bool includeSolutions = true,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/exam/export');
+    final payload = {
+      'exam': exam,
+      'format': format,
+      'include_solutions': includeSolutions,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> generateTargetedTrapQuestion({
+    required String bugId,
+    int? seed,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/exam/question/targeted');
+    final payload = {
+      'bug_id': bugId,
+      if (seed != null) 'seed': seed,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> verifyTrapQuestion(Map<String, dynamic> question) async {
+    final uri = Uri.parse('$baseUrl/api/v1/exam/question/verify');
+    final payload = {'question': question};
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
   void dispose() {
     _client.close();
   }
