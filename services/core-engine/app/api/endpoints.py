@@ -1383,3 +1383,171 @@ async def simulate_monte_carlo_endpoint(req: MonteCarloSimulateRequest) -> Dict[
         )
 
 
+# =====================================================================
+# HEDEF 15: MATEMATİKSEL İSPAT VE MANTIK LABORATUVARI ENDPOINTS
+# =====================================================================
+
+from app.logic.proof_lab import (
+    TruthTableGenerator,
+    ProofCatalog,
+    ProofChecker,
+    MathematicalInductionEngine,
+    QuantifierEngine,
+    logic_and,
+    logic_or,
+    logic_not,
+    logic_implies,
+    logic_iff,
+    logic_xor,
+)
+
+
+class ProofTruthTableRequest(BaseModel):
+    variables: List[str] = ["p", "q"]
+    expression_type: str = "implies"  # "implies", "iff", "and", "or", "xor", "de_morgan_and", "contrapositive"
+
+
+class ProofVerifyStepRequest(BaseModel):
+    theorem_id: str
+    step_number: int
+    student_statement: str
+    selected_rule: str
+    student_id: Optional[str] = None
+    problem_statement: Optional[str] = None
+
+
+class ProofVerifyStepResponse(BaseModel):
+    step_number: int
+    is_valid: bool
+    feedback: str
+    expected_statement: Optional[str] = None
+    expected_justification: Optional[str] = None
+    detected_bug: Optional[str] = None
+    vault_recorded: bool = False
+
+
+class InductionSimulateRequest(BaseModel):
+    claim_type: str = "gauss"  # "gauss", "exp_ineq"
+    start_k: int = 1
+    test_range: int = 10
+
+
+@router.post("/api/v1/proof/truth-table")
+async def generate_truth_table_endpoint(req: ProofTruthTableRequest) -> Dict[str, Any]:
+    """
+    Hedef 15: Mantıksal önermeler için 2^n satırlı doğruluk tablosu ve totoloji/çelişki analizi.
+    """
+    expr_type = req.expression_type.lower()
+    if expr_type == "implies":
+        formula = lambda env: logic_implies(env.get("p", False), env.get("q", False))
+    elif expr_type == "iff":
+        formula = lambda env: logic_iff(env.get("p", False), env.get("q", False))
+    elif expr_type == "and":
+        formula = lambda env: logic_and(env.get("p", False), env.get("q", False))
+    elif expr_type == "or":
+        formula = lambda env: logic_or(env.get("p", False), env.get("q", False))
+    elif expr_type == "xor":
+        formula = lambda env: logic_xor(env.get("p", False), env.get("q", False))
+    elif expr_type == "de_morgan_and":
+        # ¬(p ∧ q) ⇔ (¬p ∨ ¬q) -> Tautology test
+        formula = lambda env: logic_iff(
+            logic_not(logic_and(env.get("p", False), env.get("q", False))),
+            logic_or(logic_not(env.get("p", False)), logic_not(env.get("q", False))),
+        )
+    elif expr_type == "contrapositive":
+        # (p ⇒ q) ⇔ (¬q ⇒ ¬p) -> Tautology test
+        formula = lambda env: logic_iff(
+            logic_implies(env.get("p", False), env.get("q", False)),
+            logic_implies(logic_not(env.get("q", False)), logic_not(env.get("p", False))),
+        )
+    else:
+        formula = lambda env: env.get("p", False)
+
+    return TruthTableGenerator.generate_table(req.variables, formula)
+
+
+@router.get("/api/v1/proof/catalog")
+async def get_proof_catalog_endpoint() -> List[Dict[str, Any]]:
+    """
+    Hedef 15: Temel teorem ispat kataloğu (√2 irrasyonelliği, asal sayıların sonsuzluğu, Gauss vb.).
+    """
+    return ProofCatalog.get_all_theorems()
+
+
+@router.post("/api/v1/proof/verify-step", response_model=ProofVerifyStepResponse)
+async def verify_proof_step_endpoint(req: ProofVerifyStepRequest) -> ProofVerifyStepResponse:
+    """
+    Hedef 15: Öğrencinin teorem ispat adımını denetler; safsata ve bilişsel hataları tespit eder.
+    """
+    try:
+        res = ProofChecker.verify_step(
+            theorem_id=req.theorem_id,
+            step_number=req.step_number,
+            student_statement=req.student_statement,
+            selected_rule=req.selected_rule,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    vault_recorded = False
+    detected_bug = res.get("detected_bug")
+
+    # If no bug from ProofChecker, also test via misconception_detector
+    if not detected_bug:
+        diag = misconception_detector.detect(req.student_statement, req.problem_statement or "", "")
+        if diag and diag.bug_id.startswith("BUG-LOGIC"):
+            detected_bug = diag.bug_id
+            res["is_valid"] = False
+            res["feedback"] = diag.description
+
+    if detected_bug and req.student_id:
+        node_map = {
+            "BUG-LOGIC-01": "N214",
+            "BUG-LOGIC-02": "N217",
+            "BUG-LOGIC-03": "N219",
+            "BUG-LOGIC-04": "N226",
+            "BUG-LOGIC-05": "N223",
+        }
+        node_id = node_map.get(detected_bug, "N211")
+        cognitive_mistake_vault.record_mistake(
+            user_id=req.student_id,
+            node_id=node_id,
+            bug_id=detected_bug,
+            problem_statement=req.problem_statement or f"İspat Denetimi: {req.theorem_id} Adım {req.step_number}",
+            offending_step=req.student_statement,
+            correct_principle=res.get("feedback", "Mantıksal çıkarım kuralına uyulmalıdır."),
+            remediation_directive="Çıkarım kurallarını ve ters varsayım/taban adımı ilkelerini gözden geçir.",
+        )
+        vault_recorded = True
+
+    return ProofVerifyStepResponse(
+        step_number=res["step_number"],
+        is_valid=res["is_valid"],
+        feedback=res["feedback"],
+        expected_statement=res.get("expected_statement"),
+        expected_justification=res.get("expected_justification"),
+        detected_bug=detected_bug,
+        vault_recorded=vault_recorded,
+    )
+
+
+@router.post("/api/v1/proof/induction/simulate")
+async def simulate_induction_endpoint(req: InductionSimulateRequest) -> Dict[str, Any]:
+    """
+    Hedef 15: Matematiksel tümevarım domino zinciri simülasyonu.
+    """
+    if req.claim_type == "exp_ineq":
+        # 2^n > n
+        pred = lambda n: (2 ** n) > n
+    else:
+        # Gauss sum: sum(1..n) == n*(n+1)//2
+        pred = lambda n: sum(range(1, n + 1)) == (n * (n + 1)) // 2
+
+    return MathematicalInductionEngine.simulate_inductive_step(
+        predicate=pred,
+        start_k=req.start_k,
+        test_range=req.test_range,
+    )
+
+
+

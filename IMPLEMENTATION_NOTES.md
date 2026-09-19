@@ -633,3 +633,50 @@ Total Verified Passing Tests: 1,137 (0 regressions, 0 failures)
    - Backend: 973 test geçti (44 test `test_curriculum_hedef14_probability_combinatorics.py`).
    - Mobile: 192 test geçti (6 test `counting_tree_venn_canvas_test.dart`).
    - Genel Toplam: 1,165 test %100 başarılı, 0 regresyon, 0 hata.
+
+---
+
+# MOBILDERS Focus Kernel — Implementation Checkpoint Round 31 (Hedef 15: Matematiksel İspat ve Mantık Laboratuvarı "Nedenini Anla")
+
+## Scope & Implementation Details
+1. **Önermeler Mantığı ve Doğruluk Tablosu Motoru (`TruthTableGenerator`)**:
+   - `services/core-engine/app/logic/proof_lab.py`:
+     * Bağlaçlar: $\neg$ (Değil), $\land$ (Ve), $\lor$ (Veya), $\veebar$ (Ya da), $\implies$ (İse), $\iff$ (Ancak ve Ancak).
+     * $2^n$ satırlı doğruluk tablosu hesabı, Totoloji, Çelişki ve Tutarlı (Contingency) analizi.
+     * De Morgan kuralları ve mantıksal denklik doğrulaması ($P \implies Q \equiv \neg P \lor Q \equiv \neg Q \implies \neg P$).
+2. **Niceleyiciler ve Açık Önermeler (`QuantifierEngine`)**:
+   - Evrensel ($\forall$) ve Varlıksal ($\exists$) niceleyiciler, sonlu evrenlerde doğruluk ve tanık/karşıt örnek tespiti.
+   - Niceleyici değillemesi: $\neg(\forall x, P(x)) \equiv \exists x, \neg P(x)$ ve $\neg(\exists x, P(x)) \equiv \forall x, \neg P(x)$.
+3. **Çıkarım Kuralları & Adım Adım İspat Denetleyicisi (`ProofChecker`)**:
+   - Çıkarım kuralları: Modus Ponens, Modus Tollens, Hipotetik Silojizm, Seçenekli Tasım, Çelişki ve Tümevarım geçişleri.
+   - Bilişsel Hata ve Safsata Dedektörleri:
+     * `BUG-LOGIC-01`: İse bağlacında yanlış öncül yanılgısı ($0 \implies 0 = 0$ sanma) $\to$ `N214`.
+     * `BUG-LOGIC-02`: Karşıt-ters yerine tersini alma ($P \implies Q \equiv \neg P \implies \neg Q$) $\to$ `N217`.
+     * `BUG-LOGIC-03`: Niceleyici değillemesinde kapsam hatası $\to$ `N219`.
+     * `BUG-LOGIC-04`: Tümevarımda taban adımını ($n=1$) atlama $\to$ `N226`.
+     * `BUG-LOGIC-05`: Çelişki ispatında $\neg P$ yerine $P$ varsayma $\to$ `N223`.
+     * `CognitiveMistakeVault` SQLite kaydı ve FSRS-4.5 aralıklı tekrar entegrasyonu.
+4. **Temel Teorem İspat Kataloğu (`ProofCatalog`)**:
+   - $\sqrt{2}$'nin irrasyonelliği (Olmayana Ergi / Çelişki).
+   - Asal sayıların sonsuzluğu (Öklid İspatı / Çelişki).
+   - Gauss Toplam Formülü: $\sum_{i=1}^n i = \frac{n(n+1)}{2}$ (Tümevarım).
+   - $2^n > n$ eşitsizliği (Tümevarım).
+   - İki çift sayının toplamı çifttir (Doğrudan İspat).
+   - $n^2$ tek ise $n$ tektir (Karşıt-Ters ile İspat).
+5. **REST API Endpoint'leri (`endpoints.py`)**:
+   - `POST /api/v1/proof/truth-table`: Doğruluk tablosu ve totoloji analizi.
+   - `GET /api/v1/proof/catalog`: Teorem ve ispat kataloğu listesi.
+   - `POST /api/v1/proof/verify-step`: İspat adımı denetimi ve safsata tespiti.
+   - `POST /api/v1/proof/induction/simulate`: Tümevarım domino zinciri simülasyonu.
+6. **Mobil Arayüz & İstemci Entegrasyonu (`ProofCanvas` & `EngineApiService`)**:
+   - `apps/mobile/lib/ui/features/session/views/proof_canvas.dart`:
+     * Doğruluk Tablosu Modu: $p, q$ değerleri, bağlaçlar, doğruluk tablosu ve Totoloji rozeti.
+     * Teorem İspatı Modu: Teorem seçici, adım giriş alanı, kural seçimi, canlı adım doğrulama ve safsata teşhisi.
+     * Tümevarım Modu: 3 aşamalı iskele ve interaktif 10 taşlı domino etkisi simülatörü.
+   - `apps/mobile/lib/data/services/engine_api_service.dart`:
+     * `generateTruthTable`, `fetchProofCatalog`, `verifyProofStep`, `simulateInduction`.
+7. **Doğrulama & Test Kapsamı**:
+   - Backend: 1,016 test geçti (43 test `test_curriculum_hedef15_proof_and_logic.py` + 40 test `test_curriculum_hedef15_proof_logic.py`).
+   - Mobile: 196 test geçti (7 test `proof_canvas_test.dart`).
+   - Genel Toplam: 1,212 test %100 başarılı, 0 regresyon, 0 hata.
+

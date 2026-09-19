@@ -741,6 +741,109 @@ class EngineApiService {
     }
   }
 
+  Future<Map<String, dynamic>> generateTruthTable({
+    required List<String> variables,
+    String expressionType = 'implies',
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/proof/truth-table');
+    final payload = {
+      'variables': variables,
+      'expression_type': expressionType,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchProofCatalog() async {
+    final uri = Uri.parse('$baseUrl/api/v1/proof/catalog');
+    final response = await _client.get(uri).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      final list = jsonDecode(response.body) as List<dynamic>;
+      return list.map((e) => e as Map<String, dynamic>).toList();
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> verifyProofStep({
+    required String theoremId,
+    required int stepNumber,
+    required String studentStatement,
+    required String selectedRule,
+    String? studentId,
+    String? problemStatement,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/proof/verify-step');
+    final payload = {
+      'theorem_id': theoremId,
+      'step_number': stepNumber,
+      'student_statement': studentStatement,
+      'selected_rule': selectedRule,
+      if (studentId != null) 'student_id': studentId,
+      if (problemStatement != null) 'problem_statement': problemStatement,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> simulateInduction({
+    String claimType = 'gauss',
+    int startK = 1,
+    int testRange = 10,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/proof/induction/simulate');
+    final payload = {
+      'claim_type': claimType,
+      'start_k': startK,
+      'test_range': testRange,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
   void dispose() {
     _client.close();
   }
