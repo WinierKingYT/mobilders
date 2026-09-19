@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../ui/core/app_theme.dart';
+import '../../../../data/services/engine_api_service.dart';
 
 class AtlasNodeModel {
   final String id;
@@ -19,14 +20,28 @@ class AtlasNodeModel {
     required this.prerequisites,
     required this.description,
   });
+
+  factory AtlasNodeModel.fromJson(Map<String, dynamic> json) {
+    return AtlasNodeModel(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      domain: json['domain'] as String? ?? 'Cebir & Polinomlar',
+      level: (json['level'] as num?)?.toInt() ?? 0,
+      status: json['status'] as String? ?? 'LOCKED',
+      prerequisites: (json['prerequisites'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
+      description: json['description'] as String? ?? '',
+    );
+  }
 }
 
 class LivingKnowledgeAtlasView extends StatefulWidget {
   final List<AtlasNodeModel>? nodes;
+  final EngineApiService? apiService;
 
   const LivingKnowledgeAtlasView({
     super.key,
     this.nodes,
+    this.apiService,
   });
 
   @override
@@ -55,7 +70,27 @@ class _LivingKnowledgeAtlasViewState extends State<LivingKnowledgeAtlasView> {
   @override
   void initState() {
     super.initState();
-    _allNodes = widget.nodes ?? _generateSampleNodes();
+    if (widget.nodes != null) {
+      _allNodes = widget.nodes!;
+    } else {
+      _allNodes = _generateInitialRootNodes();
+      _loadRealNodes();
+    }
+  }
+
+  Future<void> _loadRealNodes() async {
+    try {
+      final service = widget.apiService ?? EngineApiService();
+      final payload = await service.fetchAtlasPayload();
+      final rawNodes = payload['nodes'] as List<dynamic>?;
+      if (rawNodes != null && rawNodes.isNotEmpty && mounted) {
+        setState(() {
+          _allNodes = rawNodes.map((n) => AtlasNodeModel.fromJson(n as Map<String, dynamic>)).toList();
+        });
+      }
+    } catch (_) {
+      // Keep initial honest root nodes if offline
+    }
   }
 
   List<AtlasNodeModel> get _filteredNodes {
@@ -305,52 +340,151 @@ class _LivingKnowledgeAtlasViewState extends State<LivingKnowledgeAtlasView> {
     );
   }
 
-  static List<AtlasNodeModel> _generateSampleNodes() {
+  static List<AtlasNodeModel> _generateInitialRootNodes() {
     return [
       const AtlasNodeModel(
         id: 'N_ROOT_01',
         title: 'Sayı Doğrusu ve Yön Sezgisi',
         domain: 'Temel Kökler & Sezgi',
-        level: -3,
-        status: 'MASTERED',
+        level: 0,
+        status: 'IN_ZPD',
         prerequisites: [],
         description: 'Sıfırın sağı kazanç, solu kayıptır; sola gidildikçe değer küçülür.',
       ),
       const AtlasNodeModel(
-        id: 'N01',
-        title: 'Tam Sayılarda Dört İşlem ve İşaret Kuralları',
-        domain: 'Cebir & Polinomlar',
-        level: 0,
-        status: 'MASTERED',
-        prerequisites: ['N_ROOT_01'],
-        description: 'İşlem önceliği ve işaret çarpım kuralları.',
-      ),
-      const AtlasNodeModel(
-        id: 'N02',
-        title: 'İşlem Önceliği ve Parantez Açma',
-        domain: 'Cebir & Polinomlar',
+        id: 'N_ROOT_02',
+        title: 'Eşitlik ve İki Kefeli Terazi Sezgisi',
+        domain: 'Temel Kökler & Sezgi',
         level: 0,
         status: 'IN_ZPD',
-        prerequisites: ['N01'],
-        description: 'Çarpma/bölme önceliği ve dağılma özelliği.',
+        prerequisites: [],
+        description: 'Denklem terazidir; her iki tarafa aynı işlem uygulanınca denge bozulmaz.',
       ),
       const AtlasNodeModel(
-        id: 'N91',
-        title: 'Toplam ve Farkın Türevi',
-        domain: 'Diferansiyel Analiz (Türev)',
-        level: 11,
-        status: 'LOCKED',
-        prerequisites: ['N89', 'N90'],
-        description: '(f ± g) türevi polinom türev kuralı.',
+        id: 'N_ROOT_03',
+        title: 'Negatif Sayı ve Borç/Kayıp Metaforu',
+        domain: 'Temel Kökler & Sezgi',
+        level: 0,
+        status: 'IN_ZPD',
+        prerequisites: [],
+        description: 'Eksi işaretinin borç ve yön değişimi anlamı.',
       ),
       const AtlasNodeModel(
-        id: 'N227',
-        title: 'Matematiksel Tümevarım: Hipotez ve Geçiş Adımı',
-        domain: 'Mantık & Matematiksel İspat',
-        level: 19,
-        status: 'LOCKED',
-        prerequisites: ['N226'],
-        description: 'P(k) kabulü ve P(k+1) türetimi.',
+        id: 'N_ROOT_04',
+        title: 'Alan ve Çarpma Geometrisi',
+        domain: 'Temel Kökler & Sezgi',
+        level: 0,
+        status: 'IN_ZPD',
+        prerequisites: [],
+        description: 'Çarpma işlemi dikdörtgensel alan modelidir.',
+      ),
+      const AtlasNodeModel(
+        id: 'N_ROOT_05',
+        title: 'Bölme ve Paylaştırma Sezgisi',
+        domain: 'Temel Kökler & Sezgi',
+        level: 0,
+        status: 'IN_ZPD',
+        prerequisites: [],
+        description: 'Eşit paylaştırma ve ters çarpma mantığı.',
+      ),
+      const AtlasNodeModel(
+        id: 'N_ROOT_06',
+        title: 'Oran, Orantı ve Benzerlik',
+        domain: 'Temel Kökler & Sezgi',
+        level: 0,
+        status: 'IN_ZPD',
+        prerequisites: [],
+        description: 'Birim dönüşümleri ve benzer üçgen oranları.',
+      ),
+      const AtlasNodeModel(
+        id: 'N_ROOT_07',
+        title: 'Değişken ve Bilinmeyen Kutusu',
+        domain: 'Temel Kökler & Sezgi',
+        level: 0,
+        status: 'IN_ZPD',
+        prerequisites: [],
+        description: 'x bir kutudur; içine değerler konulur.',
+      ),
+      const AtlasNodeModel(
+        id: 'N_ROOT_08',
+        title: 'Koordinat Sistemi ve Konum Sezgisi',
+        domain: 'Temel Kökler & Sezgi',
+        level: 0,
+        status: 'IN_ZPD',
+        prerequisites: [],
+        description: '2B düzlemde (x, y) adresleme ve mesafe.',
+      ),
+      const AtlasNodeModel(
+        id: 'N_ROOT_09',
+        title: 'Eğim ve Diklik Sezgisi',
+        domain: 'Temel Kökler & Sezgi',
+        level: 0,
+        status: 'IN_ZPD',
+        prerequisites: [],
+        description: 'Yükseklik/uzaklık oranı ve diklik kuralı.',
+      ),
+      const AtlasNodeModel(
+        id: 'N_ROOT_10',
+        title: 'Açı ve Dönme Hareketi',
+        domain: 'Temel Kökler & Sezgi',
+        level: 0,
+        status: 'IN_ZPD',
+        prerequisites: [],
+        description: 'Dairesel yay ve açı kavramı.',
+      ),
+      const AtlasNodeModel(
+        id: 'N_ROOT_11',
+        title: 'Üstel Büyüme ve Katlanma Sezgisi',
+        domain: 'Temel Kökler & Sezgi',
+        level: 0,
+        status: 'IN_ZPD',
+        prerequisites: [],
+        description: 'Sürekli ikiye katlanma ve geometrik artış.',
+      ),
+      const AtlasNodeModel(
+        id: 'N_ROOT_12',
+        title: 'Logaritma ve Basamak Sayma Sezgisi',
+        domain: 'Temel Kökler & Sezgi',
+        level: 0,
+        status: 'IN_ZPD',
+        prerequisites: [],
+        description: 'Katlanmanın tersi; kaç kez çarpıldığını bulma.',
+      ),
+      const AtlasNodeModel(
+        id: 'N_ROOT_13',
+        title: 'Limit ve Yaklaşma Sezgisi',
+        domain: 'Temel Kökler & Sezgi',
+        level: 0,
+        status: 'IN_ZPD',
+        prerequisites: [],
+        description: 'Bir noktaya sonsuz yaklaşma ama asla dokunmama.',
+      ),
+      const AtlasNodeModel(
+        id: 'N_ROOT_14',
+        title: 'Türev ve Anlık Hız Sezgisi',
+        domain: 'Temel Kökler & Sezgi',
+        level: 0,
+        status: 'IN_ZPD',
+        prerequisites: [],
+        description: 'Kilometre göstergesindeki anlık ibre hızı.',
+      ),
+      const AtlasNodeModel(
+        id: 'N_ROOT_15',
+        title: 'İntegral ve Birikim Sezgisi',
+        domain: 'Temel Kökler & Sezgi',
+        level: 0,
+        status: 'IN_ZPD',
+        prerequisites: [],
+        description: 'Damlayan suyun kovayı doldurması gibi birikim alanı.',
+      ),
+      const AtlasNodeModel(
+        id: 'N_ROOT_16',
+        title: 'Olasılık ve Şans Sezgisi',
+        domain: 'Temel Kökler & Sezgi',
+        level: 0,
+        status: 'IN_ZPD',
+        prerequisites: [],
+        description: 'Zar atma, yazı-tura ve adil şans dağılımı.',
       ),
     ];
   }

@@ -4,10 +4,21 @@ import 'package:personal_learning_engine/ui/features/analytics/views/cognitive_h
 import 'package:personal_learning_engine/ui/features/atlas/living_knowledge_atlas_view.dart';
 
 void main() {
-  testWidgets('CognitiveHealthAtlasScreen renders tabs and switches views', (WidgetTester tester) async {
+  testWidgets('CognitiveHealthAtlasScreen renders populated metrics when real telemetry is available', (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
-        home: CognitiveHealthAtlasScreen(studentId: 'EXP-STU-TEST'),
+        home: CognitiveHealthAtlasScreen(
+          studentId: 'EXP-STU-TEST',
+          hasRealData: true,
+          ece: 0.0661,
+          brierScore: 0.048,
+          imposterRate: 4.2,
+          paasIndex: 0.752,
+          meanLatencySeconds: 3.12,
+          ddmDriftRate: 0.184,
+          retentionS14: 86.7,
+          stabilityDays: 18.25,
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -54,5 +65,37 @@ void main() {
 
     expect(find.byType(LivingKnowledgeAtlasView), findsOneWidget);
     expect(find.text('Toplam Düğüm'), findsOneWidget);
+  });
+
+  testWidgets('CognitiveHealthAtlasScreen displays honest baseline empty state when no session data exists', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: CognitiveHealthAtlasScreen(
+          studentId: 'EXP-STU-FRESH',
+          hasRealData: false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify Title
+    expect(find.text('Bilişsel Sağlık & Cebir Atlası'), findsOneWidget);
+
+    // Verify Tab 1: Shows '--' and 'SEANS VERİSİ GEREKLİ' without fabricated numbers
+    expect(find.text('SEANS VERİSİ GEREKLİ'), findsOneWidget);
+    expect(find.text('--'), findsWidgets);
+
+    // Tap Tab 2 (Paas): Shows '--' and 'ÖLÇÜM BEKLENİYOR'
+    await tester.tap(find.text('Paas Bilişsel Yük'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('ÖLÇÜM BEKLENİYOR'), findsOneWidget);
+    expect(find.text('Öğrenci Konumu (Seans Bekleniyor)'), findsOneWidget);
+
+    // Tap Tab 3 (FSRS): Shows '--' and 'FSRS-4.5 TAKİBİ BEKLEMEDE'
+    await tester.tap(find.text('FSRS 14 Gün Kalıcılık'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('FSRS-4.5 TAKİBİ BEKLEMEDE'), findsOneWidget);
   });
 }

@@ -93,12 +93,50 @@ class _MistakeAutopsyViewState extends State<MistakeAutopsyView> {
                 _buildSelfCorrectionCard()
               else ...[
                 // 5. Mistakes List
-                if (_filteredMistakes.isEmpty)
+                if (widget.mistakes.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 48.0, horizontal: 24.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.verified_rounded,
+                              color: Color(0xFF10B981),
+                              size: 48,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            "Kayıtlı Bilişsel Hata Yok",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            "Harika! Henüz tespit edilen kavram yanılgısı veya zihinsel zaaf bulunmuyor. Seanslarda karşılaştığınız hatalar otomatik olarak buraya kaydedilip tedavi edilecektir.",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.white60, fontSize: 13, height: 1.4),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else if (_filteredMistakes.isEmpty)
                   const Center(
                     child: Padding(
                       padding: EdgeInsets.all(32.0),
                       child: Text(
-                        "Bu kategoride kayıtlı hata bulunmuyor. Zihnin pırıl pırıl!",
+                        "Bu filtre kategorisinde kayıtlı hata bulunmuyor.",
                         style: TextStyle(color: Colors.white54, fontSize: 14),
                       ),
                     ),

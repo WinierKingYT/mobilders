@@ -300,5 +300,20 @@ void main() {
       expect(turn['damage_dealt'], equals(100));
       expect(turn['remaining_hp'], equals(200));
     });
+
+    testWidgets('MistakeAutopsyView renders honest empty state when zero mistakes exist',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: MistakeAutopsyView(
+            mistakes: [],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Kayıtlı Bilişsel Hata Yok'), findsOneWidget);
+      expect(find.textContaining('Harika! Henüz tespit edilen kavram yanılgısı'), findsOneWidget);
+    });
   });
 }

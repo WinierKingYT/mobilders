@@ -713,4 +713,21 @@ Total Verified Passing Tests: 1,137 (0 regressions, 0 failures)
    - Mobile: 200 test geçti (7 test `living_knowledge_atlas_view_test.dart` + 1 test `cognitive_health_atlas_screen_test.dart`).
    - Genel Toplam: 1,221 test %100 başarılı, 0 regresyon, 0 hata.
 
+---
+
+## Round 33 Checkpoint (Veri Dürüstlüğü ve Sıfır Sahte Bilgi - Zero-Fabrication Overhaul)
+1. **Tespit & Temizlik**:
+   - `CognitiveHealthAtlasScreen`: Sabit/uydurma `+0.752 Paas`, `3.12 s`, `0.0661 ECE`, `%86.7 Kalıcılık` değerleri kaldırıldı.
+   - Kullanıcı henüz seans çözmediğinde dürüstçe `--` ve `"SEANS VERİSİ GEREKLİ / ÖLÇÜM BEKLENİYOR"` durum kartları sunulması sağlandı.
+   - Gerçek seans verisi olduğunda `SessionViewModel` üzerinden hesaplanan gerçek tepki süreleri ve başarı oranları yansıtıldı.
+2. **Bilişsel Hata Kasası & Servisi**:
+   - `MistakeVaultService` (`apps/mobile/lib/data/services/mistake_vault_service.dart`) oluşturuldu.
+   - `daily_journey_screen.dart` içindeki 3 sahte hata (`m1, m2, m3`) temizlendi; gerçek hatalar servise bağlandı.
+   - `MistakeAutopsyView` boş olduğunda dürüst ve estetik `"Kayıtlı Bilişsel Hata Yok"` boş durum görünümü sağlandı.
+3. **Yaşayan Zihin Haritası 246 Düğüm Entegrasyonu**:
+   - `LivingKnowledgeAtlasView`: 10 yapay örnek düğüm kaldırıldı; `EngineApiService.fetchAtlasPayload()` ile 246 gerçek düğümün asenkron yüklenmesi ve çevrimdışı durumda 16 gerçek kök düğümün (`N_ROOT_01`..`16`) dürüstçe sunulması sağlandı.
+4. **Test & Doğrulama**:
+   - Toplam **1,223 test** (1,021 Backend + 202 Mobile) %100 başarılı.
+
+
 

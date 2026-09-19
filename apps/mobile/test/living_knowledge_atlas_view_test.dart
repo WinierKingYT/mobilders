@@ -28,7 +28,7 @@ void main() {
     // 3. Verify Nodes rendered
     expect(find.byKey(const Key('atlas_nodes_list')), findsOneWidget);
     expect(find.text("Sayı Doğrusu ve Yön Sezgisi"), findsOneWidget);
-    expect(find.text("Toplam ve Farkın Türevi"), findsOneWidget);
+    expect(find.text("Eşitlik ve İki Kefeli Terazi Sezgisi"), findsOneWidget);
   });
 
   testWidgets('LivingKnowledgeAtlasView filters nodes by search query',
@@ -46,7 +46,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify filtered results
-    expect(find.text("Toplam ve Farkın Türevi"), findsOneWidget);
+    expect(find.text("Türev ve Anlık Hız Sezgisi"), findsOneWidget);
     expect(find.text("Sayı Doğrusu ve Yön Sezgisi"), findsNothing);
   });
 
