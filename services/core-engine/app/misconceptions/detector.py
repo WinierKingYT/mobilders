@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any, List
 import sympy as sp
 from app.models.schemas import DiagnosticPayload
 from app.cas.symbolic_engine import SymbolicEquivalenceEngine
+from app.cas.preprocessor import ImplicitMultiplicationPreprocessor
 
 
 class QuadraticMisconceptionDetector:
@@ -29,8 +30,8 @@ class QuadraticMisconceptionDetector:
         if not user_step_str or not user_step_str.strip():
             return None
 
-        clean_user = user_step_str.strip().replace("^", "**")
-        clean_prev = (previous_step_str or target_equation_str or "").strip().replace("^", "**")
+        clean_user = ImplicitMultiplicationPreprocessor.preprocess(user_step_str)
+        clean_prev = ImplicitMultiplicationPreprocessor.preprocess(previous_step_str or target_equation_str or "")
 
         checks = [
             self._check_bug_quad_01,

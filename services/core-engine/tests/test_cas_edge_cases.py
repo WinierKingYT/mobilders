@@ -68,3 +68,23 @@ class TestCasEdgeCases:
         # Extra whitespace around operators
         is_equiv, _, _ = engine.verify_equivalence("  x   +   5   =   12  ", "x + 5 = 12")
         assert is_equiv is True
+
+    def test_detector_with_preprocessed_unicode_and_uppercase(self, engine):
+        from app.misconceptions.detector import QuadraticMisconceptionDetector
+        detector = QuadraticMisconceptionDetector(cas_engine=engine)
+        
+        # User typed X - 3 = 6 when previous step was (X - 3)(X + 2) = 6
+        bug = detector.detect(
+            user_step_str="X - 3 = 6",
+            previous_step_str="(X - 3)(X + 2) = 6",
+        )
+        assert bug is not None
+        assert bug.bug_id == "BUG-QUAD-01"
+
+        # User wrote x = 7 for x² = 49 (missing -7)
+        bug2 = detector.detect(
+            user_step_str="x = 7",
+            previous_step_str="x² = 49",
+        )
+        assert bug2 is not None
+        assert bug2.bug_id == "BUG-QUAD-02"
