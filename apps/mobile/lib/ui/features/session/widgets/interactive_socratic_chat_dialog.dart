@@ -293,19 +293,32 @@ class _InteractiveSocraticChatDialogState extends State<InteractiveSocraticChatD
           ),
 
           if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               child: Row(
                 children: [
-                  SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF38BDF8)),
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    "Sokratik Öğretmen düşünüyor...",
-                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontStyle: FontStyle.italic),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF38BDF8)),
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          "Sokratik Öğretmen düşünüyor...",
+                          style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontStyle: FontStyle.italic),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
