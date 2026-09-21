@@ -30,8 +30,23 @@ class QuadraticMisconceptionDetector:
         if not user_step_str or not user_step_str.strip():
             return None
 
-        clean_user = ImplicitMultiplicationPreprocessor.preprocess(user_step_str)
-        clean_prev = ImplicitMultiplicationPreprocessor.preprocess(previous_step_str or target_equation_str or "")
+        def _normalize_detector_str(s: Optional[str]) -> str:
+            if not s:
+                return ""
+            res = s.strip()
+            # Unicode superscripts
+            res = res.replace("²", "**2").replace("³", "**3")
+            # Unicode math symbols
+            res = res.replace("−", "-").replace("–", "-").replace("—", "-")
+            res = res.replace("×", "*").replace("÷", "/")
+            # Caret power to SymPy power
+            res = res.replace("^", "**")
+            # Single-letter variable case normalization: X -> x, Y -> y, Z -> z
+            res = re.sub(r"\b([XYZ])\b", lambda m: m.group(1).lower(), res)
+            return res
+
+        clean_user = _normalize_detector_str(user_step_str)
+        clean_prev = _normalize_detector_str(previous_step_str or target_equation_str or "")
 
         checks = [
             self._check_bug_quad_01,
