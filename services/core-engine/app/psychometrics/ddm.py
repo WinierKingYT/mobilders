@@ -56,6 +56,8 @@ class EZDiffusionSolver:
         Raises:
             ValueError: If MRT < 0.100s or VRT <= 0.0 (ERR_DDM_DEGENERATE_DATA).
         """
+        if not (math.isfinite(mrt) and math.isfinite(vrt) and math.isfinite(pc) and math.isfinite(s)):
+            raise ValueError("DDM parametreleri sonlu reel sayılar olmalıdır. [ERR_DDM_DEGENERATE_DATA 3002]")
         if mrt < 0.100:
             raise ValueError(
                 f"Degenerate response time: MRT={mrt:.3f}s is below physiological minimum (100ms) [ERR_DDM_DEGENERATE_DATA 3002]"

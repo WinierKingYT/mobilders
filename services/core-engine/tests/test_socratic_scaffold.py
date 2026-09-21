@@ -196,3 +196,67 @@ def test_session_state_history_tracking(scaffold):
     assert len(state.history) == 4
     assert "RESOLVED:" in state.history[3]
     assert state.confidence_gain == 0.10
+
+
+# =====================================================================
+# 5. Multi-Turn Socratic Pipeline Tests
+# =====================================================================
+
+def test_socratic_pipeline_multi_turn_flow():
+    from app.socratic.pipeline import SocraticPipeline, SocraticRequest
+    from app.models.schemas import DiagnosticPayload
+
+    pipeline = SocraticPipeline()
+    diag = DiagnosticPayload(
+        bug_id="BUG-QUAD-03",
+        severity="CRITICAL",
+        category="STRUCTURAL_MISCONCEPTION",
+        description="Tam kare açılımında çarpımın iki katı (2ab) terimi ihmal edildi.",
+        remediation_directive="Geometrik karo modelini göster; iki adet ax dikdörtgenini hatırlat.",
+        offending_term="(x + 3)^2 = x^2 + 9",
+    )
+
+    # Turn 1: Opening prompt on misconception
+    req1 = SocraticRequest(
+        user_input="(x + 3)^2 = x^2 + 9",
+        target_equation="x^2 + 6*x + 9 = 0",
+        solution_roots=[-3.0],
+        diagnostic_bug=diag,
+        conversation_history=[],
+    )
+    res1 = pipeline.process(req1)
+    assert res1.socratic_ratio >= 2.0
+    assert "-3" not in res1.final_output
+    assert "alan" in res1.final_output.lower() or "dikdörtgen" in res1.final_output.lower()
+
+    # Turn 2: Student asks "Neden?"
+    history = [
+        {"role": "assistant", "content": res1.final_output},
+        {"role": "user", "content": "Neden iki adet ax terimi var?"},
+    ]
+    req2 = SocraticRequest(
+        user_input="Neden iki adet ax terimi var?",
+        target_equation="x^2 + 6*x + 9 = 0",
+        solution_roots=[-3.0],
+        diagnostic_bug=diag,
+        conversation_history=history,
+    )
+    res2 = pipeline.process(req2)
+    assert res2.socratic_ratio >= 1.0
+    assert "alan" in res2.final_output.lower() or "topladığında" in res2.final_output.lower()
+
+    # Turn 3: Student discovers middle term "6x"
+    history.extend([
+        {"role": "assistant", "content": res2.final_output},
+        {"role": "user", "content": "Ortadaki iki 3x terimini toplayınca 6x olur"},
+    ])
+    req3 = SocraticRequest(
+        user_input="Ortadaki iki 3x terimini toplayınca 6x olur",
+        target_equation="x^2 + 6*x + 9 = 0",
+        solution_roots=[-3.0],
+        diagnostic_bug=diag,
+        conversation_history=history,
+    )
+    res3 = pipeline.process(req3)
+    assert "harika" in res3.final_output.lower() or "eksiksiz" in res3.final_output.lower()
+    assert "-3" not in res3.final_output

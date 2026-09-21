@@ -5,6 +5,8 @@ import 'package:personal_learning_engine/data/services/engine_api_service.dart';
 import 'package:personal_learning_engine/ui/features/diagnostic/view_models/diagnostic_view_model.dart';
 import 'package:personal_learning_engine/ui/features/session/view_models/session_view_model.dart';
 import 'package:personal_learning_engine/ui/features/session/views/daily_journey_screen.dart';
+import 'package:personal_learning_engine/ui/features/session/views/interactive_coordinate_canvas.dart';
+import 'package:personal_learning_engine/ui/features/session/views/euclidean_canvas.dart';
 
 void main() {
   testWidgets('DailyJourneyScreen renders 20-min session header and warm-up phase', (tester) async {
@@ -221,5 +223,73 @@ void main() {
     // Verify that MistakeAutopsyView is pushed
     expect(find.byKey(const Key('mistake_vault_view')), findsOneWidget);
     expect(find.text('Bilişsel Hata Otopsisi Kasası'), findsOneWidget);
+  });
+
+  testWidgets('DailyJourneyScreen enforces mutual exclusion and constrained scroll on visual canvases in problemBoard phase', (tester) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final apiService = EngineApiService();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          Provider<EngineApiService>.value(value: apiService),
+          ChangeNotifierProvider<SessionViewModel>(
+            create: (_) => SessionViewModel(
+              apiService: apiService,
+              sessionId: 'test-session-006',
+              targetEquation: 'x^2 + 6x - 2 = 0',
+            ),
+          ),
+          ChangeNotifierProvider<DiagnosticViewModel>(
+            create: (_) => DiagnosticViewModel(
+              apiService: apiService,
+              sessionId: 'test-cat-006',
+            ),
+          ),
+        ],
+        child: const MaterialApp(
+          home: DailyJourneyScreen(initialPhase: DailyPhase.problemBoard),
+        ),
+      ),
+    );
+
+    // Initial state in problemBoard: no canvases displayed
+    expect(find.byType(InteractiveCoordinateCanvas), findsNothing);
+    expect(find.byType(EuclideanCanvas), findsNothing);
+
+    // Tap coordinate canvas toggle button
+    final coordBtn = find.byKey(const Key('toggle_coordinate_canvas_button'));
+    expect(coordBtn, findsOneWidget);
+    await tester.ensureVisible(coordBtn);
+    await tester.tap(coordBtn);
+    await tester.pumpAndSettle();
+
+    // Verify coordinate canvas is displayed
+    expect(find.byType(InteractiveCoordinateCanvas), findsOneWidget);
+    expect(find.byType(EuclideanCanvas), findsNothing);
+
+    // Tap euclidean canvas toggle button (should switch mutually, not stack!)
+    final euclidBtn = find.byKey(const Key('toggle_euclidean_canvas_button'));
+    expect(euclidBtn, findsOneWidget);
+    await tester.ensureVisible(euclidBtn);
+    await tester.tap(euclidBtn);
+    await tester.pumpAndSettle();
+
+    // Verify euclidean canvas is now displayed and coordinate canvas is dismissed
+    expect(find.byType(InteractiveCoordinateCanvas), findsNothing);
+    expect(find.byType(EuclideanCanvas), findsOneWidget);
+
+    // Tap euclidean canvas again to turn off
+    await tester.ensureVisible(euclidBtn);
+    await tester.tap(euclidBtn);
+    await tester.pumpAndSettle();
+
+    // Verify both are dismissed
+    expect(find.byType(InteractiveCoordinateCanvas), findsNothing);
+    expect(find.byType(EuclideanCanvas), findsNothing);
   });
 }

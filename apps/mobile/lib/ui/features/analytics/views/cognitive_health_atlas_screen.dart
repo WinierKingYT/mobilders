@@ -69,14 +69,21 @@ class _CognitiveHealthAtlasScreenState extends State<CognitiveHealthAtlasScreen>
     double? realPaasE;
 
     if (hasSessionSteps) {
-      final steps = sessionVm!.steps;
+      final steps = sessionVm.steps;
       final totalElapsedMs = steps.map((s) => s.elapsedMs).reduce((a, b) => a + b);
       realLatency = totalElapsedMs > 0 ? (totalElapsedMs / (steps.length * 1000.0)) : 3.0;
+      if (realLatency.isNaN || realLatency.isInfinite) {
+        realLatency = 3.0;
+      }
       final validCount = steps.where((s) => s.isValid).length;
-      realAccuracy = validCount / steps.length;
+      realAccuracy = steps.isNotEmpty ? (validCount / steps.length) : 0.0;
+      if (realAccuracy.isNaN || realAccuracy.isInfinite) {
+        realAccuracy = 0.0;
+      }
       final zP = (realAccuracy - 0.65) / 0.20;
       final zR = (realLatency - 5.0) / 2.0;
-      realPaasE = (zP - zR) / math.sqrt(2.0);
+      final computedE = (zP - zR) / math.sqrt(2.0);
+      realPaasE = (computedE.isNaN || computedE.isInfinite) ? 0.0 : computedE;
     }
 
     final eceVal = widget.ece ?? (hasData ? 0.0661 : null);

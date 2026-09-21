@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:personal_learning_engine/ui/core/app_theme.dart';
 import 'package:personal_learning_engine/data/services/engine_api_service.dart';
 import 'package:personal_learning_engine/domain/models/solution_step.dart';
 import 'package:personal_learning_engine/ui/features/session/view_models/session_view_model.dart';

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../../core/services/haptic_feedback_service.dart';
-import '../../../core/app_theme.dart';
 
 class StepSourceLineage {
   final String targetToken;
@@ -124,6 +123,22 @@ class _SourceUnpackerWidgetState extends State<SourceUnpackerWidget> {
       previousStep: widget.previousStep,
       selectedToken: widget.initialToken,
     );
+  }
+
+  @override
+  void didUpdateWidget(covariant SourceUnpackerWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentStep != widget.currentStep ||
+        oldWidget.previousStep != widget.previousStep ||
+        oldWidget.initialToken != widget.initialToken) {
+      setState(() {
+        _lineage = StepSourceLineage.deriveLineage(
+          currentStep: widget.currentStep,
+          previousStep: widget.previousStep,
+          selectedToken: widget.initialToken,
+        );
+      });
+    }
   }
 
   @override

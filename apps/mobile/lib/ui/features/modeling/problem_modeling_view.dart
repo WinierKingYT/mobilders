@@ -176,6 +176,17 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
     _activePresetIndex = initialIdx;
   }
 
+  @override
+  void didUpdateWidget(covariant ProblemModelingView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.problemId != oldWidget.problemId && widget.problemId != null) {
+      final idx = kDefaultProblemPresets.indexWhere((p) => p.id == widget.problemId);
+      if (idx != -1 && idx != _activePresetIndex) {
+        _switchPreset(idx);
+      }
+    }
+  }
+
   ProblemPreset get _currentPreset {
     final base = kDefaultProblemPresets[_activePresetIndex];
     return ProblemPreset(
@@ -576,8 +587,8 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: const [
+                  const Row(
+                    children: [
                       Icon(Icons.menu_book, color: Colors.amberAccent, size: 18),
                       SizedBox(width: 8),
                       Text(
@@ -836,8 +847,8 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.amberAccent.withValues(alpha: 0.6)),
       ),
-      child: Row(
-        children: const [
+      child: const Row(
+        children: [
           Icon(Icons.emoji_events, color: Colors.amberAccent, size: 28),
           SizedBox(width: 12),
           Expanded(

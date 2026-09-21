@@ -97,6 +97,8 @@ class IndividualizedBKT:
         if params is None:
             params = BKTParameters()
 
+        if math.isnan(p_l):
+            p_l = 0.5
         p_l = max(1e-6, min(1.0 - 1e-6, p_l))
         p_s = params.p_s
         p_g = params.p_g
@@ -120,6 +122,11 @@ class IndividualizedBKT:
         next_p_l = posterior_p_l + ((1.0 - posterior_p_l) * p_t)
 
         # Numerical clamping
+        if math.isnan(posterior_p_l):
+            posterior_p_l = p_l
+        if math.isnan(next_p_l):
+            next_p_l = posterior_p_l
+
         posterior_p_l = max(1e-5, min(1.0 - 1e-5, posterior_p_l))
         next_p_l = max(1e-5, min(1.0 - 1e-5, next_p_l))
 
@@ -130,6 +137,8 @@ class IndividualizedBKT:
         """
         Predicts probability of a correct response: P(Y=1) = P(L)*(1 - P(S)) + (1 - P(L))*P(G)
         """
+        if math.isnan(p_l):
+            p_l = 0.5
         if params is None:
             params = BKTParameters()
         return (p_l * (1.0 - params.p_s)) + ((1.0 - p_l) * params.p_g)
@@ -151,7 +160,7 @@ class ContinuousTimeBKT:
         Calculates hazard rate of forgetting from memory stability:
         lambda_f = -ln(R_target) / S
         """
-        if stability_days <= 0.01:
+        if math.isnan(stability_days) or stability_days <= 0.01:
             stability_days = 0.01
         return -math.log(cls.TARGET_RETRIEVAL_RATE) / stability_days
 
@@ -168,11 +177,13 @@ class ContinuousTimeBKT:
         - If learning_flow_rate == 0.0: Pure passive forgetting P(L) = P(L_0) * exp(-lambda_f * dt).
         - If learning_flow_rate > 0.0: Active session transition with steady state P_inf.
         """
-        if elapsed_days <= 0.0:
+        if math.isnan(p_l_initial):
+            p_l_initial = 0.5
+        if math.isnan(elapsed_days) or elapsed_days <= 0.0:
             return max(0.0, min(1.0, p_l_initial))
 
         lambda_f = cls.calculate_forgetting_rate(stability_days)
-        lambda_t = max(0.0, learning_flow_rate)
+        lambda_t = max(0.0, learning_flow_rate) if not math.isnan(learning_flow_rate) else 0.0
 
         total_rate = lambda_t + lambda_f
         if total_rate <= 1e-12:
@@ -184,5 +195,8 @@ class ContinuousTimeBKT:
         else:
             p_inf = lambda_t / total_rate
             decayed = p_inf + ((p_l_initial - p_inf) * math.exp(-total_rate * elapsed_days))
+
+        if math.isnan(decayed):
+            decayed = p_l_initial
 
         return max(1e-5, min(1.0 - 1e-5, decayed))

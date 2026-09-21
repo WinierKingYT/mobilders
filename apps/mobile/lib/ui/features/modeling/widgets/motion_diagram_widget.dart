@@ -23,12 +23,16 @@ class MotionDiagramWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final double safeDist = (distanceKm.isFinite && distanceKm >= 0) ? distanceKm : 0.0;
+    final double safeV1 = (vehicle1Speed.isFinite && vehicle1Speed >= 0) ? vehicle1Speed : 0.0;
+    final double safeV2 = (vehicle2Speed.isFinite && vehicle2Speed >= 0) ? vehicle2Speed : 0.0;
     final double relativeSpeed = isOppositeDirection
-        ? (vehicle1Speed + vehicle2Speed)
-        : (vehicle1Speed - vehicle2Speed).abs();
-    final double computedTime = relativeSpeed > 0 ? (distanceKm / relativeSpeed) : 0;
+        ? (safeV1 + safeV2)
+        : (safeV1 - safeV2).abs();
+    final double computedTime = relativeSpeed > 0 ? (safeDist / relativeSpeed) : 0;
+    final double totalV = safeV1 + safeV2;
     final double meetingRatio = isOppositeDirection
-        ? (vehicle1Speed / (vehicle1Speed + vehicle2Speed)).clamp(0.1, 0.9)
+        ? (totalV > 0 ? (safeV1 / totalV).clamp(0.1, 0.9) : 0.5)
         : 0.8;
 
     return Container(
@@ -65,7 +69,7 @@ class MotionDiagramWidget extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'Yol: ${distanceKm.toStringAsFixed(0)} km',
+                  'Yol: ${safeDist.toStringAsFixed(0)} km',
                   style: const TextStyle(
                     color: Colors.cyanAccent,
                     fontSize: 12,
@@ -133,7 +137,7 @@ class MotionDiagramWidget extends StatelessWidget {
                             children: [
                               const Icon(Icons.arrow_forward, color: Colors.greenAccent, size: 14),
                               Text(
-                                '${vehicle1Speed.toStringAsFixed(0)} km/h',
+                                '${safeV1.toStringAsFixed(0)} km/h',
                                 style: const TextStyle(color: Colors.greenAccent, fontSize: 11),
                               ),
                             ],
@@ -166,7 +170,7 @@ class MotionDiagramWidget extends StatelessWidget {
                                 size: 14,
                               ),
                               Text(
-                                '${vehicle2Speed.toStringAsFixed(0)} km/h',
+                                '${safeV2.toStringAsFixed(0)} km/h',
                                 style: const TextStyle(color: Colors.orangeAccent, fontSize: 11),
                               ),
                             ],

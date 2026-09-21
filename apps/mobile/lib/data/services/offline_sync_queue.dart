@@ -121,14 +121,32 @@ class UnsyncedFocusAttemptEvent {
       );
 }
 
+/// Result of a batch replay containing synced count and updated step models.
+class BatchReplayResult {
+  final int syncedCount;
+  final List<Map<String, dynamic>> replayedSteps;
+  final double? latestPl;
+  final bool isTargetReached;
+
+  BatchReplayResult({
+    required this.syncedCount,
+    this.replayedSteps = const [],
+    this.latestPl,
+    this.isTargetReached = false,
+  });
+}
+
 /// Offline Event Queue Manager.
 /// Stores unsynced steps locally, provides client-timestamp ordering,
 /// exponential backoff retry calculations, and idempotent batch replay.
 class OfflineSyncQueue extends ChangeNotifier {
+  static const int maxQueueSize = 500;
+
   final List<UnsyncedStepEvent> _events = [];
   final List<UnsyncedFocusAttemptEvent> _focusEvents = [];
   final String? storageFilePath;
   bool _isSyncing = false;
+  BatchReplayResult? _lastReplayResult;
 
   OfflineSyncQueue({this.storageFilePath}) {
     _loadFromDisk();
@@ -139,14 +157,24 @@ class OfflineSyncQueue extends ChangeNotifier {
 
   int get pendingCount => _events.where((e) => !e.isSynced).length;
   bool get isSyncing => _isSyncing;
+  BatchReplayResult? get lastReplayResult => _lastReplayResult;
 
   List<UnsyncedFocusAttemptEvent> get pendingFocusEvents =>
       List.unmodifiable(_focusEvents.where((e) => !e.isSynced).toList());
 
   int get pendingFocusCount => _focusEvents.where((e) => !e.isSynced).length;
 
+  /// Explicitly loads stored events from disk (useful in async setup or tests).
+  Future<void> load() async {
+    await _loadFromDisk();
+    notifyListeners();
+  }
+
   /// Enqueue step to local storage and memory ledger.
   void enqueueStep(UnsyncedStepEvent event) {
+    if (_events.length >= maxQueueSize) {
+      _events.removeAt(0);
+    }
     _events.add(event);
     _persistToDisk();
     notifyListeners();
@@ -154,26 +182,42 @@ class OfflineSyncQueue extends ChangeNotifier {
 
   /// Enqueue a focus attempt for offline synchronization.
   void enqueueFocusAttempt(UnsyncedFocusAttemptEvent event) {
+    if (_focusEvents.length >= maxQueueSize) {
+      _focusEvents.removeAt(0);
+    }
     _focusEvents.add(event);
+    _persistToDisk();
     notifyListeners();
   }
 
   /// Mark a focus attempt as synced and remove from pending queue.
   void markFocusAttemptSynced(String clientMsgId) {
     _focusEvents.removeWhere((e) => e.clientMsgId == clientMsgId);
+    _persistToDisk();
     notifyListeners();
   }
 
   /// Calculate exponential backoff interval in seconds: 2s -> 4s -> 8s -> max 30s.
   static int calculateBackoffSeconds(int retryCount) {
     if (retryCount <= 0) return 2;
+    if (retryCount >= 10) return 30; // Prevent pow(2, retryCount) numeric overflow
     return min(30, 2 * pow(2, retryCount).toInt());
   }
 
-  /// Replays pending events against the EngineApiService in chronological order.
-  Future<int> replayQueue(EngineApiService apiService) async {
+  /// Calculates exponential backoff with full jitter to avoid the Thundering Herd problem.
+  /// Generates a randomized backoff interval in [0, calculateBackoffSeconds(retryCount)].
+  static double calculateBackoffWithJitter(int retryCount, {Random? random}) {
+    final baseSeconds = calculateBackoffSeconds(retryCount);
+    final rng = random ?? Random();
+    return rng.nextDouble() * baseSeconds;
+  }
+
+  /// Replays pending events against the EngineApiService and returns full batch details.
+  Future<BatchReplayResult> replayBatch(EngineApiService apiService) async {
     final pending = _events.where((e) => !e.isSynced).toList();
-    if (pending.isEmpty || _isSyncing) return 0;
+    if (pending.isEmpty || _isSyncing) {
+      return BatchReplayResult(syncedCount: 0);
+    }
 
     _isSyncing = true;
     notifyListeners();
@@ -182,6 +226,10 @@ class OfflineSyncQueue extends ChangeNotifier {
     pending.sort((a, b) => a.clientTimestamp.compareTo(b.clientTimestamp));
 
     int syncedCount = 0;
+    List<Map<String, dynamic>> replayedSteps = [];
+    double? latestPl;
+    bool isTargetReached = false;
+
     try {
       final payloadEvents = pending.map((e) => e.toJson()).toList();
       final sessionId = pending.first.sessionId;
@@ -192,13 +240,23 @@ class OfflineSyncQueue extends ChangeNotifier {
       );
 
       final returnedSynced = res['synced_count'] as int? ?? 0;
+      latestPl = (res['latest_p_l'] as num?)?.toDouble();
+      isTargetReached = res['is_target_reached'] as bool? ?? false;
+
+      final rawSteps = res['replayed_steps'] as List<dynamic>?;
+      if (rawSteps != null) {
+        replayedSteps = rawSteps
+            .whereType<Map<String, dynamic>>()
+            .toList();
+      }
+
       if (returnedSynced > 0) {
         for (int i = 0; i < min(returnedSynced, pending.length); i++) {
           pending[i].isSynced = true;
         }
         syncedCount = returnedSynced;
         _events.removeWhere((e) => e.isSynced);
-        _persistToDisk();
+        await _persistToDisk();
       }
     } catch (err) {
       // Network still offline or error occurred; record retry and calculate backoff
@@ -206,48 +264,131 @@ class OfflineSyncQueue extends ChangeNotifier {
         event.retryCount += 1;
         event.syncError = err.toString();
       }
-      _persistToDisk();
+      await _persistToDisk();
     } finally {
       _isSyncing = false;
       notifyListeners();
     }
 
-    return syncedCount;
+    final result = BatchReplayResult(
+      syncedCount: syncedCount,
+      replayedSteps: replayedSteps,
+      latestPl: latestPl,
+      isTargetReached: isTargetReached,
+    );
+    _lastReplayResult = result;
+    return result;
   }
 
-  void clearQueue() {
+  /// Replays pending events against the EngineApiService in chronological order.
+  Future<int> replayQueue(EngineApiService apiService) async {
+    final result = await replayBatch(apiService);
+    return result.syncedCount;
+  }
+
+  Future<void> clearQueue() async {
     _events.clear();
-    _persistToDisk();
+    _focusEvents.clear();
+    await _persistToDisk();
     notifyListeners();
   }
 
-  void _persistToDisk() {
+  bool _isPersisting = false;
+  bool _needsAnotherPersist = false;
+
+  Future<void> _persistToDisk() async {
     if (storageFilePath == null) return;
+    if (_isPersisting) {
+      _needsAnotherPersist = true;
+      return;
+    }
+    _isPersisting = true;
     try {
-      final file = File(storageFilePath!);
-      final data = _events.map((e) => e.toJson()).toList();
-      file.writeAsStringSync(jsonEncode(data), flush: true);
+      do {
+        _needsAnotherPersist = false;
+        final file = File(storageFilePath!);
+        await file.parent.create(recursive: true);
+        final tmpFile = File('${file.path}.tmp');
+        final payload = {
+          'events': _events.map((e) => e.toJson()).toList(),
+          'focus_events': _focusEvents.map((e) => e.toJson()).toList(),
+        };
+        await tmpFile.writeAsString(jsonEncode(payload), flush: true);
+        if (await file.exists()) {
+          await file.delete();
+        }
+        await tmpFile.rename(file.path);
+      } while (_needsAnotherPersist);
     } catch (e) {
       debugPrint("OfflineSyncQueue persist warning: $e");
+    } finally {
+      _isPersisting = false;
     }
   }
 
-  void _loadFromDisk() {
+  Future<void>? _loadFuture;
+
+  Future<void> _loadFromDisk() async {
     if (storageFilePath == null) return;
+    if (_loadFuture != null) return _loadFuture!;
+    final completer = Completer<void>();
+    _loadFuture = completer.future;
     try {
       final file = File(storageFilePath!);
-      if (file.existsSync()) {
-        final content = file.readAsStringSync();
+      final tmpFile = File('${file.path}.tmp');
+      File fileToRead = file;
+
+      if (!await file.exists() && await tmpFile.exists()) {
+        try {
+          await tmpFile.rename(file.path);
+          fileToRead = file;
+        } catch (_) {
+          fileToRead = tmpFile;
+        }
+      }
+
+      if (await fileToRead.exists()) {
+        final content = await fileToRead.readAsString();
         if (content.isNotEmpty) {
-          final list = jsonDecode(content) as List<dynamic>;
-          _events.clear();
-          for (final item in list) {
-            _events.add(UnsyncedStepEvent.fromJson(item as Map<String, dynamic>));
+          try {
+            final decoded = jsonDecode(content);
+            _events.clear();
+            _focusEvents.clear();
+            if (decoded is List) {
+              // Backwards compatibility with flat list of steps
+              for (final item in decoded) {
+                _events.add(UnsyncedStepEvent.fromJson(item as Map<String, dynamic>));
+              }
+            } else if (decoded is Map<String, dynamic>) {
+              if (decoded['events'] is List) {
+                for (final item in decoded['events']) {
+                  _events.add(UnsyncedStepEvent.fromJson(item as Map<String, dynamic>));
+                }
+              }
+              if (decoded['focus_events'] is List) {
+                for (final item in decoded['focus_events']) {
+                  _focusEvents.add(
+                    UnsyncedFocusAttemptEvent.fromJson(item as Map<String, dynamic>),
+                  );
+                }
+              }
+            }
+          } on FormatException catch (fe) {
+            debugPrint("OfflineSyncQueue corrupt JSON detected: $fe");
+            try {
+              final bakFile = File('${file.path}.corrupt.bak');
+              await bakFile.writeAsString(content, flush: true);
+            } catch (_) {}
+            _events.clear();
+            _focusEvents.clear();
           }
         }
       }
     } catch (e) {
       debugPrint("OfflineSyncQueue load warning: $e");
+    } finally {
+      completer.complete();
+      _loadFuture = null;
     }
   }
 }

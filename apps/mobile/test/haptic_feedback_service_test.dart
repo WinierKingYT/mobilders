@@ -62,5 +62,14 @@ void main() {
 
       expect(receivedEvents, [HapticType.lightImpact, HapticType.mediumImpact]);
     });
+
+    test('triggeredHistory is strictly bounded to maxHistoryLength to prevent memory leak', () async {
+      for (int i = 0; i < 150; i++) {
+        await hapticService.keyPress();
+      }
+
+      expect(hapticService.triggeredHistory.length, HapticFeedbackService.maxHistoryLength);
+      expect(hapticService.triggeredHistory.length, 100);
+    });
   });
 }

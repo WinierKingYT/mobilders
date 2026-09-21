@@ -52,7 +52,6 @@ class _LivingKnowledgeAtlasViewState extends State<LivingKnowledgeAtlasView> {
   late List<AtlasNodeModel> _allNodes;
   String _selectedDomain = 'Tümü';
   String _searchQuery = '';
-  AtlasNodeModel? _inspectedNode;
 
   final List<String> _domains = [
     'Tümü',
@@ -75,6 +74,14 @@ class _LivingKnowledgeAtlasViewState extends State<LivingKnowledgeAtlasView> {
     } else {
       _allNodes = _generateInitialRootNodes();
       _loadRealNodes();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant LivingKnowledgeAtlasView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.nodes != null && widget.nodes != oldWidget.nodes) {
+      _allNodes = widget.nodes!;
     }
   }
 

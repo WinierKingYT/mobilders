@@ -10,9 +10,11 @@ import '../../accessibility/dyscalculia_helpers.dart';
 import '../../accessibility/tunnel_focus_mode.dart';
 import '../view_models/session_view_model.dart';
 import '../widgets/hesitation_whisper_bubble.dart';
+import '../widgets/interactive_socratic_chat_dialog.dart';
 import '../widgets/socratic_hint_dialog.dart';
 import '../widgets/source_unpacker_widget.dart';
 import '../../notes/living_notes_drawer.dart';
+import '../../analytics/views/misconception_profiler_screen.dart';
 import 'zen_focus_overlay.dart';
 
 class SessionScreen extends StatefulWidget {
@@ -27,6 +29,13 @@ class _SessionScreenState extends State<SessionScreen> {
   final ScrollController _scrollController = ScrollController();
   final SessionRestorationManager _restorationManager = SessionRestorationManager();
   bool _isRestored = false;
+  SessionViewModel? _viewModel;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _viewModel = context.read<SessionViewModel>();
+  }
 
   @override
   void initState() {
@@ -36,8 +45,8 @@ class _SessionScreenState extends State<SessionScreen> {
     );
     _inputController.addListener(() {
       if (_inputController.text.isNotEmpty && mounted) {
-        final vm = context.read<SessionViewModel>();
-        if (vm.hesitationWhisper != null) {
+        final vm = _viewModel ?? (mounted ? context.read<SessionViewModel>() : null);
+        if (vm != null && vm.hesitationWhisper != null) {
           vm.dismissHesitationWhisper();
         }
       }
@@ -51,7 +60,7 @@ class _SessionScreenState extends State<SessionScreen> {
     if (!mounted || _isRestored) return;
     final draft = await _restorationManager.restoreDraft();
     if (draft != null && mounted) {
-      final vm = context.read<SessionViewModel>();
+      final vm = _viewModel ?? context.read<SessionViewModel>();
       if (draft.sessionId == vm.sessionId) {
         if (draft.draftText.isNotEmpty) {
           _inputController.text = draft.draftText;
@@ -65,8 +74,8 @@ class _SessionScreenState extends State<SessionScreen> {
   }
 
   void _saveCurrentState() {
-    if (!mounted) return;
-    final vm = context.read<SessionViewModel>();
+    final vm = _viewModel;
+    if (vm == null) return;
     _restorationManager.saveDraft(
       sessionId: vm.sessionId,
       nodeId: vm.nodeId,
@@ -340,6 +349,18 @@ class _SessionScreenState extends State<SessionScreen> {
             onPressed: () => _showSocraticHint(context, viewModel),
           ),
           IconButton(
+            key: const Key('session_misconception_profiler_button'),
+            icon: const Icon(Icons.account_tree_outlined, color: Color(0xFF38BDF8)),
+            tooltip: 'Hata Ağacı & Yanılgı Teşhisi',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const MisconceptionProfilerScreen(),
+                ),
+              );
+            },
+          ),
+          IconButton(
             key: const Key('open_living_notes_button'),
             icon: const Icon(Icons.menu_book_rounded, color: Color(0xFF38BDF8)),
             tooltip: '📚 Yaşayan Ders Notları',
@@ -362,24 +383,28 @@ class _SessionScreenState extends State<SessionScreen> {
 
   Widget _buildEmptyState(SessionViewModel viewModel) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.edit_note_rounded, size: 56, color: AppColors.textMuted.withValues(alpha: 0.5)),
-            const SizedBox(height: 12),
-            const Text(
-              'Çözüm Tahtası Hazır',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Aşağıdaki matematik touchpadini kullanarak ilk adımı atın.\nÖrn: ${viewModel.targetEquation}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: AppColors.textMuted),
-            ),
-          ],
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.edit_note_rounded, size: 56, color: AppColors.textMuted.withValues(alpha: 0.5)),
+              const SizedBox(height: 12),
+              const Text(
+                'Çözüm Tahtası Hazır',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Aşağıdaki matematik touchpadini kullanarak ilk adımı atın.\nÖrn: ${viewModel.targetEquation}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 14, color: AppColors.textMuted),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -493,6 +518,59 @@ class _SessionScreenState extends State<SessionScreen> {
                       fontStyle: FontStyle.italic,
                       color: AppColors.accentCorrect,
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton.icon(
+                        key: Key('view_in_misconception_tree_button_${step.stepNumber}'),
+                        icon: const Icon(Icons.account_tree_outlined, size: 14),
+                        label: const Text(
+                          "Hata Ağacı",
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF38BDF8),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          backgroundColor: const Color(0xFF38BDF8).withValues(alpha: 0.08),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const MisconceptionProfilerScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton.icon(
+                        key: Key('talk_to_socratic_tutor_button_${step.stepNumber}'),
+                        icon: const Icon(Icons.chat_bubble_outline, size: 14),
+                        label: const Text(
+                          "💬 Sokratik Öğretmenle Konuş",
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.accentPrimary,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          backgroundColor: AppColors.accentPrimary.withValues(alpha: 0.08),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () {
+                          InteractiveSocraticChatDialog.show(
+                            context,
+                            targetEquation: viewModel.targetEquation,
+                            diagnosticBug: step.detectedBug,
+                            userExpression: step.userExpression,
+                            onApplyCorrectedStep: (corrected) {
+                              _inputController.text = corrected;
+                            },
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),

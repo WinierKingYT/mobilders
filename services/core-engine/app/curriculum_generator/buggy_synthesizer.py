@@ -13,7 +13,7 @@ class TopicBuggySynthesizer:
 
     @staticmethod
     def get_buggy_rules_for_topic(topic: str) -> List[Dict[str, Any]]:
-        t = topic.upper()
+        t = (topic or "").strip().upper()
         if "LOG" in t:
             return TopicBuggySynthesizer._logarithm_buggy_rules()
         elif "TRIG" in t:
@@ -139,14 +139,16 @@ class TopicBuggySynthesizer:
 
     @staticmethod
     def _generic_advanced_buggy_rules(topic: str) -> List[Dict[str, Any]]:
+        clean_topic = (topic or "MATH").strip()[:30]
+        prefix = "".join(c for c in clean_topic if c.isalnum())[:4].upper() or "MATH"
         return [
             {
-                "bug_id": f"BUG-{topic[:4].upper()}-01",
-                "name": f"{topic} Distributive Fallacy",
+                "bug_id": f"BUG-{prefix}-01",
+                "name": f"{clean_topic} Distributive Fallacy",
                 "category": "LINEARITY_FALLACY",
-                "flawed_rule": f"f(x + y) = f(x) + f(y) for non-linear {topic}",
+                "flawed_rule": f"f(x + y) = f(x) + f(y) for non-linear {clean_topic}",
                 "correct_rule": "Fonksiyonel bağıntılar ve tanım kuralları uygulanmalıdır.",
-                "description": f"{topic} konusunda doğrusal olmayan fonksiyonun toplama üzerine dağıldığı yanılgısı.",
+                "description": f"{clean_topic} konusunda doğrusal olmayan fonksiyonun toplama üzerine dağıldığı yanılgısı.",
                 "remediation_directive": "Temel tanım ve özellikleri adım adım yazdırarak teyit et.",
             }
         ]

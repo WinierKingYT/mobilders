@@ -48,10 +48,9 @@ class ClassroomAnalyticsReporter:
         self, cohort_id: str, student_count: int = 28
     ) -> ClassroomAnalyticsResponse:
         """Generates cohort analytics report for teachers with Zero-PII."""
-        # Simulated or aggregated distribution of student ZPD frontiers across core nodes
-        # Deterministic seed based on cohort_id to allow stable assertions and dynamic variation
-        seed = abs(hash(cohort_id)) % 1000
-        total_students = max(10, student_count)
+        safe_cohort_id = str(cohort_id).strip()[:100] if cohort_id else "cohort_default"
+        seed = abs(hash(safe_cohort_id)) % 1000
+        total_students = max(10, min(int(student_count) if isinstance(student_count, (int, float)) and math.isfinite(student_count) else 28, 10_000))
 
         # Distribute students across frontier ZPD nodes
         core_nodes = ["N06", "N08", "N10", "N12", "N14", "N15", "N18", "N20", "N22", "N24"]

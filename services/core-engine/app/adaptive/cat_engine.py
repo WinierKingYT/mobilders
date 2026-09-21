@@ -379,6 +379,8 @@ class CATEngine:
 
             delta = f_prime / f_double_prime
             theta -= delta
+            # Sayısal kararlılık için theta [-4.0, 4.0] aralığında tutulur
+            theta = max(-4.0, min(4.0, theta))
 
             if abs(delta) < 1e-4:
                 break
@@ -391,7 +393,7 @@ class CATEngine:
             item = self.item_pool[item_id]
             total_info += self.fisher_information(theta, item.discrimination_a, item.difficulty_b)
 
-        standard_error = 1.0 / math.sqrt(total_info)
+        standard_error = 1.0 / math.sqrt(max(total_info, 1e-6))
         return theta, standard_error
 
     def select_next_item(
@@ -423,13 +425,31 @@ class CATEngine:
         return best_item
 
     def is_test_complete(
-        self, administered_responses: List[Tuple[str, bool]], current_se: float, max_items: int = 8, target_se: float = 0.35
+        self,
+        administered_responses: List[Tuple[str, bool]],
+        current_se: float,
+        max_items: int = 8,
+        target_se: float = 0.35,
+        min_items: int = 3,
+        min_information: Optional[float] = None,
     ) -> bool:
-        """Durdurma kuralı: SE <= 0.35 veya maksimum soru sayısına ulaşıldı."""
+        """
+        CAT Durdurma Kuralı (Stopping Rules):
+        1. Maksimum soru sayısına ulaşıldıysa testi sonlandır (len >= max_items).
+        2. Minimum soru sayısı sağlandıktan sonra (len >= min_items):
+           - Standart hata hedefe ulaştıysa (current_se <= target_se) VEYA
+           - Toplam Fisher bilgisi hedefe ulaştıysa (current_info >= target_info).
+        """
         if len(administered_responses) >= max_items:
             return True
-        if len(administered_responses) >= 3 and current_se <= target_se:
-            return True
+
+        target_info = min_information if min_information is not None else (1.0 / (target_se ** 2))
+        current_info = 1.0 / (current_se ** 2) if current_se > 0 else float("inf")
+
+        if len(administered_responses) >= min_items:
+            if current_se <= target_se or current_info >= target_info:
+                return True
+
         return False
 
     def seed_knowledge_dag(self, theta_hat: float) -> Dict[str, float]:

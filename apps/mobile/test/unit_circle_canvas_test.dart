@@ -4,14 +4,11 @@ import 'package:personal_learning_engine/ui/features/session/views/unit_circle_c
 
 void main() {
   testWidgets('UnitCircleCanvas renders header, canvas, slider, and quadrant badge', (tester) async {
-    double selectedAngle = 45.0;
-
     await tester.pumpWidget(
-      MaterialApp(
+      const MaterialApp(
         home: Scaffold(
           body: UnitCircleCanvas(
             initialAngle: 45.0,
-            onAngleChanged: (val) => selectedAngle = val,
           ),
         ),
       ),

@@ -31,5 +31,33 @@ void main() {
       wsService.sendHintRequest('x(x+6) = 2');
       expect(wsService.queuedEventsCount, equals(3));
     });
+
+    test('sendStepSubmit and sendHintRequest preserve custom targetEquation', () {
+      wsService.sendStepSubmit(
+        rawLatex: 'x^2 + 5x + 6 = 0',
+        previousStep: 'x^2 + 5x = -6',
+        latencyMs: 1200,
+        targetEquation: 'x**2 + 5*x + 6 = 0',
+      );
+      expect(wsService.queuedEventsCount, equals(1));
+
+      wsService.sendHintRequest(
+        'x^2 + 5x',
+        targetEquation: 'x**2 + 5*x + 6 = 0',
+      );
+      expect(wsService.queuedEventsCount, equals(2));
+    });
+
+    test('disconnect and multiple dispose calls are idempotent and safe', () {
+      expect(() => wsService.disconnect(), returnsNormally);
+      expect(() => wsService.dispose(), returnsNormally);
+      expect(() => wsService.dispose(), returnsNormally);
+      expect(wsService.isConnected, isFalse);
+    });
+
+    test('affectiveAlerts stream is accessible and emits broadcast events', () {
+      expect(wsService.affectiveAlerts, isNotNull);
+      expect(wsService.affectiveAlerts.isBroadcast, isTrue);
+    });
   });
 }

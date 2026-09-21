@@ -18,6 +18,8 @@ def factorial(n: int) -> int:
     """Faktöriyel hesabı: n! = n * (n-1) * ... * 1, 0! = 1."""
     if n < 0:
         raise ValueError(f"Negatif sayıların faktöriyeli tanımlı değildir: {n}")
+    if n > 10000:
+        raise ValueError(f"Faktöriyel için n en fazla 10000 olabilir: {n}")
     return math.factorial(n)
 
 
@@ -28,6 +30,8 @@ def permutation(n: int, r: int) -> int:
     """
     if n < 0 or r < 0:
         raise ValueError(f"n ve r negatif olamaz: n={n}, r={r}")
+    if n > 10000 or r > 10000:
+        raise ValueError(f"n ve r en fazla 10000 olabilir: n={n}, r={r}")
     if r > n:
         return 0
     return math.perm(n, r)
@@ -40,6 +44,8 @@ def circular_permutation(n: int) -> int:
     """
     if n <= 0:
         raise ValueError(f"Dairesel dizilim için eleman sayısı pozitif olmalıdır: {n}")
+    if n > 10000:
+        raise ValueError(f"Dairesel dizilim için n en fazla 10000 olabilir: {n}")
     return factorial(n - 1)
 
 
@@ -50,6 +56,8 @@ def repeated_permutation(n: int, counts: List[int]) -> int:
     """
     if n < 0:
         raise ValueError(f"n negatif olamaz: {n}")
+    if n > 10000:
+        raise ValueError(f"n en fazla 10000 olabilir: {n}")
     if sum(counts) != n:
         raise ValueError(f"Grup eleman sayıları toplamı ({sum(counts)}) n'e ({n}) eşit olmalıdır!")
     for c in counts:
@@ -70,6 +78,8 @@ def combination(n: int, r: int) -> int:
     """
     if n < 0 or r < 0:
         raise ValueError(f"n ve r negatif olamaz: n={n}, r={r}")
+    if n > 10000 or r > 10000:
+        raise ValueError(f"n ve r en fazla 10000 olabilir: n={n}, r={r}")
     if r > n:
         return 0
     return math.comb(n, r)
@@ -79,6 +89,8 @@ def pascal_row(n: int) -> List[int]:
     """Pascal üçgeninin n. satırını [C(n, 0), C(n, 1), ..., C(n, n)] döndürür."""
     if n < 0:
         raise ValueError(f"Satır indeksi negatif olamaz: {n}")
+    if n > 1000:
+        raise ValueError(f"Pascal satırı için n en fazla 1000 olabilir: {n}")
     return [combination(n, r) for r in range(n + 1)]
 
 
@@ -96,8 +108,12 @@ def binomial_term(n: int, r: int, a: float = 1.0, b: float = 1.0) -> Dict[str, A
     (a*x + b*y)^n açılımında baştan (r + 1). terimin katsayısı ve dereceleri:
     T_(r+1) = C(n, r) * a^(n-r) * b^r * x^(n-r) * y^r.
     """
+    if not (math.isfinite(a) and math.isfinite(b)):
+        raise ValueError("Katsayılar 'a' ve 'b' sonlu reel sayılar olmalıdır.")
     if n < 0 or r < 0 or r > n:
         raise ValueError(f"Geçersiz binom terim indeksleri: n={n}, r={r}")
+    if n > 1000:
+        raise ValueError(f"Binom açılımı için n en fazla 1000 olabilir: {n}")
 
     comb_coeff = combination(n, r)
     numeric_coeff = comb_coeff * (a ** (n - r)) * (b ** r)
@@ -148,7 +164,7 @@ def classical_probability(favorable: int, sample_space: int) -> float:
 
 def complement_probability(p_a: float) -> float:
     """Tümleyen olasılık: P(A') = 1 - P(A)."""
-    if not (0.0 <= p_a <= 1.0):
+    if not math.isfinite(p_a) or not (0.0 <= p_a <= 1.0):
         raise ValueError(f"Olasılık değeri [0, 1] aralığında olmalıdır: {p_a}")
     return 1.0 - p_a
 
@@ -160,7 +176,7 @@ def union_probability(p_a: float, p_b: float, p_intersection: float = 0.0) -> fl
     Ayrık olaylarda P(A ∩ B) = 0.
     """
     for name, p in [("P(A)", p_a), ("P(B)", p_b), ("P(A∩B)", p_intersection)]:
-        if not (0.0 <= p <= 1.0):
+        if not math.isfinite(p) or not (0.0 <= p <= 1.0):
             raise ValueError(f"{name} değeri [0, 1] aralığında olmalıdır: {p}")
     if p_intersection > min(p_a, p_b):
         raise ValueError(f"Kesişim olasılığı ({p_intersection}) P(A) ({p_a}) ve P(B) ({p_b})'den büyük olamaz!")
@@ -173,9 +189,9 @@ def conditional_probability(p_intersection: float, p_condition: float) -> float:
     """
     Koşullu olasılık: P(A|B) = P(A ∩ B) / P(B).
     """
-    if p_condition <= 0.0 or p_condition > 1.0:
+    if not math.isfinite(p_condition) or p_condition <= 0.0 or p_condition > 1.0:
         raise ValueError(f"Koşul olasılığı (0, 1] aralığında olmalıdır: {p_condition}")
-    if p_intersection < 0.0 or p_intersection > p_condition:
+    if not math.isfinite(p_intersection) or p_intersection < 0.0 or p_intersection > p_condition:
         raise ValueError(f"P(A ∩ B) ({p_intersection}) değeri [0, P(B)={p_condition}] aralığında olmalıdır!")
     return p_intersection / p_condition
 
@@ -184,6 +200,8 @@ def bayes_theorem(prior_b: float, likelihood_a_given_b: float, marginal_a: float
     """
     Bayes Teoremi: P(B|A) = (P(A|B) * P(B)) / P(A).
     """
+    if not (math.isfinite(prior_b) and math.isfinite(likelihood_a_given_b) and math.isfinite(marginal_a)):
+        raise ValueError("Olasılık parametreleri sonlu reel sayılar olmalıdır.")
     if marginal_a <= 0.0:
         raise ValueError(f"Marjinal kanıt olasılığı P(A) pozitif olmalıdır: {marginal_a}")
     numerator = likelihood_a_given_b * prior_b
@@ -200,6 +218,8 @@ def bayes_multi_hypothesis(priors: List[float], likelihoods: List[float], target
         raise ValueError("Priors ve likelihoods listeleri eşit uzunlukta olmalıdır.")
     if not (0 <= target_index < len(priors)):
         raise IndexError(f"Geçersiz hedef hipotez indeksi: {target_index}")
+    if not (all(math.isfinite(p) for p in priors) and all(math.isfinite(l) for l in likelihoods)):
+        raise ValueError("Önsel ve olabilirlik değerleri sonlu reel sayılar olmalıdır.")
     if abs(sum(priors) - 1.0) > 1e-4:
         raise ValueError(f"Önsel olasılıklar (priors) toplamı 1 olmalıdır: {sum(priors)}")
 
@@ -227,6 +247,8 @@ def discrete_expected_value(values: List[float], probabilities: List[float]) -> 
     """
     if len(values) != len(probabilities):
         raise ValueError("Değerler ve olasılıklar eşit sayıda olmalıdır.")
+    if not all(math.isfinite(x) for x in values) or not all(math.isfinite(p) for p in probabilities):
+        raise ValueError("Tüm değerler ve olasılıklar sonlu reel sayılar olmalıdır.")
     if abs(sum(probabilities) - 1.0) > 1e-4:
         raise ValueError(f"Olasılıklar toplamı 1 olmalıdır: {sum(probabilities)}")
 
@@ -256,6 +278,8 @@ def mean(data: List[float]) -> float:
     """Aritmetik ortalama: sum(x) / n."""
     if not data:
         raise ValueError("Veri kümesi boş olamaz.")
+    if not all(math.isfinite(x) for x in data):
+        raise ValueError("Veri kümesindeki tüm elemanlar sonlu reel sayılar olmalıdır.")
     return sum(data) / len(data)
 
 
@@ -263,6 +287,8 @@ def median(data: List[float]) -> float:
     """Medyan (ortanca değer)."""
     if not data:
         raise ValueError("Veri kümesi boş olamaz.")
+    if not all(math.isfinite(x) for x in data):
+        raise ValueError("Veri kümesindeki tüm elemanlar sonlu reel sayılar olmalıdır.")
     s = sorted(data)
     n = len(s)
     mid = n // 2
@@ -275,6 +301,8 @@ def mode(data: List[float]) -> List[float]:
     """Mod (tepe değer) - en çok tekrar eden değer(ler)."""
     if not data:
         raise ValueError("Veri kümesi boş olamaz.")
+    if not all(math.isfinite(x) for x in data):
+        raise ValueError("Veri kümesindeki tüm elemanlar sonlu reel sayılar olmalıdır.")
     counts: Dict[float, int] = {}
     for x in data:
         counts[x] = counts.get(x, 0) + 1
@@ -286,6 +314,8 @@ def data_range(data: List[float]) -> float:
     """Açıklık (range): max(x) - min(x)."""
     if not data:
         raise ValueError("Veri kümesi boş olamaz.")
+    if not all(math.isfinite(x) for x in data):
+        raise ValueError("Veri kümesindeki tüm elemanlar sonlu reel sayılar olmalıdır.")
     return max(data) - min(data)
 
 
@@ -299,6 +329,8 @@ def variance(data: List[float], is_sample: bool = True) -> float:
         raise ValueError("Örneklem varyansı için en az 2 veri noktası gereklidir.")
     if not is_sample and n < 1:
         raise ValueError("Popülasyon varyansı için en az 1 veri noktası gereklidir.")
+    if not all(math.isfinite(x) for x in data):
+        raise ValueError("Veri kümesindeki tüm elemanlar sonlu reel sayılar olmalıdır.")
 
     m = mean(data)
     sq_diff_sum = sum((x - m) ** 2 for x in data)
@@ -317,6 +349,8 @@ def quartiles_and_iqr(data: List[float]) -> Dict[str, Any]:
     """
     if len(data) < 4:
         raise ValueError("Çeyrekler hesabı için en az 4 veri noktası gereklidir.")
+    if not all(math.isfinite(x) for x in data):
+        raise ValueError("Veri kümesindeki tüm elemanlar sonlu reel sayılar olmalıdır.")
     s = sorted(data)
     n = len(s)
     q2 = median(s)
@@ -351,6 +385,8 @@ def quartiles_and_iqr(data: List[float]) -> Dict[str, Any]:
 
 def z_score(x: float, mu: float, sigma: float) -> float:
     """Z-Puanı standartlaştırması: z = (x - mu) / sigma."""
+    if not (math.isfinite(x) and math.isfinite(mu) and math.isfinite(sigma)):
+        raise ValueError("Tüm parametreler sonlu reel sayılar olmalıdır.")
     if sigma <= 0:
         raise ValueError(f"Standart sapma pozitif olmalıdır: {sigma}")
     return (x - mu) / sigma
@@ -358,6 +394,8 @@ def z_score(x: float, mu: float, sigma: float) -> float:
 
 def t_score(z: float) -> float:
     """T-Puanı dönüşümü: T = 10 * z + 50."""
+    if not math.isfinite(z):
+        raise ValueError("z değeri sonlu bir reel sayı olmalıdır.")
     return 10.0 * z + 50.0
 
 
@@ -368,6 +406,8 @@ def empirical_rule_intervals(mu: float, sigma: float) -> Dict[str, Tuple[float, 
     - %95.45: [mu - 2*sigma, mu + 2*sigma]
     - %99.73: [mu - 3*sigma, mu + 3*sigma]
     """
+    if not (math.isfinite(mu) and math.isfinite(sigma)):
+        raise ValueError("mu ve sigma sonlu reel sayılar olmalıdır.")
     if sigma <= 0:
         raise ValueError("Standart sapma pozitif olmalıdır.")
     return {

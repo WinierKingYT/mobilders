@@ -1,8 +1,11 @@
 import ast
+from collections import OrderedDict
+import concurrent.futures
 import time
 from typing import Tuple, Optional, Set, Any
 import sympy as sp
 from app.cas.preprocessor import ImplicitMultiplicationPreprocessor
+from app.core.config import settings
 
 
 class SecurityViolationError(Exception):
@@ -10,14 +13,19 @@ class SecurityViolationError(Exception):
     pass
 
 
+class CASTimeoutError(Exception):
+    """CAS sembolik hesaplama zaman aşımına uğradığında fırlatılır."""
+    pass
+
+
 class SymbolicEquivalenceEngine:
     """
     Kuadratik denklemlerde öğrencinin yazdığı adımları
     SymPy kullanarak cebirsel olarak doğrular.
-    eval() ve exec() kullanmaz; katı AST beyaz liste denetimi uygular.
+    eval() ve exec() kullanmaz; katı AST beyaz liste denetimi ve zaman aşımı koruması uygular.
     """
 
-    MAX_AST_DEPTH = 15
+    MAX_CACHE_SIZE = 2048
     ALLOWED_VARIABLES = {
         "x", "y", "z", "a", "b", "c", "k", "n", "m", "r", "p", "q", "d", "Delta", "P", "Q", "R",
         "theta", "alpha", "beta", "pi", "e",
@@ -32,7 +40,15 @@ class SymbolicEquivalenceEngine:
         "integrate", "Integral"
     }
 
-    def __init__(self):
+    def __init__(
+        self,
+        timeout_ms: Optional[int] = None,
+        max_ast_depth: Optional[int] = None,
+    ):
+        self.timeout_ms = timeout_ms if timeout_ms is not None else settings.CAS_TIMEOUT_MS
+        self.max_ast_depth = max_ast_depth if max_ast_depth is not None else settings.MAX_AST_DEPTH
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+
         # SymPy sembolleri
         self.symbols = {name: sp.Symbol(name) for name in self.ALLOWED_VARIABLES}
         self.symbols["pi"] = sp.pi
@@ -65,7 +81,7 @@ class SymbolicEquivalenceEngine:
         self.symbols["Integral"] = sp.Integral
 
         # Eşdeğerlik LRU önbelleği (Tekrar eden adımlarda <0.1ms hızlı yol)
-        self._cache: dict = {}
+        self._cache: OrderedDict[Tuple[str, str], Tuple[bool, Optional[str]]] = OrderedDict()
 
         # SymPy soğuk başlangıç (cold-start) gecikmesini önlemek için motoru ısıt (warm-up)
         try:
@@ -73,6 +89,38 @@ class SymbolicEquivalenceEngine:
             _ = sp.simplify(self.symbols["x"] - self.symbols["x"])
         except Exception:
             pass
+
+    def shutdown(self, wait: bool = False) -> None:
+        """Kapatma sırasında iş parçacığı havuzunu temizler."""
+        if hasattr(self, "_executor") and self._executor:
+            try:
+                self._executor.shutdown(wait=wait, cancel_futures=True)
+            except Exception:
+                pass
+
+    def __del__(self) -> None:
+        try:
+            self.shutdown(wait=False)
+        except Exception:
+            pass
+
+    def __enter__(self) -> "SymbolicEquivalenceEngine":
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.shutdown(wait=False)
+
+    def _cache_get(self, key: Tuple[str, str]) -> Optional[Tuple[bool, Optional[str]]]:
+        if key in self._cache:
+            self._cache.move_to_end(key)
+            return self._cache[key]
+        return None
+
+    def _cache_put(self, key: Tuple[str, str], val: Tuple[bool, Optional[str]]) -> None:
+        self._cache[key] = val
+        self._cache.move_to_end(key)
+        if len(self._cache) > self.MAX_CACHE_SIZE:
+            self._cache.popitem(last=False)
 
 
     def sanitize_and_validate_ast(self, raw_str: str) -> None:
@@ -82,6 +130,12 @@ class SymbolicEquivalenceEngine:
         """
         # Örtük çarpma ve mobil doğal sözdizimi ön-işlemesi
         normalized = ImplicitMultiplicationPreprocessor.preprocess(raw_str)
+
+        # DoS guard: reject expressions with extreme parenthesis depth before calling ast.parse
+        if normalized.count("(") > self.max_ast_depth or normalized.count(")") > self.max_ast_depth:
+            raise SecurityViolationError(
+                f"Aşırı parantez derinliği tespit edildi (> {self.max_ast_depth})"
+            )
 
         # Eşittir işaretini geçici olarak kaldırıp iki tarafı ayrı parse et
         parts = normalized.split("=")
@@ -93,13 +147,15 @@ class SymbolicEquivalenceEngine:
                 tree = ast.parse(part, mode="eval")
             except SyntaxError as e:
                 raise ValueError(f"Sözdizimi hatası: {e}")
+            except RecursionError:
+                raise SecurityViolationError("Aşırı parantez derinliği veya döngüsel sözdizimi (RecursionError)")
 
             # Derinlik ve düğüm denetimi
             self._check_ast_safety(tree, current_depth=0)
 
     def _check_ast_safety(self, node: ast.AST, current_depth: int) -> None:
-        if current_depth > self.MAX_AST_DEPTH:
-            raise SecurityViolationError(f"AST derinlik sınırı aşıldı (> {self.MAX_AST_DEPTH})")
+        if current_depth > self.max_ast_depth:
+            raise SecurityViolationError(f"AST derinlik sınırı aşıldı (> {self.max_ast_depth})")
 
         # İzin verilen düğüm türleri
         allowed_types = (
@@ -154,8 +210,31 @@ class SymbolicEquivalenceEngine:
         else:
             return sp.sympify(expr_str, locals=self.symbols)
 
-    def verify_equivalence(
+    def _compute_equivalence(
         self, user_expr_str: str, target_expr_str: str
+    ) -> Tuple[bool, Optional[str]]:
+        user_expr = self.parse_to_sympy(user_expr_str)
+        target_expr = self.parse_to_sympy(target_expr_str)
+
+        # 1. Doğrudan fark testi: user_expr - target_expr == 0 ?
+        diff = sp.simplify(user_expr - target_expr)
+        if diff == 0:
+            return True, "0"
+
+        # 2. Skaler kat denklem eşdeğerliği (c * target_expr == user_expr, c != 0)
+        # Yalnızca denklemlerde (LHS = RHS) geçerlidir; türev veya fonksiyon değerlerinde skaler kat eşit kabul edilemez.
+        if ("=" in user_expr_str or "=" in target_expr_str) and target_expr != 0 and user_expr != 0:
+            try:
+                ratio = sp.simplify(user_expr / target_expr)
+                if ratio.is_number and ratio != 0:
+                    return True, "0"
+            except Exception:
+                pass
+
+        return False, str(diff)
+
+    def verify_equivalence(
+        self, user_expr_str: str, target_expr_str: str, timeout_ms: Optional[int] = None
     ) -> Tuple[bool, float, Optional[str]]:
         """
         Kullanıcı ifadesinin hedef ifadeyle cebirsel olarak eşdeğer olup olmadığını doğrular.
@@ -163,44 +242,31 @@ class SymbolicEquivalenceEngine:
         """
         start_time = time.perf_counter()
         cache_key = (user_expr_str.strip(), target_expr_str.strip())
-        if cache_key in self._cache:
-            is_eq, diff_repr = self._cache[cache_key]
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            is_eq, diff_repr = cached
             elapsed_ms = (time.perf_counter() - start_time) * 1000.0
             return is_eq, elapsed_ms, diff_repr
 
+        effective_timeout_ms = timeout_ms if timeout_ms is not None else self.timeout_ms
+        timeout_sec = (effective_timeout_ms / 1000.0) if effective_timeout_ms and effective_timeout_ms > 0 else None
+
         try:
-            user_expr = self.parse_to_sympy(user_expr_str)
-            target_expr = self.parse_to_sympy(target_expr_str)
-
-            # 1. Doğrudan fark testi: user_expr - target_expr == 0 ?
-            diff = sp.simplify(user_expr - target_expr)
-            if diff == 0:
-                elapsed_ms = (time.perf_counter() - start_time) * 1000.0
-                if len(self._cache) > 2048:
-                    self._cache.clear()
-                self._cache[cache_key] = (True, "0")
-                return True, elapsed_ms, "0"
-
-            # 2. Skaler kat denklem eşdeğerliği (c * target_expr == user_expr, c != 0)
-            # Yalnızca denklemlerde (LHS = RHS) geçerlidir; türev veya fonksiyon değerlerinde skaler kat eşit kabul edilemez.
-            if ("=" in user_expr_str or "=" in target_expr_str) and target_expr != 0 and user_expr != 0:
+            if timeout_sec is not None:
+                future = self._executor.submit(self._compute_equivalence, user_expr_str, target_expr_str)
                 try:
-                    ratio = sp.simplify(user_expr / target_expr)
-                    if ratio.is_number and ratio != 0:
-                        elapsed_ms = (time.perf_counter() - start_time) * 1000.0
-                        if len(self._cache) > 2048:
-                            self._cache.clear()
-                        self._cache[cache_key] = (True, "0")
-                        return True, elapsed_ms, "0"
-                except Exception:
-                    pass
+                    is_equiv, diff_str = future.result(timeout=timeout_sec)
+                except concurrent.futures.TimeoutError:
+                    elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+                    raise CASTimeoutError(
+                        f"CAS sembolik doğrulama {effective_timeout_ms}ms zaman aşımına uğradı."
+                    )
+            else:
+                is_equiv, diff_str = self._compute_equivalence(user_expr_str, target_expr_str)
 
             elapsed_ms = (time.perf_counter() - start_time) * 1000.0
-            diff_str = str(diff)
-            if len(self._cache) > 2048:
-                self._cache.clear()
-            self._cache[cache_key] = (False, diff_str)
-            return False, elapsed_ms, diff_str
+            self._cache_put(cache_key, (is_equiv, diff_str))
+            return is_equiv, elapsed_ms, diff_str
         except Exception as e:
             elapsed_ms = (time.perf_counter() - start_time) * 1000.0
             raise e

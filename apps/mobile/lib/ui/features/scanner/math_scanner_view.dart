@@ -190,6 +190,22 @@ class _MathScannerViewState extends State<MathScannerView> with SingleTickerProv
   }
 
   @override
+  void didUpdateWidget(covariant MathScannerView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_hasScanned && !_isProcessing) {
+      if (oldWidget.initialProblem != widget.initialProblem) {
+        _currentProblem = widget.initialProblem;
+      }
+      if (oldWidget.dagNodeId != widget.dagNodeId) {
+        _currentDagNodeId = widget.dagNodeId;
+      }
+      if (oldWidget.dagNodeTitle != widget.dagNodeTitle) {
+        _currentDagNodeTitle = widget.dagNodeTitle;
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _scanController.dispose();
     super.dispose();

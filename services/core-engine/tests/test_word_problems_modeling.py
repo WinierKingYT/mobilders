@@ -693,3 +693,31 @@ def test_scaffold_all_ten_bug_prob_remediations(scaffold_engine):
         combined = (bug.remediation_directive + " " + bug.description).lower()
         assert keyword in combined, f"Keyword '{keyword}' not in combined text: {combined}"
 
+
+def test_scaffold_stage_2_rejects_nonequivalent_equation(scaffold_engine):
+    """Kanonik denkleme denk olmayan keyfi denklemler Aşama 2'de kesinlikle reddedilmelidir."""
+    req = ScaffoldStepRequest(
+        session_id="test-sess-st2",
+        problem_id="PROB_AGE_01",
+        stage=ModelingStage.STAGE_2_EQUATION,
+        student_input="x = 999",
+    )
+    resp = scaffold_engine.evaluate_step(req)
+    assert resp.is_valid is False
+    assert resp.stage_completed is False
+    assert "uyuşmuyor" in resp.socratic_feedback.lower() or "gözden geçir" in resp.socratic_feedback.lower()
+
+
+def test_scaffold_stage_3_supports_arithmetic_expressions(scaffold_engine):
+    """Aşama 3'te öğrencinin girdiği basit kesirli/işlemli ifadeler (örn: 50 / 5) doğru değerlendirilmelidir."""
+    req = ScaffoldStepRequest(
+        session_id="test-sess-st3",
+        problem_id="PROB_AGE_01",
+        stage=ModelingStage.STAGE_3_SOLVE,
+        student_input="50 / 5",
+    )
+    resp = scaffold_engine.evaluate_step(req)
+    assert resp.is_valid is True
+    assert resp.stage_completed is True
+    assert resp.domain_valid is True
+

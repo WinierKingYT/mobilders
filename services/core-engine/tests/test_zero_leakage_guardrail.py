@@ -236,3 +236,28 @@ def test_guardrail_multivariable_and_latex_edge_cases():
     assert intercepted is True
     assert out == ZeroLeakageGuardrail.SAFE_FALLBACK_PROMPT
 
+
+def test_guardrail_malformed_and_none_roots():
+    """None veya sayısal olmayan köklerin guardrail'i çökertmediğini doğrular."""
+    out, intercepted = ZeroLeakageGuardrail.enforce_zero_leakage(
+        "Normal bir metin.",
+        solution_roots=[None, "invalid_str", complex(1, 2)],
+    )
+    assert intercepted is False
+
+    out, intercepted = ZeroLeakageGuardrail.enforce_zero_leakage(
+        "Burada x = 5 buluruz.",
+        solution_roots=[None, "gecersiz", 5],
+    )
+    assert intercepted is True
+
+
+def test_socratic_pipeline_resilient_fallback(pipeline):
+    """Boş girdi veya uç durumlarda SocraticPipeline'ın geçerli bir log ve socratic_ratio >= 2.0 döndüğünü doğrular."""
+    req = SocraticRequest(user_input="", target_equation="x**2 = 4")
+    log = pipeline.process(req)
+    assert log is not None
+    assert log.socratic_ratio >= 2.0
+    assert len(log.final_output) > 0
+
+

@@ -53,14 +53,19 @@ class ZeroLeakageGuardrail:
         # 1. Check against specific numerical roots of the active problem
         if solution_roots:
             for root in solution_roots:
+                if root is None:
+                    continue
                 try:
                     root_val = float(root)
                     if root_val.is_integer():
                         root_str = str(int(root_val))
                     else:
                         root_str = f"{root_val:.2f}"
-                except (ValueError, TypeError):
+                except (ValueError, TypeError, OverflowError):
                     root_str = str(root).strip()
+
+                if not root_str:
+                    continue
 
                 escaped = re.escape(root_str)
                 # Specific root leakage patterns
@@ -107,8 +112,13 @@ class ZeroLeakageGuardrail:
                     expr = sp.sympify(rhs)
                     val = float(expr.evalf())
                     for root in solution_roots:
-                        if abs(val - float(root)) < 1e-5:
-                            return True
+                        if root is None:
+                            continue
+                        try:
+                            if abs(val - float(root)) < 1e-5:
+                                return True
+                        except (ValueError, TypeError, OverflowError):
+                            continue
                 except Exception:
                     continue
         return False

@@ -117,7 +117,7 @@ class _CognitiveProfileHubScreenState extends State<CognitiveProfileHubScreen>
                 children: [
                   SwitchListTile(
                     value: sessionVm.isTunnelFocusMode,
-                    activeColor: const Color(0xFF38BDF8),
+                    activeThumbColor: const Color(0xFF38BDF8),
                     title: const Text(
                       'DEHB Tünel Odak Modu',
                       style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
@@ -134,7 +134,7 @@ class _CognitiveProfileHubScreenState extends State<CognitiveProfileHubScreen>
                   const Divider(color: Color(0xFF334155), height: 1),
                   SwitchListTile(
                     value: sessionVm.isDyscalculiaHelper,
-                    activeColor: const Color(0xFF10B981),
+                    activeThumbColor: const Color(0xFF10B981),
                     title: const Text(
                       'Diskalkuli Görsel Desteği',
                       style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
@@ -168,45 +168,33 @@ class _CognitiveProfileHubScreenState extends State<CognitiveProfileHubScreen>
                 border: Border.all(color: const Color(0xFF334155)),
               ),
               padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  RadioListTile<InputMode>(
-                    value: InputMode.touchpad,
-                    groupValue: sessionVm.inputMode,
-                    activeColor: const Color(0xFF38BDF8),
-                    title: const Text('Touchpad (Dokunmatik Matematik Tuşları)', style: TextStyle(color: Colors.white, fontSize: 13)),
-                    onChanged: (mode) {
-                      if (mode != null) {
-                        HapticFeedbackService().modeSwitch();
-                        sessionVm.setInputMode(mode);
-                      }
-                    },
-                  ),
-                  RadioListTile<InputMode>(
-                    value: InputMode.virtualKeyboard,
-                    groupValue: sessionVm.inputMode,
-                    activeColor: const Color(0xFF38BDF8),
-                    title: const Text('Klavye / LaTeX Doğrudan Giriş', style: TextStyle(color: Colors.white, fontSize: 13)),
-                    onChanged: (mode) {
-                      if (mode != null) {
-                        HapticFeedbackService().modeSwitch();
-                        sessionVm.setInputMode(mode);
-                      }
-                    },
-                  ),
-                  RadioListTile<InputMode>(
-                    value: InputMode.inkingCanvas,
-                    groupValue: sessionVm.inputMode,
-                    activeColor: const Color(0xFF38BDF8),
-                    title: const Text('Vektör Çizim (İnk Tuvali)', style: TextStyle(color: Colors.white, fontSize: 13)),
-                    onChanged: (mode) {
-                      if (mode != null) {
-                        HapticFeedbackService().modeSwitch();
-                        sessionVm.setInputMode(mode);
-                      }
-                    },
-                  ),
-                ],
+              child: RadioGroup<InputMode>(
+                groupValue: sessionVm.inputMode,
+                onChanged: (mode) {
+                  if (mode != null) {
+                    HapticFeedbackService().modeSwitch();
+                    sessionVm.setInputMode(mode);
+                  }
+                },
+                child: const Column(
+                  children: [
+                    RadioListTile<InputMode>(
+                      value: InputMode.touchpad,
+                      activeColor: Color(0xFF38BDF8),
+                      title: Text('Touchpad (Dokunmatik Matematik Tuşları)', style: TextStyle(color: Colors.white, fontSize: 13)),
+                    ),
+                    RadioListTile<InputMode>(
+                      value: InputMode.virtualKeyboard,
+                      activeColor: Color(0xFF38BDF8),
+                      title: Text('Klavye / LaTeX Doğrudan Giriş', style: TextStyle(color: Colors.white, fontSize: 13)),
+                    ),
+                    RadioListTile<InputMode>(
+                      value: InputMode.inkingCanvas,
+                      activeColor: Color(0xFF38BDF8),
+                      title: Text('Vektör Çizim (İnk Tuvali)', style: TextStyle(color: Colors.white, fontSize: 13)),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 20),

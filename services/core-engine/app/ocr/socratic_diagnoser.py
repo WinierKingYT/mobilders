@@ -67,8 +67,27 @@ class SocraticNotebookDiagnoser:
                 confidence=0.0,
             )
 
-        problem_raw = target_problem or segmented_lines[0]
-        steps_raw = segmented_lines[1:] if len(segmented_lines) > 1 else [segmented_lines[0]]
+        clean_lines = [str(line or "").strip() for line in segmented_lines if line is not None and str(line).strip()]
+        if not clean_lines:
+            return MathScanResponse(
+                problem_statement="Boş görüntü veya taranamadı",
+                dag_node_id="N01",
+                dag_node_title="Genel Matematik",
+                segmented_steps=[],
+                has_error=True,
+                error_step_index=None,
+                detected_bug_id=None,
+                socratic_hint="Görüntüde herhangi bir matematiksel adım tespit edilemedi. Lütfen soruyu daha net ve aydınlık bir ortamda tekrar fotoğraflayınız.",
+                is_zero_leakage_sanitized=True,
+                confidence=0.0,
+            )
+
+        # DoS guard: limit max steps to 50
+        if len(clean_lines) > 50:
+            clean_lines = clean_lines[:50]
+
+        problem_raw = target_problem or clean_lines[0]
+        steps_raw = clean_lines[1:] if len(clean_lines) > 1 else [clean_lines[0]]
 
         # 1. Map to Knowledge DAG Node
         node_id, node_title = self.vision.link_problem_to_dag_node(problem_raw)

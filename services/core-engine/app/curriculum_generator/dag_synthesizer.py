@@ -21,7 +21,8 @@ class AutonomousCurriculumSynthesizer:
     """End-to-end neuro-symbolic curriculum generator and formal verifier."""
 
     def synthesize(self, request: CurriculumSynthesizeRequest) -> SynthesizedCurriculumResponse:
-        topic = request.topic.strip().upper()
+        topic_raw = (request.topic or "GENERIC").strip()
+        topic = topic_raw[:100].upper()
 
         if "LOG" in topic:
             raw_nodes = self._build_logarithm_30_nodes()
@@ -75,13 +76,13 @@ class AutonomousCurriculumSynthesizer:
 
     def _assert_and_sort_dag(self, nodes: Dict[str, Dict[str, Any]]) -> List[str]:
         """Runs Kahn's algorithm to prove graph is cycle-free and returns topological sort."""
-        in_degree = {n_id: len(node["strict_prereqs"]) for n_id, node in nodes.items()}
+        in_degree = {n_id: len(set(node.get("strict_prereqs", []))) for n_id, node in nodes.items()}
         queue = [n_id for n_id, deg in in_degree.items() if deg == 0]
         sorted_nodes = []
 
         children_map: Dict[str, List[str]] = {n_id: [] for n_id in nodes}
         for n_id, node in nodes.items():
-            for p_id in node["strict_prereqs"]:
+            for p_id in set(node.get("strict_prereqs", [])):
                 if p_id not in nodes:
                     raise KeyError(f"Node {n_id} references undefined parent {p_id}")
                 children_map[p_id].append(n_id)
@@ -317,7 +318,8 @@ class AutonomousCurriculumSynthesizer:
 
     def _build_generic_30_nodes(self, topic: str) -> List[Dict[str, Any]]:
         """Fallback generator producing a certified 30-node DAG for any math topic."""
-        prefix = topic[:4].upper()
+        clean_topic = (topic or "MATH").strip()[:30]
+        prefix = "".join(c for c in clean_topic if c.isalnum())[:4].upper() or "MATH"
         nodes = []
         for i in range(1, 31):
             lvl = (i - 1) // 5
@@ -329,11 +331,11 @@ class AutonomousCurriculumSynthesizer:
             nodes.append({
                 "id": f"{prefix}-N{i:02d}",
                 "canonical_code": f"math.{prefix.lower()}.node_{i:02d}",
-                "title": f"{topic} Temel Düğüm {i:02d}",
+                "title": f"{clean_topic} Temel Düğüm {i:02d}",
                 "level": lvl,
                 "strict_prereqs": prereqs,
                 "default_difficulty_b": round(-2.0 + (i * 0.13), 2),
                 "discrimination_a": 1.9,
-                "description": f"{topic} pedagojik öğrenme kazanımı Seviye {lvl}.",
+                "description": f"{clean_topic} pedagojik öğrenme kazanımı Seviye {lvl}.",
             })
         return nodes

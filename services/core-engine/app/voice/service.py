@@ -31,9 +31,25 @@ class VoiceSocraticEngine:
     def process_voice_turn(self, request: VoiceSocraticRequest) -> VoiceSocraticResponse:
         t0 = time.perf_counter()
 
+        transcript = str(request.audio_transcript or "").strip()
+        if not transcript:
+            fallback_text = "Seni tam duyamadım. Tekrar söyler misin?"
+            audio_url = self._synthesize_audio_stream_uri(
+                text=fallback_text,
+                session_id=request.session_id,
+                language=request.language,
+            )
+            return VoiceSocraticResponse(
+                socratic_guidance_text=fallback_text,
+                audio_stream_url=audio_url,
+                zero_leakage_enforced=True,
+                socratic_ratio=1.0,
+                latency_ms=0.0,
+            )
+
         # 1. Forward spoken transcript into 4-Layer Socratic Pipeline
         socratic_req = SocraticRequest(
-            user_input=request.audio_transcript,
+            user_input=transcript[:1000],  # DoS guard
             target_equation=request.target_equation,
             previous_step=request.previous_step,
             solution_roots=request.solution_roots,

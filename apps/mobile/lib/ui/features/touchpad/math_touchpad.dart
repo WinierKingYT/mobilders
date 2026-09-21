@@ -29,6 +29,10 @@ class MathTouchpad extends StatelessWidget {
   void _insertText(String text) {
     HapticFeedbackService().keyPress();
     final value = controller.value;
+    // Guard against unbounded input length (> 500 characters)
+    if (value.text.length + text.length > 500) {
+      return;
+    }
     final selection = value.selection;
     final start = selection.start >= 0 ? selection.start : value.text.length;
     final end = selection.end >= 0 ? selection.end : value.text.length;
@@ -83,10 +87,11 @@ class MathTouchpad extends StatelessWidget {
         deleteLength = 3;
       }
 
-      final newText = value.text.replaceRange(start - deleteLength, start, '');
+      final safeStart = (start - deleteLength).clamp(0, value.text.length);
+      final newText = value.text.replaceRange(safeStart, start, '');
       controller.value = TextEditingValue(
         text: newText,
-        selection: TextSelection.collapsed(offset: start - deleteLength),
+        selection: TextSelection.collapsed(offset: safeStart),
       );
     }
   }

@@ -22,6 +22,22 @@ class Triangle2D:
         angle_B: Optional[float] = None,
         angle_C: Optional[float] = None,
     ):
+        for val, name in [(a, "a"), (b, "b"), (c, "c"), (angle_A, "angle_A"), (angle_B, "angle_B"), (angle_C, "angle_C")]:
+            if val is not None and not math.isfinite(val):
+                raise ValueError(f"{name} sonlu bir reel sayı olmalıdır.")
+        if a is not None and a <= 0:
+            raise ValueError("Kenar uzunluğu 'a' pozitif olmalıdır.")
+        if b is not None and b <= 0:
+            raise ValueError("Kenar uzunluğu 'b' pozitif olmalıdır.")
+        if c is not None and c <= 0:
+            raise ValueError("Kenar uzunluğu 'c' pozitif olmalıdır.")
+        if angle_A is not None and (angle_A <= 0 or angle_A >= 180):
+            raise ValueError("Açı 'angle_A' (0, 180) aralığında olmalıdır.")
+        if angle_B is not None and (angle_B <= 0 or angle_B >= 180):
+            raise ValueError("Açı 'angle_B' (0, 180) aralığında olmalıdır.")
+        if angle_C is not None and (angle_C <= 0 or angle_C >= 180):
+            raise ValueError("Açı 'angle_C' (0, 180) aralığında olmalıdır.")
+
         self.a = float(a) if a is not None else None
         self.b = float(b) if b is not None else None
         self.c = float(c) if c is not None else None

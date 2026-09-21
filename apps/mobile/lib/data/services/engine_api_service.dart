@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../../domain/models/solution_step.dart';
 import '../../domain/models/diagnostic_item.dart';
+import '../../domain/models/misconception_profile_model.dart';
+import '../../domain/models/twin_question_model.dart';
 
 class EngineApiService {
   final String baseUrl;
@@ -11,7 +13,7 @@ class EngineApiService {
   EngineApiService({
     String? baseUrl,
     http.Client? client,
-  })  : baseUrl = baseUrl ?? _defaultBaseUrl(),
+  })  : baseUrl = (baseUrl ?? _defaultBaseUrl()).replaceAll(RegExp(r'/+$'), ''),
         _client = client ?? http.Client();
 
   static String _defaultBaseUrl() {
@@ -93,6 +95,79 @@ class EngineApiService {
     }
   }
 
+  /// Requests multi-turn Socratic tutoring guidance from the core engine.
+  Future<Map<String, dynamic>> requestSocraticGuidance({
+    required String userInput,
+    required String targetEquation,
+    String? previousStep,
+    List<double> solutionRoots = const [],
+    Map<String, dynamic>? diagnosticBug,
+    String affectiveState = 'FLOW',
+    int scaffoldingLevel = 1,
+    String language = 'tr',
+    List<Map<String, String>> conversationHistory = const [],
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/socratic/respond');
+    final payload = {
+      'user_input': userInput,
+      'target_equation': targetEquation,
+      if (previousStep != null) 'previous_step': previousStep,
+      'solution_roots': solutionRoots,
+      if (diagnosticBug != null) 'diagnostic_bug': diagnosticBug,
+      'affective_state': affectiveState,
+      'scaffolding_level': scaffoldingLevel,
+      'language': language,
+      'conversation_history': conversationHistory,
+    };
+
+    try {
+      final response = await _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } else {
+        throw HttpException('Server returned ${response.statusCode}: ${response.body}', uri: uri);
+      }
+    } catch (e) {
+      // Graceful fallback for offline mode or network errors
+      return {
+        'final_output': _fallbackSocraticResponse(userInput, diagnosticBug, language),
+        'socratic_ratio': 2.0,
+        'layer1_pedagogical_intent': 'LOCAL_OFFLINE_FALLBACK',
+      };
+    }
+  }
+
+  static String _fallbackSocraticResponse(String input, Map<String, dynamic>? bug, String lang) {
+    final isEn = lang.toLowerCase() == 'en';
+    final remediation = bug?['remediation_directive'] as String?;
+    if (remediation != null && remediation.trim().isNotEmpty) {
+      return remediation;
+    }
+
+    final bugId = bug?['bug_id'] as String?;
+    if (bugId == 'BUG-QUAD-03') {
+      return isEn
+          ? 'Can you visualize the geometric area model when squaring a binomial (x + a)? Where should the two middle rectangular terms of area ax go?'
+          : 'İki terimin toplamının karesini alırken alan modelini hatırla. İki adet ax alanlı dikdörtgen terimini nereye yerleştirmeliyiz?';
+    } else if (bugId == 'BUG-QUAD-02') {
+      return isEn
+          ? 'Could there also be a negative twin root whose square equals this target number?'
+          : 'Karesi bu hedef sayıyı veren negatif bir ikiz kök de var olabilir mi?';
+    } else if (bugId == 'BUG-QUAD-01') {
+      return isEn
+          ? 'Can the zero-product property apply when the other side of the equation is non-zero?'
+          : 'Eşitliğin sağ tarafı sıfırdan farklı bir sayı iken sıfır-çarpım kuralı geçerli olabilir mi?';
+    }
+    return isEn
+        ? 'What algebraic operation should we apply to both sides now to maintain balance?'
+        : 'Bu aşamada eşitliği korumak için her iki tarafa hangi işlemi uygulamalıyız?';
+  }
+
   Future<DiagnosticItem?> getNextCatItem({
     required String sessionId,
     required double currentTheta,
@@ -112,9 +187,12 @@ class EngineApiService {
     ).timeout(const Duration(seconds: 4));
 
     if (response.statusCode == 200) {
-      if (response.body.isEmpty || response.body == 'null') return null;
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-      return DiagnosticItem.fromJson(json);
+      if (response.body.isEmpty || response.body.trim() == 'null') return null;
+      final dynamic decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic> && decoded.containsKey('item_id')) {
+        return DiagnosticItem.fromJson(decoded);
+      }
+      return null;
     } else {
       throw HttpException(
         'Server returned ${response.statusCode}: ${response.body}',
@@ -146,6 +224,78 @@ class EngineApiService {
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       return DiagnosticSubmitResult.fromJson(json);
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> startDailySession({
+    String? userId,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/session/start-daily');
+    final payload = {
+      if (userId != null) 'user_id': userId,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> concludeDailySession({
+    String? sessionId,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/session/conclude');
+    final payload = {
+      if (sessionId != null) 'session_id': sessionId,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      throw HttpException(
+        'Server returned ${response.statusCode}: ${response.body}',
+        uri: uri,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> startCatSession({
+    String? sessionId,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/cat/start');
+    final payload = {
+      if (sessionId != null) 'session_id': sessionId,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(payload),
+    ).timeout(const Duration(seconds: 4));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
     } else {
       throw HttpException(
         'Server returned ${response.statusCode}: ${response.body}',
@@ -357,6 +507,143 @@ class EngineApiService {
         uri: uri,
       );
     }
+  }
+
+  Future<MisconceptionProfileResponse> fetchMisconceptionProfile(String userId) async {
+    final uri = Uri.parse('$baseUrl/api/v1/vault/misconception-profile/$userId');
+    try {
+      final response = await _client.get(uri).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        return MisconceptionProfileResponse.fromJson(json);
+      }
+    } catch (_) {
+      // Graceful offline fallback
+    }
+
+    return MisconceptionProfileResponse(
+      userId: userId,
+      totalRecordedMistakes: 0,
+      totalCured: 0,
+      overallCureRate: 0.0,
+      topRecurringTraps: const [],
+      categories: const [
+        MisconceptionCategory(
+          categoryId: 'KUADRATIK_DENKLEMLER',
+          categoryTitle: 'Kuadratik Denklemler',
+          totalMistakes: 0,
+          activeMistakes: 0,
+          curedMistakes: 0,
+          nodes: [],
+        ),
+        MisconceptionCategory(
+          categoryId: 'ISARET_VE_DAGILMA',
+          categoryTitle: 'İşaret ve Parantez Dağılımı',
+          totalMistakes: 0,
+          activeMistakes: 0,
+          curedMistakes: 0,
+          nodes: [],
+        ),
+        MisconceptionCategory(
+          categoryId: 'PARABOL_VE_POLINOM',
+          categoryTitle: 'Parabol ve Polinomlar',
+          totalMistakes: 0,
+          activeMistakes: 0,
+          curedMistakes: 0,
+          nodes: [],
+        ),
+        MisconceptionCategory(
+          categoryId: 'TRIGONOMETRI_VE_LOGARITMA',
+          categoryTitle: 'Trigonometri ve Logaritma',
+          totalMistakes: 0,
+          activeMistakes: 0,
+          curedMistakes: 0,
+          nodes: [],
+        ),
+        MisconceptionCategory(
+          categoryId: 'ANALIZ_TUREV_INTEGRAL',
+          categoryTitle: 'Analiz (Türev & İntegral)',
+          totalMistakes: 0,
+          activeMistakes: 0,
+          curedMistakes: 0,
+          nodes: [],
+        ),
+      ],
+    );
+  }
+
+  Future<TwinQuestionModel> generateTwinQuestion({
+    required String bugId,
+    String? originalEquation,
+    int difficultyLevel = 1,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/twin/generate');
+    final payload = {
+      'bug_id': bugId,
+      if (originalEquation != null) 'original_equation': originalEquation,
+      'difficulty_level': difficultyLevel,
+    };
+
+    try {
+      final response = await _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        return TwinQuestionModel.fromJson(json);
+      }
+    } catch (_) {
+      // Graceful offline fallback
+    }
+
+    return _fallbackTwinQuestion(bugId, difficultyLevel);
+  }
+
+  static TwinQuestionModel _fallbackTwinQuestion(String bugId, int difficulty) {
+    final b = bugId.toUpperCase();
+    if (b == 'BUG-QUAD-01') {
+      return const TwinQuestionModel(
+        twinId: 'twin_offline_01',
+        targetEquation: '(x - 3)(x + 2) = 6',
+        canonicalRoots: [4.0, -3.0],
+        targetedBugId: 'BUG-QUAD-01',
+        targetedBugTitle: 'Sıfır-Çarpım Kuralı İhlali',
+        pedagogicalFocus: 'Eşitliğin sağ tarafı sıfırdan farklıdır. Önce parantezleri açıp tüm terimleri bir tarafa toplamalısın.',
+        hint: 'Önce sol tarafı aç: x² - x - 6 = 6. Sonra 6 çıkar: x² - x - 12 = 0.',
+      );
+    } else if (b == 'BUG-QUAD-02') {
+      return const TwinQuestionModel(
+        twinId: 'twin_offline_02',
+        targetEquation: 'x² = 49',
+        canonicalRoots: [7.0, -7.0],
+        targetedBugId: 'BUG-QUAD-02',
+        targetedBugTitle: 'Negatif İkiz Kök İhmali',
+        pedagogicalFocus: 'Karesi pozitif bir sayı olan denklemlerde negatif kökü de (±√c) unutma.',
+        hint: 'Karesi 49 olan sayılar: x = 7 ve x = -7.',
+      );
+    } else if (b == 'BUG-QUAD-03') {
+      return const TwinQuestionModel(
+        twinId: 'twin_offline_03',
+        targetEquation: '(x - 4)² = 25',
+        canonicalRoots: [9.0, -1.0],
+        targetedBugId: 'BUG-QUAD-03',
+        targetedBugTitle: 'Binom Karesi Açılım Hatası',
+        pedagogicalFocus: '(x ± a)² açılımında ortadaki 2ax terimini unutma.',
+        hint: '(x - 4)² = x² - 8x + 16.',
+      );
+    }
+    return const TwinQuestionModel(
+      twinId: 'twin_offline_generic',
+      targetEquation: 'x² - 5x + 6 = 0',
+      canonicalRoots: [3.0, 2.0],
+      targetedBugId: 'GENERIC',
+      targetedBugTitle: 'Kavramsal Pekiştirme',
+      pedagogicalFocus: 'Temel cebirsel kuralları adım adım uygulayarak denklemi çöz.',
+      hint: '(x - 3)(x - 2) = 0 şeklinde çarpanlara ayır.',
+    );
   }
 
   Future<Map<String, dynamic>> recordVaultMistake({

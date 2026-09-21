@@ -23,8 +23,11 @@ class ZeroLayoutShiftDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final double safeDockHeight = dockHeight.isFinite && !dockHeight.isNaN && dockHeight >= 100.0
+        ? dockHeight
+        : 310.0;
     return Container(
-      height: dockHeight,
+      height: safeDockHeight,
       decoration: BoxDecoration(
         color: AppColors.bgSurface,
         border: Border(

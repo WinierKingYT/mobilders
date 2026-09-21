@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../../core/services/haptic_feedback_service.dart';
-import '../../../core/app_theme.dart';
 
 /// Cognitive Hesitation Whisper Bubble (Bölüm 1 - Bilişsel Öğretim Manifestosu)
 /// Appears when student pauses for 8-10 seconds without typing.

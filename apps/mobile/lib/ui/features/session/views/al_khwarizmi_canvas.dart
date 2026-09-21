@@ -13,7 +13,8 @@ class AlKhwarizmiPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2 - 10);
     const xSize = 130.0;
-    final bHalf = (bCoefficient / 2.0).abs() * 22.0; // Visual scaling
+    final safeB = (bCoefficient.isNaN || bCoefficient.isInfinite) ? 6.0 : bCoefficient;
+    final bHalf = (safeB / 2.0).abs() * 22.0; // Visual scaling
 
     final xSquareLeft = center.dx - (xSize + bHalf) / 2;
     final xSquareTop = center.dy - (xSize + bHalf) / 2;
@@ -111,8 +112,19 @@ class _AlKhwarizmiCanvasState extends State<AlKhwarizmiCanvas> {
   bool _isCompleted = false;
 
   @override
+  void didUpdateWidget(covariant AlKhwarizmiCanvas oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.bCoefficient != widget.bCoefficient) {
+      setState(() {
+        _isCompleted = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final bHalf = widget.bCoefficient / 2.0;
+    final safeB = (widget.bCoefficient.isNaN || widget.bCoefficient.isInfinite) ? 6.0 : widget.bCoefficient;
+    final bHalf = safeB / 2.0;
     final bSquared = bHalf * bHalf;
 
     return Container(

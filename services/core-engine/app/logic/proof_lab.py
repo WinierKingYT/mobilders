@@ -65,6 +65,8 @@ class TruthTableGenerator:
         """
         if not variables:
             raise ValueError("En az bir mantıksal değişken belirtilmelidir.")
+        if len(variables) > 10:
+            raise ValueError("Doğruluk tablosu en fazla 10 değişken için hesaplanabilir.")
 
         rows: List[Dict[str, Any]] = []
         outcomes: List[bool] = []
@@ -101,6 +103,10 @@ class TruthTableGenerator:
         func_b: Callable[[Dict[str, bool]], bool],
     ) -> bool:
         """İki mantıksal formülün tüm durumlarda denk (A ≡ B) olduğunu kanıtlar."""
+        if not variables:
+            raise ValueError("En az bir mantıksal değişken belirtilmelidir.")
+        if len(variables) > 10:
+            raise ValueError("Doğruluk tablosu en fazla 10 değişken için hesaplanabilir.")
         combinations = list(itertools.product([True, False], repeat=len(variables)))
         for combo in combinations:
             env = dict(zip(variables, combo))

@@ -92,3 +92,42 @@ def test_dag_seeding_based_on_theta(cat):
     # Üst seviye tam kare ve diskriminant düğümlerinde ustalık düşük olmalı
     assert low_mastery["N15"] < 0.10
     assert low_mastery["N20"] < 0.05
+
+
+def test_cat_extreme_theta_clamping(cat):
+    """Öncelik 9: Aşırı uçlarda theta kestiriminin [-4.0, 4.0] aralığında kararlı kaldığını doğrular."""
+    # 1. Aşırı yüksek yetenek senaryosu
+    all_correct = [(f"CAT-ITEM-{i:02d}", True) for i in range(1, 10)]
+    theta_high, se_high = cat.estimate_theta(all_correct, initial_theta=10.0)
+    assert -4.0 <= theta_high <= 4.0
+    assert se_high > 0.0
+    assert not (se_high != se_high)  # Not NaN
+
+    # 2. Aşırı düşük yetenek senaryosu
+    all_incorrect = [(f"CAT-ITEM-{i:02d}", False) for i in range(1, 10)]
+    theta_low, se_low = cat.estimate_theta(all_incorrect, initial_theta=-10.0)
+    assert -4.0 <= theta_low <= 4.0
+    assert se_low > 0.0
+    assert not (se_low != se_low)  # Not NaN
+
+
+def test_cat_dual_stopping_rules(cat):
+    """CAT Durdurma kurallarının SE, Fisher Bilgisi ve min/max soru eşiklerini doğrulayışı."""
+    # 1. min_items sağlanmadan SE düşük olsa bile tamamlanmamalı
+    short_responses = [("CAT-ITEM-01", True), ("CAT-ITEM-02", True)]
+    assert not cat.is_test_complete(short_responses, current_se=0.20, min_items=3)
+
+    # 2. min_items sağlandı ve SE <= target_se ise tamamlanmalı
+    three_responses = [("CAT-ITEM-01", True), ("CAT-ITEM-02", True), ("CAT-ITEM-03", True)]
+    assert cat.is_test_complete(three_responses, current_se=0.30, target_se=0.35, min_items=3)
+
+    # 3. min_items sağlandı ve Fisher Bilgisi hedefi aşıldıysa tamamlanmalı
+    # current_se = 0.40 => current_info = 1/(0.4^2) = 6.25
+    assert not cat.is_test_complete(three_responses, current_se=0.40, min_information=10.0, min_items=3)
+    # current_se = 0.25 => current_info = 16.0 >= 10.0
+    assert cat.is_test_complete(three_responses, current_se=0.25, min_information=10.0, min_items=3)
+
+    # 4. max_items eşiğine ulaşıldığında SE yüksek olsa bile tamamlanmalı
+    max_responses = [(f"CAT-ITEM-{i:02d}", True) for i in range(1, 9)]
+    assert cat.is_test_complete(max_responses, current_se=0.80, max_items=8)
+

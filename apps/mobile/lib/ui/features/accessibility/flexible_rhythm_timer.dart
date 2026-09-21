@@ -19,7 +19,6 @@ class _FlexibleRhythmPacerState extends State<FlexibleRhythmPacer>
     with SingleTickerProviderStateMixin {
   late AnimationController _breathingController;
   late Animation<double> _breathingAnimation;
-  int _minutesActive = 0;
 
   @override
   void initState() {

@@ -107,17 +107,6 @@ void main() {
     });
 
     test('Expired draft returns null and clears storage', () async {
-      final expiredState = RestoredSessionState(
-        sessionId: 'sess_old',
-        nodeId: 'N1',
-        targetEquation: 'x = 1',
-        draftText: '',
-        inputMode: InputMode.touchpad,
-        serializedSteps: [],
-        currentPl: 0.1,
-        lastUpdated: DateTime.now().subtract(const Duration(hours: 48)),
-      );
-
       await mockStorage.write(
         SessionRestorationManager.defaultDraftKey,
         '{"sessionId":"sess_old","nodeId":"N1","targetEquation":"x = 1","draftText":"","inputMode":"touchpad","serializedSteps":[],"currentPl":0.1,"lastUpdated":"2020-01-01T00:00:00.000"}',

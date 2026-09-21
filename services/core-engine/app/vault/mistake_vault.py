@@ -3,10 +3,12 @@ Kişisel Hata Otopsisi Kasası, Kendi Hatasını Düzeltme Seansı ve Boss Battl
 FSRS-4.5 aralıklı tekrar modeliyle entegre bilişsel hata hafızası ve telafi seansları.
 """
 from __future__ import annotations
+import math
 import time
 import uuid
 import sqlite3
 import json
+import threading
 from enum import Enum
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
@@ -64,6 +66,7 @@ class CognitiveMistakeVault:
     Kişisel Bilişsel Hata Otopsisi Kasası.
     Öğrencinin kavramsal yanılgılarını (misconceptions) kalıcı olarak SQLite/Postgres tabanında saklar,
     FSRS-4.5 ile zamanlar ve unutma eğrisine göre telafi planlar.
+    Eşzamanlı isteklerde tam thread-safety garantisi sunar.
     """
 
     def __init__(
@@ -73,10 +76,12 @@ class CognitiveMistakeVault:
     ):
         self.fsrs = fsrs_engine or FSRSEngine()
         self.db_path = db_path
-        self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
-        self._init_db()
-        self._records: Dict[str, MistakeRecord] = {}
-        self._load_all_from_db()
+        self._lock = threading.Lock()
+        with self._lock:
+            self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            self._init_db()
+            self._records: Dict[str, MistakeRecord] = {}
+            self._load_all_from_db()
 
     def _init_db(self) -> None:
         """SQLite şemasını ve indekslerini başlatır."""
@@ -111,32 +116,39 @@ class CognitiveMistakeVault:
 
     def _save_record_to_db(self, record: MistakeRecord) -> None:
         """Kayıt kartını SQLite veritabanına yazar."""
-        cursor = self._conn.cursor()
-        cursor.execute("""
-            INSERT OR REPLACE INTO mistake_records VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            record.mistake_id,
-            record.user_id,
-            record.node_id,
-            record.bug_id,
-            record.problem_statement,
-            record.offending_step,
-            record.correct_principle,
-            record.remediation_directive,
-            record.created_at,
-            record.last_reviewed_at,
-            record.due_date,
-            record.status.value,
-            record.dsr_state.stability,
-            record.dsr_state.difficulty,
-            record.dsr_state.retrievability,
-            record.dsr_state.repetitions,
-            record.dsr_state.lapses,
-            record.self_correction_stage.value,
-            record.consecutive_clean_solves,
-            json.dumps(record.history),
-        ))
-        self._conn.commit()
+        with self._lock:
+            cursor = self._conn.cursor()
+            status_str = record.status.value if hasattr(record.status, "value") else str(record.status)
+            stage_val = (
+                record.self_correction_stage.value
+                if hasattr(record.self_correction_stage, "value")
+                else int(record.self_correction_stage)
+            )
+            cursor.execute("""
+                INSERT OR REPLACE INTO mistake_records VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                record.mistake_id,
+                record.user_id,
+                record.node_id,
+                record.bug_id,
+                record.problem_statement,
+                record.offending_step,
+                record.correct_principle,
+                record.remediation_directive,
+                record.created_at,
+                record.last_reviewed_at,
+                record.due_date,
+                status_str,
+                record.dsr_state.stability,
+                record.dsr_state.difficulty,
+                record.dsr_state.retrievability,
+                record.dsr_state.repetitions,
+                record.dsr_state.lapses,
+                stage_val,
+                record.consecutive_clean_solves,
+                json.dumps(record.history),
+            ))
+            self._conn.commit()
 
     def _row_to_record(self, row: tuple) -> MistakeRecord:
         """Veritabanı satırını MistakeRecord nesnesine dönüştürür."""
@@ -149,12 +161,27 @@ class CognitiveMistakeVault:
             self_corr_stage_val, consec_clean, history_json
         ) = row
         dsr = DSRState(
-            stability=dsr_stability,
-            difficulty=dsr_difficulty,
-            retrievability=dsr_retrievability,
-            repetitions=dsr_repetitions,
-            lapses=dsr_lapses,
+            stability=float(dsr_stability),
+            difficulty=float(dsr_difficulty),
+            retrievability=float(dsr_retrievability),
+            repetitions=int(dsr_repetitions),
+            lapses=int(dsr_lapses),
         )
+        try:
+            status_enum = MistakeStatus(status_val)
+        except ValueError:
+            status_enum = MistakeStatus.OPEN
+
+        try:
+            stage_enum = SelfCorrectionStage(int(self_corr_stage_val))
+        except ValueError:
+            stage_enum = SelfCorrectionStage.STAGE_1_IDENTIFY
+
+        try:
+            parsed_history = json.loads(history_json) if history_json else []
+        except Exception:
+            parsed_history = []
+
         return MistakeRecord(
             mistake_id=mistake_id,
             user_id=user_id,
@@ -164,14 +191,14 @@ class CognitiveMistakeVault:
             offending_step=offending_step,
             correct_principle=correct_principle,
             remediation_directive=remediation_directive,
-            created_at=created_at,
-            last_reviewed_at=last_reviewed_at,
-            due_date=due_date,
-            status=MistakeStatus(status_val),
+            created_at=float(created_at),
+            last_reviewed_at=float(last_reviewed_at) if last_reviewed_at is not None else None,
+            due_date=float(due_date),
+            status=status_enum,
             dsr_state=dsr,
-            self_correction_stage=SelfCorrectionStage(self_corr_stage_val),
-            consecutive_clean_solves=consec_clean,
-            history=json.loads(history_json) if history_json else [],
+            self_correction_stage=stage_enum,
+            consecutive_clean_solves=int(consec_clean),
+            history=parsed_history,
         )
 
     def _load_all_from_db(self) -> None:
@@ -194,7 +221,7 @@ class CognitiveMistakeVault:
         timestamp: Optional[float] = None,
     ) -> MistakeRecord:
         """Kavramsal bir hata yapıldığında kasaya yeni bir otopsi dosyası açar ve SQLite'a yazar."""
-        curr_time = timestamp if timestamp is not None else time.time()
+        curr_time = float(timestamp) if (timestamp is not None and math.isfinite(timestamp)) else time.time()
         init_dsr = self.fsrs.init_dsr(Rating.AGAIN)
         due_date = curr_time
 
@@ -219,12 +246,14 @@ class CognitiveMistakeVault:
                 "offending_step": offending_step,
             }],
         )
-        self._records[record.mistake_id] = record
+        with self._lock:
+            self._records[record.mistake_id] = record
         self._save_record_to_db(record)
         return record
 
     def get_mistake(self, mistake_id: str) -> Optional[MistakeRecord]:
-        return self._records.get(mistake_id)
+        with self._lock:
+            return self._records.get(mistake_id)
 
     def list_mistakes(
         self,
@@ -232,10 +261,11 @@ class CognitiveMistakeVault:
         status: Optional[MistakeStatus] = None,
     ) -> List[MistakeRecord]:
         """Kullanıcının kayıtlı hatalarını filtreli listeler."""
-        user_records = [r for r in self._records.values() if r.user_id == user_id]
-        if status is not None:
-            user_records = [r for r in user_records if r.status == status]
-        return sorted(user_records, key=lambda x: x.created_at, reverse=True)
+        with self._lock:
+            user_records = [r for r in self._records.values() if r.user_id == user_id]
+            if status is not None:
+                user_records = [r for r in user_records if r.status == status]
+            return sorted(user_records, key=lambda x: x.created_at, reverse=True)
 
     def get_due_mistakes(
         self,
@@ -244,72 +274,242 @@ class CognitiveMistakeVault:
     ) -> List[MistakeRecord]:
         """FSRS tekrar zamanı gelmiş (due_date <= current_time) ve henüz kür edilmemiş hataları getirir."""
         curr_time = current_timestamp if current_timestamp is not None else time.time()
-        due = [
-            r for r in self._records.values()
-            if r.user_id == user_id
-            and r.status != MistakeStatus.CURED
-            and r.due_date <= curr_time
-        ]
-        return sorted(due, key=lambda x: x.due_date)
+        with self._lock:
+            due = [
+                r for r in self._records.values()
+                if r.user_id == user_id
+                and r.status != MistakeStatus.CURED
+                and r.due_date <= curr_time
+            ]
+            return sorted(due, key=lambda x: x.due_date)
 
     def update_record(self, record: MistakeRecord) -> None:
         """Kayıt kartını günceller ve SQLite'a yazar."""
-        self._records[record.mistake_id] = record
+        with self._lock:
+            self._records[record.mistake_id] = record
         self._save_record_to_db(record)
 
     def delete_mistake(self, mistake_id: str) -> bool:
         """Hata kaydını hem bellekten hem SQLite veritabanından siler."""
-        if mistake_id in self._records:
-            del self._records[mistake_id]
-            cursor = self._conn.cursor()
-            cursor.execute("DELETE FROM mistake_records WHERE mistake_id = ?", (mistake_id,))
-            self._conn.commit()
-            return True
-        return False
+        with self._lock:
+            if mistake_id in self._records:
+                del self._records[mistake_id]
+                cursor = self._conn.cursor()
+                cursor.execute("DELETE FROM mistake_records WHERE mistake_id = ?", (mistake_id,))
+                self._conn.commit()
+                return True
+            return False
 
     def query_sql(self, query: str, params: tuple = ()) -> List[tuple]:
         """Doğrudan SQLite SQL sorgusu çalıştırır."""
-        cursor = self._conn.cursor()
-        cursor.execute(query, params)
-        return cursor.fetchall()
+        with self._lock:
+            cursor = self._conn.cursor()
+            cursor.execute(query, params)
+            return cursor.fetchall()
 
     def close(self) -> None:
         """Veritabanı bağlantısını kapatır."""
-        if self._conn:
-            self._conn.close()
+        with self._lock:
+            if self._conn:
+                self._conn.close()
 
     def get_vault_analytics(self, user_id: str) -> Dict[str, Any]:
         """Kasa analitiği: Açık, telafide, kür edilmiş oranları ve en sık yapılan yanılgılar."""
-        user_records = [r for r in self._records.values() if r.user_id == user_id]
-        total = len(user_records)
-        if total == 0:
+        with self._lock:
+            user_records = [r for r in self._records.values() if r.user_id == user_id]
+            total = len(user_records)
+            if total == 0:
+                return {
+                    "total_mistakes": 0,
+                    "open_count": 0,
+                    "in_remediation_count": 0,
+                    "cured_count": 0,
+                    "cure_rate": 0.0,
+                    "top_bugs": {},
+                }
+
+            open_c = sum(1 for r in user_records if r.status == MistakeStatus.OPEN)
+            remed_c = sum(1 for r in user_records if r.status == MistakeStatus.IN_REMEDIATION)
+            cured_c = sum(1 for r in user_records if r.status == MistakeStatus.CURED)
+
+            bug_freq: Dict[str, int] = {}
+            for r in user_records:
+                bug_freq[r.bug_id] = bug_freq.get(r.bug_id, 0) + 1
+
+            top_bugs = dict(sorted(bug_freq.items(), key=lambda item: item[1], reverse=True)[:5])
+
             return {
-                "total_mistakes": 0,
-                "open_count": 0,
-                "in_remediation_count": 0,
-                "cured_count": 0,
-                "cure_rate": 0.0,
-                "top_bugs": {},
+                "total_mistakes": total,
+                "open_count": open_c,
+                "in_remediation_count": remed_c,
+                "cured_count": cured_c,
+                "cure_rate": round(cured_c / total, 3),
+                "top_bugs": top_bugs,
             }
 
-        open_c = sum(1 for r in user_records if r.status == MistakeStatus.OPEN)
-        remed_c = sum(1 for r in user_records if r.status == MistakeStatus.IN_REMEDIATION)
-        cured_c = sum(1 for r in user_records if r.status == MistakeStatus.CURED)
+    def get_misconception_profile(self, user_id: str) -> Dict[str, Any]:
+        """
+        Öğrencinin kavramsal yanılgı profilini hiyerarşik ağaç yapısında,
+        zaaf derecesi ve FSRS kalıcılık durumu ile birlikte döner.
+        """
+        # Standart pedagojik kategoriler ve metadata haritası
+        KNOWN_CATEGORIES = [
+            {"id": "KUADRATIK_DENKLEMLER", "title": "Kuadratik Denklemler"},
+            {"id": "ISARET_VE_DAGILMA", "title": "İşaret ve Parantez Dağılımı"},
+            {"id": "PARABOL_VE_POLINOM", "title": "Parabol ve Polinomlar"},
+            {"id": "TRIGONOMETRI_VE_LOGARITMA", "title": "Trigonometri ve Logaritma"},
+            {"id": "ANALIZ_TUREV_INTEGRAL", "title": "Analiz (Türev & İntegral)"},
+            {"id": "GENEL_CEBIR", "title": "Genel Cebirsel İlkeler"},
+        ]
 
-        bug_freq: Dict[str, int] = {}
-        for r in user_records:
-            bug_freq[r.bug_id] = bug_freq.get(r.bug_id, 0) + 1
-
-        top_bugs = dict(sorted(bug_freq.items(), key=lambda item: item[1], reverse=True)[:5])
-
-        return {
-            "total_mistakes": total,
-            "open_count": open_c,
-            "in_remediation_count": remed_c,
-            "cured_count": cured_c,
-            "cure_rate": round(cured_c / total, 3),
-            "top_bugs": top_bugs,
+        BUG_METADATA: Dict[str, Dict[str, str]] = {
+            "BUG-QUAD-01": {
+                "title": "Sıfır-Çarpım Kuralı İhlali",
+                "category_id": "KUADRATIK_DENKLEMLER",
+                "cognitive_cause": "Eşitliğin sağ tarafı sıfırdan farklı iken çarpanları doğrudan sayıya eşitleme.",
+            },
+            "BUG-QUAD-02": {
+                "title": "Negatif İkiz Kök İhmali",
+                "category_id": "KUADRATIK_DENKLEMLER",
+                "cognitive_cause": "x² = c eşitliğinde sadece pozitif karekökü alıp negatif ikiz kökü unutma.",
+            },
+            "BUG-QUAD-03": {
+                "title": "Binom Karesi Açılım Hatası",
+                "category_id": "ISARET_VE_DAGILMA",
+                "cognitive_cause": "(x+a)² açılımında orta terimi (2ax) atlayıp x²+a² yazma.",
+            },
+            "BUG-QUAD-04": {
+                "title": "Tam Kare Denge Hatası",
+                "category_id": "KUADRATIK_DENKLEMLER",
+                "cognitive_cause": "Eşitliğin bir tarafına eklenen terimi diğer tarafa eklemeyip dengeyi bozma.",
+            },
+            "BUG-QUAD-05": {
+                "title": "Formül Payda Hatası",
+                "category_id": "KUADRATIK_DENKLEMLER",
+                "cognitive_cause": "Kuadratik formülde paydadaki 2a katsayısı yerine 2 yazma.",
+            },
+            "SIGN_FLIP": {
+                "title": "Eksi İşareti Dağıtım Yanılgısı",
+                "category_id": "ISARET_VE_DAGILMA",
+                "cognitive_cause": "Parantez önündeki eksi işaretini içteki tüm terimlere dağıtmama.",
+            },
+            "EXPONENT_DISTRIBUTION": {
+                "title": "Üslerin Toplam Üzerine Hatalı Dağıtımı",
+                "category_id": "GENEL_CEBIR",
+                "cognitive_cause": "Çarpma kuralını toplama işlemine hatalı genelleştirme.",
+            },
         }
+
+        def _resolve_category(bug_id: str) -> tuple[str, str]:
+            if bug_id in BUG_METADATA:
+                cat_id = BUG_METADATA[bug_id]["category_id"]
+                cat_title = next((c["title"] for c in KNOWN_CATEGORIES if c["id"] == cat_id), "Genel Cebir")
+                return cat_id, cat_title
+            b = bug_id.upper()
+            if b.startswith("BUG-QUAD-"):
+                return "KUADRATIK_DENKLEMLER", "Kuadratik Denklemler"
+            if b.startswith("SIGN") or b.startswith("BUG-FOUND-") or "SIGN" in b:
+                return "ISARET_VE_DAGILMA", "İşaret ve Parantez Dağılımı"
+            if b.startswith("BUG-PARAB-") or b.startswith("BUG-POLY-"):
+                return "PARABOL_VE_POLINOM", "Parabol ve Polinomlar"
+            if b.startswith("BUG-TRIG-") or b.startswith("BUG-LOG-"):
+                return "TRIGONOMETRI_VE_LOGARITMA", "Trigonometri ve Logaritma"
+            if b.startswith("BUG-CALC-") or b.startswith("BUG-INT-"):
+                return "ANALIZ_TUREV_INTEGRAL", "Analiz (Türev & İntegral)"
+            return "GENEL_CEBIR", "Genel Cebirsel İlkeler"
+
+        with self._lock:
+            user_records = [r for r in self._records.values() if r.user_id == user_id]
+            total_mistakes = len(user_records)
+            cured_count = sum(1 for r in user_records if r.status == MistakeStatus.CURED)
+            cure_rate = round(cured_count / max(1, total_mistakes), 3) if total_mistakes > 0 else 0.0
+
+            # Grup: bug_id -> List[MistakeRecord]
+            grouped_by_bug: Dict[str, List[MistakeRecord]] = {}
+            for r in user_records:
+                grouped_by_bug.setdefault(r.bug_id, []).append(r)
+
+            # Her bug için düğüm verisi hazırla
+            nodes_by_category: Dict[str, List[Dict[str, Any]]] = {}
+            all_bug_summaries: List[Dict[str, Any]] = []
+
+            for bug_id, records in grouped_by_bug.items():
+                cat_id, cat_title = _resolve_category(bug_id)
+                freq = len(records)
+                open_cnt = sum(1 for r in records if r.status == MistakeStatus.OPEN)
+                remed_cnt = sum(1 for r in records if r.status == MistakeStatus.IN_REMEDIATION)
+                cur_cnt = sum(1 for r in records if r.status == MistakeStatus.CURED)
+
+                if cur_cnt == freq and cur_cnt > 0:
+                    status_str = "cured"
+                elif open_cnt >= 2:
+                    status_str = "critical"
+                elif open_cnt == 1:
+                    status_str = "warning"
+                elif remed_cnt > 0:
+                    status_str = "in_remediation"
+                else:
+                    status_str = "clean"
+
+                latest_rec = max(records, key=lambda x: x.created_at)
+                meta = BUG_METADATA.get(bug_id, {})
+                title = meta.get("title", f"Yanılgı: {bug_id}")
+                cause = meta.get("cognitive_cause", latest_rec.correct_principle or "Kavramsal kural ihlali.")
+                avg_stab = round(sum(r.dsr_state.stability for r in records) / freq, 2)
+
+                node_dict = {
+                    "bug_id": bug_id,
+                    "title": title,
+                    "category_id": cat_id,
+                    "category_title": cat_title,
+                    "cognitive_cause": cause,
+                    "remediation_directive": latest_rec.remediation_directive,
+                    "correct_principle": latest_rec.correct_principle,
+                    "frequency": freq,
+                    "open_count": open_cnt,
+                    "in_remediation_count": remed_cnt,
+                    "cured_count": cur_cnt,
+                    "status": status_str,
+                    "last_offending_step": latest_rec.offending_step,
+                    "last_problem": latest_rec.problem_statement,
+                    "avg_stability_days": avg_stab,
+                }
+                nodes_by_category.setdefault(cat_id, []).append(node_dict)
+                all_bug_summaries.append(node_dict)
+
+            # Top 3 tekrarlayan tuzak (önce açık sayısı, sonra toplam frekans)
+            top_traps = sorted(
+                all_bug_summaries,
+                key=lambda x: (x["open_count"], x["frequency"]),
+                reverse=True,
+            )[:3]
+
+            # Kategorileri oluştur
+            categories_list: List[Dict[str, Any]] = []
+            for cat in KNOWN_CATEGORIES:
+                cat_id = cat["id"]
+                c_nodes = nodes_by_category.get(cat_id, [])
+                cat_total = sum(n["frequency"] for n in c_nodes)
+                cat_active = sum(n["open_count"] + n["in_remediation_count"] for n in c_nodes)
+                cat_cured = sum(n["cured_count"] for n in c_nodes)
+
+                categories_list.append({
+                    "category_id": cat_id,
+                    "category_title": cat["title"],
+                    "total_mistakes": cat_total,
+                    "active_mistakes": cat_active,
+                    "cured_mistakes": cat_cured,
+                    "nodes": sorted(c_nodes, key=lambda x: (x["status"] == "critical", x["open_count"]), reverse=True),
+                })
+
+            return {
+                "user_id": user_id,
+                "total_recorded_mistakes": total_mistakes,
+                "total_cured": cured_count,
+                "overall_cure_rate": cure_rate,
+                "top_recurring_traps": top_traps,
+                "categories": categories_list,
+            }
 
 
 class SelfCorrectionSessionManager:
@@ -405,8 +605,9 @@ class SelfCorrectionSessionManager:
         if not record:
             raise KeyError(f"Hata kaydı bulunamadı: {mistake_id}")
 
-        now = current_time if current_time is not None else time.time()
-        elapsed_days = max(0.0, (now - (record.last_reviewed_at or record.created_at)) / 86400.0)
+        now = float(current_time) if (current_time is not None and math.isfinite(current_time)) else time.time()
+        raw_elapsed = (now - (record.last_reviewed_at or record.created_at)) / 86400.0
+        elapsed_days = max(0.0, raw_elapsed) if math.isfinite(raw_elapsed) else 0.0
 
         if is_correct:
             # FSRS review with Rating.GOOD

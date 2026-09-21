@@ -41,6 +41,15 @@ class MicroTriumphEngine:
         """
         Creates an isomorphic, lightweight variant of the assisted step.
         """
+        if not assisted_expression or not isinstance(assisted_expression, str):
+            return MicroVariant(
+                variant_id="mv_default_3x_15",
+                original_rule=rule_id,
+                prompt="Aynı mantığı kendin göster: 3x = 15 denkleminde x kaçtır?",
+                target_expression="3x = 15",
+                expected_answer="5",
+            )
+
         clean = assisted_expression.replace(" ", "")
 
         # Variant for simple linear division: e.g. 2x = 8 or 2x=8
@@ -88,6 +97,14 @@ class MicroTriumphEngine:
         """
         Evaluates student's independent response to the micro-variant.
         """
+        if not student_input or not isinstance(student_input, str) or len(student_input) > 200:
+            return MicroTriumphResult(
+                is_triumph=False,
+                dopamine_pulse=False,
+                confidence_bonus=0.0,
+                feedback_message="Lütfen geçerli bir yanıt giriniz.",
+            )
+
         clean_input = student_input.strip().replace(" ", "")
         expected = variant.expected_answer.strip().replace(" ", "")
 

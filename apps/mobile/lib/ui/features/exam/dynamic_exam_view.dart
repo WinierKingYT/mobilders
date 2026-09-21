@@ -59,9 +59,31 @@ class _DynamicExamViewState extends State<DynamicExamView> {
   }
 
   @override
+  void didUpdateWidget(covariant DynamicExamView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_currentIndex >= widget.questions.length) {
+      _currentIndex = widget.questions.isEmpty ? 0 : widget.questions.length - 1;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (_isFinished) {
       return _buildDiagnosticResultScreen();
+    }
+
+    if (widget.questions.isEmpty) {
+      return Scaffold(
+        key: const Key('dynamic_exam_view'),
+        appBar: AppBar(
+          title: Text(widget.examTitle, style: const TextStyle(fontSize: 15)),
+          backgroundColor: const Color(0xFF0F172A),
+        ),
+        backgroundColor: const Color(0xFF090D16),
+        body: const Center(
+          child: Text("Sınavda soru bulunamadı.", style: TextStyle(color: Colors.white70)),
+        ),
+      );
     }
 
     final currentQ = widget.questions[_currentIndex];

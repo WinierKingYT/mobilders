@@ -111,13 +111,15 @@ class FSRSEngine:
         is_circadian_locked = elapsed_days < (self.CIRCADIAN_SLEEP_HOURS / 24.0)
 
         # 3. Update Stability
+        delta_r = max(0.0, min(1.0, 1.0 - r))
         if rating == Rating.AGAIN:
             # Lapse / Forgetting: old stability leaves a residue (Savings Effect)
+            exp_term = math.exp(min(20.0, self.w[14] * delta_r))
             new_s = (
                 self.w[11]
                 * (new_d ** -self.w[12])
                 * (((s + 1.0) ** self.w[13]) - 1.0)
-                * math.exp(self.w[14] * (1.0 - r))
+                * exp_term
             )
             new_s = max(0.1, min(new_s, s))  # Stability drops on lapse
             new_lapses = current_state.lapses + 1
@@ -128,17 +130,9 @@ class FSRSEngine:
                 new_s = s
             else:
                 k_g = self.w[15] if rating == Rating.HARD else (self.w[16] if rating == Rating.EASY else 1.0)
-                s_increment = (
-                    s
-                    * (
-                        1.0
-                        + math.exp(self.w[8])
-                        * (11.0 - new_d)
-                        * (s ** -self.w[9])
-                        * (math.exp(self.w[10] * (1.0 - r)) - 1.0)
-                        * k_g
-                    )
-                )
+                exp_term = math.exp(min(20.0, self.w[10] * delta_r)) - 1.0
+                s_factor = math.exp(self.w[8]) * (11.0 - new_d) * (s ** -self.w[9]) * exp_term * k_g
+                s_increment = s * (1.0 + max(0.0, s_factor))
                 new_s = max(s + 0.1, s_increment)
 
             new_lapses = current_state.lapses

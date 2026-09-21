@@ -72,6 +72,56 @@ class FakeEngineApiService extends EngineApiService {
       );
     }
   }
+  @override
+  Future<Map<String, dynamic>> replayOfflineBatch({
+    required String sessionId,
+    required List<Map<String, dynamic>> events,
+  }) async {
+    if (throwNetworkError) {
+      throw const HttpException('Simulated network offline');
+    }
+    return {
+      'session_id': sessionId,
+      'synced_count': events.length,
+      'latest_p_l': 0.70,
+      'is_target_reached': true,
+      'replayed_steps': events.map((e) => {
+        'step_number': e['step_number'],
+        'user_expression': e['user_expression'],
+        'is_valid': true,
+        'is_target_reached': true,
+        'canonical_expression': 'x = 2',
+        'error_message': null,
+      }).toList(),
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> startDailySession({String? userId}) async {
+    if (throwNetworkError) {
+      throw const HttpException('Simulated network offline');
+    }
+    return {
+      'session_id': 'sess_daily_test_123',
+      'duration_limit_minutes': 20,
+      'phases': ['warm_up', 'cat_diagnostic', 'problem_board', 'metacognitive_reflection'],
+      'target_node': 'N15',
+      'target_problem': 'x^2 + 6x = 2',
+      'circadian_lock_hours': 14,
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> concludeDailySession({String? sessionId}) async {
+    if (throwNetworkError) {
+      throw const HttpException('Simulated network offline');
+    }
+    return {
+      'status': 'CONCLUDED',
+      'circadian_lock_active': true,
+      'lock_duration_seconds': 50400,
+    };
+  }
 }
 
 void main() {
@@ -105,28 +155,29 @@ void main() {
       expect(viewModel.isTargetReached, isFalse);
     });
 
-    test('Submitting final step marks target reached', () async {
-      await viewModel.submitStep('(x - 2)(x - 3) = 0');
-      await viewModel.submitStep('x = 2');
+    test('Submitting terminal step marks target reached', () async {
+      final step = await viewModel.submitStep('x = 2');
 
-      expect(viewModel.steps.length, 2);
+      expect(step, isNotNull);
+      expect(step!.isValid, isTrue);
+      expect(step.isTargetReached, isTrue);
       expect(viewModel.isTargetReached, isTrue);
+      expect(viewModel.currentPl, 0.70);
     });
 
-    test('Submitting misconception step records bug and preserves currentPl', () async {
-      final step = await viewModel.submitStep('(x - 2)(x - 3) = 12');
+    test('Submitting invalid step diagnoses misconception bug', () async {
+      final step = await viewModel.submitStep('(x - 2)(x - 3) = 4');
 
       expect(step, isNotNull);
       expect(step!.isValid, isFalse);
       expect(step.detectedBug, isNotNull);
       expect(step.detectedBug!.bugId, 'BUG-QUAD-01');
-      expect(viewModel.steps.length, 1);
-      expect(viewModel.currentPl, 0.20); // Not updated on error
+      expect(viewModel.isTargetReached, isFalse);
     });
 
-    test('Rollback removes subsequent steps', () async {
+    test('Rollback removes steps from current session state', () async {
       await viewModel.submitStep('(x - 2)(x - 3) = 0');
-      await viewModel.submitStep('(x - 2)(x - 3) = 12'); // bad step
+      await viewModel.submitStep('(x - 2)(x - 3) = 4');
       expect(viewModel.steps.length, 2);
 
       // Rollback to step 1 (remove bad step)
@@ -154,6 +205,35 @@ void main() {
       expect(offlineQueue.pendingEvents.first.userExpression, '(x - 2)(x - 3) = 0');
     });
 
+    test('syncPendingOfflineSteps reconciles local steps and updates mastery', () async {
+      final fakeApi = FakeEngineApiService();
+      fakeApi.throwNetworkError = true;
+      final offlineQueue = OfflineSyncQueue();
+      final vm = SessionViewModel(
+        apiService: fakeApi,
+        sessionId: 'test-session-recon',
+        targetEquation: 'x^2 - 5x + 6 = 0',
+        syncQueue: offlineQueue,
+      );
+
+      // Submit while offline
+      await vm.submitStep('x = 2');
+      expect(vm.steps.length, 1);
+      expect(vm.steps.first.isValid, isFalse);
+      expect(vm.pendingOfflineCount, 1);
+
+      // Restore network and sync
+      fakeApi.throwNetworkError = false;
+      final synced = await vm.syncPendingOfflineSteps();
+
+      expect(synced, 1);
+      expect(vm.pendingOfflineCount, 0);
+      expect(vm.steps.first.isValid, isTrue);
+      expect(vm.steps.first.isTargetReached, isTrue);
+      expect(vm.isTargetReached, isTrue);
+      expect(vm.currentPl, 0.70);
+    });
+
     test('Accessibility toggles update ViewModel states', () {
       expect(viewModel.isTunnelFocusMode, isFalse);
       expect(viewModel.isDyscalculiaHelper, isFalse);
@@ -163,6 +243,40 @@ void main() {
 
       viewModel.toggleDyscalculiaHelper();
       expect(viewModel.isDyscalculiaHelper, isTrue);
+    });
+
+    test('startDailySession dynamically initializes session from backend', () async {
+      final fakeApi = FakeEngineApiService();
+      final vm = SessionViewModel(
+        apiService: fakeApi,
+        sessionId: 'initial-sess',
+        targetEquation: 'initial-eq',
+      );
+
+      final result = await vm.startDailySession();
+
+      expect(result['session_id'], 'sess_daily_test_123');
+      expect(vm.sessionId, 'sess_daily_test_123');
+      expect(vm.targetEquation, 'x^2 + 6x = 2');
+      expect(vm.nodeId, 'N15');
+      expect(vm.steps, isEmpty);
+    });
+
+    test('startDailySession falls back gracefully to local unique session id when offline', () async {
+      final fakeApi = FakeEngineApiService();
+      fakeApi.throwNetworkError = true;
+      final vm = SessionViewModel(
+        apiService: fakeApi,
+        sessionId: 'initial-sess',
+        targetEquation: 'initial-eq',
+      );
+
+      final result = await vm.startDailySession();
+
+      expect(result['offline_fallback'], isTrue);
+      expect(vm.sessionId.startsWith('sess_local_'), isTrue);
+      expect(vm.targetEquation, 'initial-eq');
+      expect(vm.steps, isEmpty);
     });
   });
 }

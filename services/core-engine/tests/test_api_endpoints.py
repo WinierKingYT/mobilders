@@ -206,6 +206,37 @@ def test_websocket_session_lifecycle():
         assert pong_msg["type"] == "PONG"
 
 
+def test_websocket_error_resilience():
+    """Öncelik 7: WebSocket hata dayanıklılığı ve bağlantı sürekliliği testi."""
+    with client.websocket_connect("/ws/v1/session") as ws:
+        init_msg = ws.receive_json()
+        assert init_msg["type"] == "SESSION_READY"
+
+        # 1. Bilinmeyen mesaj tipi gönderimi (bağlantı kopmamalı)
+        ws.send_json({"type": "INVALID_ACTION", "client_msg_id": "cmsg_bad_type"})
+        err_msg = ws.receive_json()
+        assert err_msg["type"] == "ERROR"
+        assert err_msg["code"] == "UNKNOWN_MESSAGE_TYPE"
+
+        # 2. HINT_REQUEST dinamik target_equation ile
+        ws.send_json({
+            "type": "HINT_REQUEST",
+            "client_msg_id": "cmsg_hint_dyn",
+            "payload": {
+                "current_latex": "x^2 + 5x + 6 = 0",
+                "target_equation": "x**2 + 5*x + 6 = 0",
+            }
+        })
+        hint_msg = ws.receive_json()
+        assert hint_msg["type"] == "HINT_RESPONSE"
+        assert "socratic_prompt" in hint_msg["payload"]
+
+        # 3. Hata sonrasında kanalın sağlıklı biçimde çalışmaya devam ettiğini doğrula
+        ws.send_json({"type": "PING"})
+        pong_msg = ws.receive_json()
+        assert pong_msg["type"] == "PONG"
+
+
 def test_protocol_22_rest_aliases():
     # 1. /api/v1/cat/start
     r1 = client.post("/api/v1/cat/start", json={"session_id": "test_cat_001"})

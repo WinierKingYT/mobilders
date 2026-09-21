@@ -37,9 +37,20 @@ class LocalAnalyticsReporter:
         mastery_map = node_masteries or self._estimate_mastery(trials)
 
         # 1. Metacognitive Calibration & Brier Score
-        confs = [t.get("confidence", 0.75) for t in trials]
-        accs = [1.0 if t.get("is_correct", True) else 0.0 for t in trials]
-        rts = [t.get("latency_seconds", 3.2) for t in trials]
+        confs: List[float] = []
+        accs: List[float] = []
+        rts: List[float] = []
+
+        for t in trials:
+            c = t.get("confidence", 0.75)
+            c = float(c) if (c is not None and math.isfinite(c)) else 0.75
+            confs.append(max(0.0, min(1.0, c)))
+
+            accs.append(1.0 if t.get("is_correct", True) else 0.0)
+
+            rt = t.get("latency_seconds", 3.2)
+            rt = float(rt) if (rt is not None and math.isfinite(rt) and rt >= 0.0) else 3.2
+            rts.append(rt)
 
         brier_score = float(np.mean([(c - a) ** 2 for c, a in zip(confs, accs)])) if confs else 0.05
 
@@ -57,8 +68,8 @@ class LocalAnalyticsReporter:
                 if bin_lower <= c < bin_upper or (i == len(bins) - 2 and c == 1.0)
             ]
             if bin_items:
-                bin_conf = np.mean([item[0] for item in bin_items])
-                bin_acc = np.mean([item[1] for item in bin_items])
+                bin_conf = float(np.mean([item[0] for item in bin_items]))
+                bin_acc = float(np.mean([item[1] for item in bin_items]))
                 bin_weight = len(bin_items) / len(confs)
                 ece += bin_weight * abs(bin_acc - bin_conf)
 
@@ -78,6 +89,8 @@ class LocalAnalyticsReporter:
         z_p = (mean_acc - 0.65) / 0.20
         z_r = (mean_rt - 5.0) / 2.0
         paas_e = float((z_p - z_r) / math.sqrt(2.0))
+        if not math.isfinite(paas_e):
+            paas_e = 0.0
 
         # 3. 14-Day FSRS Retention Projection
         # Average stability S across mastered nodes

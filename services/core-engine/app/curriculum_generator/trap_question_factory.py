@@ -407,6 +407,8 @@ class DynamicExamFactory:
         target_theta: float = 0.0,
     ) -> DynamicExam:
         """Belirtilen sınav tipine ve soru adedine göre bilişsel tuzaklı deneme sınavı üretir."""
+        safe_count = max(1, min(int(question_count) if isinstance(question_count, (int, float)) and math.isfinite(question_count) else 10, 200))
+        safe_theta = float(target_theta) if isinstance(target_theta, (int, float)) and math.isfinite(target_theta) else 0.0
         questions: List[TrapQuestion] = []
 
         # Soru bankası havuzu oluştur
@@ -425,7 +427,7 @@ class DynamicExamFactory:
             ("circle", 60, 0),
         ]
 
-        for i in range(question_count):
+        for i in range(safe_count):
             cfg = seed_configs[i % len(seed_configs)]
             q_type = cfg[0]
             if q_type == "quad":

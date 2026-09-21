@@ -34,6 +34,11 @@ class ScratchpadPainter extends CustomPainter {
   void _drawStroke(Canvas canvas, DrawingStroke stroke) {
     if (stroke.points.isEmpty) return;
 
+    final validPoints = stroke.points
+        .where((p) => p.dx.isFinite && !p.dx.isNaN && p.dy.isFinite && !p.dy.isNaN)
+        .toList();
+    if (validPoints.isEmpty) return;
+
     final paint = Paint()
       ..color = stroke.color
       ..strokeCap = StrokeCap.round
@@ -41,15 +46,15 @@ class ScratchpadPainter extends CustomPainter {
       ..strokeWidth = stroke.strokeWidth
       ..style = PaintingStyle.stroke;
 
-    if (stroke.points.length == 1) {
-      canvas.drawCircle(stroke.points.first, stroke.strokeWidth / 2, paint);
+    if (validPoints.length == 1) {
+      canvas.drawCircle(validPoints.first, stroke.strokeWidth / 2, paint);
       return;
     }
 
     final path = Path();
-    path.moveTo(stroke.points.first.dx, stroke.points.first.dy);
-    for (int i = 1; i < stroke.points.length; i++) {
-      path.lineTo(stroke.points[i].dx, stroke.points[i].dy);
+    path.moveTo(validPoints.first.dx, validPoints.first.dy);
+    for (int i = 1; i < validPoints.length; i++) {
+      path.lineTo(validPoints[i].dx, validPoints[i].dy);
     }
     canvas.drawPath(path, paint);
   }
@@ -71,6 +76,9 @@ class ScratchpadOverlay extends StatefulWidget {
 }
 
 class _ScratchpadOverlayState extends State<ScratchpadOverlay> {
+  static const int maxStrokes = 500;
+  static const int maxPointsPerStroke = 2000;
+
   final List<DrawingStroke> _strokes = [];
   DrawingStroke? _currentStroke;
   Color _selectedColor = const Color(0xFFF8FAFC);
@@ -148,22 +156,30 @@ class _ScratchpadOverlayState extends State<ScratchpadOverlay> {
             Expanded(
               child: GestureDetector(
                 onPanStart: (details) {
+                  final pos = details.localPosition;
+                  if (!pos.dx.isFinite || !pos.dy.isFinite) return;
                   setState(() {
                     _currentStroke = DrawingStroke(
-                      points: [details.localPosition],
+                      points: [pos],
                       color: _selectedColor,
                       strokeWidth: _strokeWidth,
                     );
                   });
                 },
                 onPanUpdate: (details) {
+                  final pos = details.localPosition;
+                  if (!pos.dx.isFinite || !pos.dy.isFinite) return;
+                  if ((_currentStroke?.points.length ?? 0) >= maxPointsPerStroke) return;
                   setState(() {
-                    _currentStroke?.points.add(details.localPosition);
+                    _currentStroke?.points.add(pos);
                   });
                 },
                 onPanEnd: (details) {
                   setState(() {
                     if (_currentStroke != null) {
+                      if (_strokes.length >= maxStrokes) {
+                        _strokes.removeAt(0);
+                      }
                       _strokes.add(_currentStroke!);
                       _currentStroke = null;
                     }

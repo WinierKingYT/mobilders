@@ -119,6 +119,20 @@ class _SocraticHintDialogState extends State<SocraticHintDialog> {
   }
 
   @override
+  void didUpdateWidget(covariant SocraticHintDialog oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.targetEquation != widget.targetEquation) {
+      setState(() {
+        _data = SocraticHintData.forEquation(widget.targetEquation);
+        _stage = SocraticDialogStage.empathy;
+        _discoveryController.clear();
+        _feedbackMessage = null;
+        _isError = false;
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _discoveryController.dispose();
     super.dispose();

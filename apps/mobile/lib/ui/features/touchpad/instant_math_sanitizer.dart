@@ -64,7 +64,19 @@ class InstantMathSanitizer {
   }
 
   static bool isOperatorChar(String ch) {
-    return ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '^' || ch == '=';
+    return ch == '+' ||
+        ch == '-' ||
+        ch == '*' ||
+        ch == '/' ||
+        ch == '^' ||
+        ch == '=' ||
+        ch == '−' ||
+        ch == '–' ||
+        ch == '—' ||
+        ch == '×' ||
+        ch == '·' ||
+        ch == '•' ||
+        ch == '÷';
   }
 
   /// Scans the expression and returns a list of bracket metadata with depths and colors.
@@ -173,17 +185,17 @@ class InstantMathSanitizer {
 
     if (trimmedIncoming.isEmpty) return currentText + incomingToken;
 
-    // Handle duplicate decimal point
-    if (trimmedIncoming == '.') {
+    // Handle duplicate decimal point or comma
+    if (trimmedIncoming == '.' || trimmedIncoming == ',') {
       // Find current active number token from the end
       int i = currentText.length - 1;
       while (i >= 0) {
         final code = currentText.codeUnitAt(i);
         final isDigit = code >= 48 && code <= 57; // '0'..'9'
-        final isDot = code == 46; // '.'
+        final isDot = code == 46 || code == 44; // '.' or ','
         if (!isDigit && !isDot) break;
         if (isDot) {
-          // Already has a dot in this number literal! Block duplicate dot
+          // Already has a decimal separator in this number literal! Block duplicate
           return currentText;
         }
         i--;
@@ -191,9 +203,17 @@ class InstantMathSanitizer {
       return '$currentText.';
     }
 
-    // Handle operator input
+    // Handle operator input (including Unicode operators)
     if (trimmedIncoming.length == 1 && isOperatorChar(trimmedIncoming)) {
-      final op = trimmedIncoming;
+      String op = trimmedIncoming;
+      // Canonicalize Unicode operators to ASCII
+      if (op == '−' || op == '–' || op == '—') {
+        op = '-';
+      } else if (op == '×' || op == '·' || op == '•') {
+        op = '*';
+      } else if (op == '÷') {
+        op = '/';
+      }
 
       // Empty text: only allow unary minus
       if (trimmedCurrent.isEmpty) {
@@ -210,7 +230,15 @@ class InstantMathSanitizer {
         return op == '-' ? '-' : '';
       }
 
-      final lastChar = currentText[opIndex];
+      String lastChar = currentText[opIndex];
+      // Canonicalize lastChar for comparison
+      if (lastChar == '−' || lastChar == '–' || lastChar == '—') {
+        lastChar = '-';
+      } else if (lastChar == '×' || lastChar == '·' || lastChar == '•') {
+        lastChar = '*';
+      } else if (lastChar == '÷') {
+        lastChar = '/';
+      }
 
       // After opening bracket: only allow unary minus
       if (isOpeningBracket(lastChar)) {

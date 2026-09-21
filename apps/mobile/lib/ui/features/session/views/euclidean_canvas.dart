@@ -33,6 +33,17 @@ class _EuclideanCanvasState extends State<EuclideanCanvas> {
     _showAuxiliary = widget.initialShowAuxiliary;
   }
 
+  @override
+  void didUpdateWidget(covariant EuclideanCanvas oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialPreset != widget.initialPreset) {
+      _preset = widget.initialPreset;
+    }
+    if (oldWidget.initialShowAuxiliary != widget.initialShowAuxiliary) {
+      _showAuxiliary = widget.initialShowAuxiliary;
+    }
+  }
+
   String get _presetTitle {
     switch (_preset) {
       case EuclideanShapePreset.isosceles:
@@ -180,11 +191,13 @@ class _EuclideanCanvasState extends State<EuclideanCanvas> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12.0),
-            child: CustomPaint(
-              key: const Key("euclidean_canvas"),
-              painter: _EuclideanPainter(
-                preset: _preset,
-                showAuxiliary: _showAuxiliary,
+            child: RepaintBoundary(
+              child: CustomPaint(
+                key: const Key("euclidean_canvas"),
+                painter: _EuclideanPainter(
+                  preset: _preset,
+                  showAuxiliary: _showAuxiliary,
+                ),
               ),
             ),
           ),
@@ -372,6 +385,7 @@ class _EuclideanPainter extends CustomPainter {
     final double dx = p2.dx - p1.dx;
     final double dy = p2.dy - p1.dy;
     final double distance = math.sqrt(dx * dx + dy * dy);
+    if (distance <= 0.0 || !distance.isFinite) return;
     final double unitX = dx / distance;
     final double unitY = dy / distance;
 

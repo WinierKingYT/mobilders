@@ -61,6 +61,10 @@ class JsonLogFormatter(logging.Formatter):
             log_obj["session_id"] = record.session_id
         if hasattr(record, "duration_ms"):
             log_obj["duration_ms"] = record.duration_ms
+        if hasattr(record, "status_code"):
+            log_obj["status_code"] = record.status_code
+        if hasattr(record, "client_ip"):
+            log_obj["client_ip"] = record.client_ip
 
         if record.exc_info:
             log_obj["exception"] = self.formatException(record.exc_info)

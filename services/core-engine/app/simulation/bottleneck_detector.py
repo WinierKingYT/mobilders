@@ -5,6 +5,7 @@ to empirically flag and prune problematic curriculum nodes before real student d
 """
 
 from __future__ import annotations
+import math
 from typing import Dict, List, Any
 import numpy as np
 
@@ -20,9 +21,17 @@ class BottleneckDetector:
     ) -> List[Dict[str, Any]]:
         bottlenecks = []
 
-        for node_id, pass_rate in node_pass_rates.items():
-            median_trials = node_median_trials.get(node_id, 3.0)
-            overload_pct = node_overload_rates.get(node_id, 0.10) * 100.0
+        for node_id, raw_pass_rate in node_pass_rates.items():
+            pass_rate = float(raw_pass_rate) if isinstance(raw_pass_rate, (int, float)) and math.isfinite(raw_pass_rate) else 0.50
+            pass_rate = min(max(pass_rate, 0.0), 1.0)
+
+            raw_median = node_median_trials.get(node_id, 3.0)
+            median_trials = float(raw_median) if isinstance(raw_median, (int, float)) and math.isfinite(raw_median) else 3.0
+            median_trials = max(median_trials, 0.0)
+
+            raw_overload = node_overload_rates.get(node_id, 0.10)
+            overload_rate = float(raw_overload) if isinstance(raw_overload, (int, float)) and math.isfinite(raw_overload) else 0.10
+            overload_pct = min(max(overload_rate * 100.0, 0.0), 100.0)
 
             is_bottleneck = False
             reasons = []

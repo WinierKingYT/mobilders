@@ -166,23 +166,37 @@ class LivingKnowledgeAtlasEngine:
             summary[node.domain] = summary.get(node.domain, 0) + 1
         return summary
 
-    def get_recursive_prerequisites(self, node_id: str) -> Set[str]:
+    def get_recursive_prerequisites(self, node_id: str, visited: Optional[Set[str]] = None) -> Set[str]:
         """Bir düğümün geçmişe doğru tüm öncüllerini (ancestors) toplar."""
+        if visited is None:
+            visited = set()
+        if node_id in visited:
+            return set()
+        visited.add(node_id)
+
         node = self.nodes.get(node_id)
         if not node:
             return set()
         prereqs = set(node.strict_prereqs)
         for parent_id in list(prereqs):
-            prereqs.update(self.get_recursive_prerequisites(parent_id))
+            if parent_id not in visited:
+                prereqs.update(self.get_recursive_prerequisites(parent_id, visited))
         return prereqs
 
-    def get_downstream_dependents(self, node_id: str) -> Set[str]:
+    def get_downstream_dependents(self, node_id: str, visited: Optional[Set[str]] = None) -> Set[str]:
         """Bu düğüme doğrudan veya dolaylı bağlı olan tüm ileri düğümleri (descendants) bulur."""
+        if visited is None:
+            visited = set()
+        if node_id in visited:
+            return set()
+        visited.add(node_id)
+
         dependents: Set[str] = set()
         for other_id, other_node in self.nodes.items():
             if node_id in other_node.strict_prereqs:
                 dependents.add(other_id)
-                dependents.update(self.get_downstream_dependents(other_id))
+                if other_id not in visited:
+                    dependents.update(self.get_downstream_dependents(other_id, visited))
         return dependents
 
     def compute_zpd_frontier(self, mastered_ids: Set[str]) -> List[str]:

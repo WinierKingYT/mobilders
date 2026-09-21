@@ -17,495 +17,126 @@ class QuadraticMisconceptionDetector:
 
     def detect(
         self,
-        user_step_str: str,
-        previous_step_str: str,
-        target_equation_str: str,
+        user_step_str: Optional[str],
+        previous_step_str: Optional[str] = None,
+        target_equation_str: Optional[str] = None,
     ) -> Optional[DiagnosticPayload]:
         """
-        Kullanıcının yazdığı adımı önceki adımlarla kıyaslayarak 5 temel bozuk kuralı arar.
+        Kullanıcının yazdığı adımı önceki adımlarla kıyaslayarak 95 temel bozuk kuralı arar.
+        Tam hata toleranslıdır (Fault-tolerant); bozuk sözdizimleri veya SymPy parse hatalarında
+        asla çökmez, diğer kuralları dener ve bulunamazsa güvenle None döner.
         """
+        if not user_step_str or not user_step_str.strip():
+            return None
+
         clean_user = user_step_str.strip().replace("^", "**")
-        clean_prev = (previous_step_str or target_equation_str).strip().replace("^", "**")
-
-        # 1. BUG-QUAD-01: Sıfır Olmayan Sayıya Sıfır-Çarpım Transferi
-        # Örnek: x(x+6) = 2 => x = 2 veya x+6 = 2
-        bug1 = self._check_bug_quad_01(clean_user, clean_prev)
-        if bug1:
-            return bug1
-
-        # 2. BUG-QUAD-02: Eksik Karekök / Negatif Kök Kaybı
-        # Örnek: x^2 = 25 => x = 5 veya (x+3)^2 = 11 => x+3 = sqrt(11)
-        bug2 = self._check_bug_quad_02(clean_user, clean_prev)
-        if bug2:
-            return bug2
-
-        # 3. BUG-QUAD-03: Dağılma Özelliğini Üslere Yanlış Genelleme
-        # Örnek: (x + 3)^2 = x^2 + 9 (2ax çapraz terimi eksik)
-        bug3 = self._check_bug_quad_03(clean_user, clean_prev)
-        if bug3:
-            return bug3
-
-        # 4. BUG-QUAD-04: Sadeleştirme Yanılsaması / Kök Katli
-        # Örnek: x^2 = 6x => x = 6 (x=0 kökü kayboldu)
-        bug4 = self._check_bug_quad_04(clean_user, clean_prev)
-        if bug4:
-            return bug4
-
-        # 5. BUG-QUAD-05: Kuadratik Formülde İşaret Hatası
-        # Örnek: b negatifken (-b) yerine b yazılması
-        bug5 = self._check_bug_quad_05(clean_user, clean_prev)
-        if bug5:
-            return bug5
-
-        # 6. BUG-QUAD-06: Eşitsizlikte Negatif Sayıyla Bölmede Yön Değiştirmeme
-        bug6 = self._check_bug_quad_06(clean_user, clean_prev)
-        if bug6:
-            return bug6
-
-        # 7. BUG-QUAD-07: Çift Katlı Kökte İşaret Değiştirme
-        bug7 = self._check_bug_quad_07(clean_user, clean_prev)
-        if bug7:
-            return bug7
-
-        # 8. BUG-QUAD-08: Parabol Tepe Noktasında Eksi İşaretini Unutma
-        bug8 = self._check_bug_quad_08(clean_user, clean_prev)
-        if bug8:
-            return bug8
-
-        # 9. BUG-QUAD-09: Yatay Fonksiyon Ötelemesinde Yönü Ters Anlama
-        bug9 = self._check_bug_quad_09(clean_user, clean_prev)
-        if bug9:
-            return bug9
-
-        # 10. BUG-QUAD-10: Eşitsizlik Çözümünde Kök Bölgesini Ters Seçme
-        bug10 = self._check_bug_quad_10(clean_user, clean_prev)
-        if bug10:
-            return bug10
-
-        # 11. BUG-PARAB-01: Parabol Tepe Apsisi Formülü Eksi İşareti Hatası
-        bug_p1 = self._check_bug_parab_01(clean_user, clean_prev)
-        if bug_p1:
-            return bug_p1
-
-        # 12. BUG-PARAB-02: Simetri Ekseni Kargaşası ve Ordinat Yanılgısı
-        bug_p2 = self._check_bug_parab_02(clean_user, clean_prev)
-        if bug_p2:
-            return bug_p2
-
-        # 13. BUG-PARAB-03: Kök Geometrisi ve Tepe Noktası İlişkisi Hatası
-        bug_p3 = self._check_bug_parab_03(clean_user, clean_prev)
-        if bug_p3:
-            return bug_p3
-
-        # 14. BUG-PARAB-04: Y-Kesişimi ile X-Kesişimini Karıştırma
-        bug_p4 = self._check_bug_parab_04(clean_user, clean_prev)
-        if bug_p4:
-            return bug_p4
-
-        # 15. BUG-PARAB-05: Başkatsayı a İşaretine Göre Ekstremum Tersliği
-        bug_p5 = self._check_bug_parab_05(clean_user, clean_prev)
-        if bug_p5:
-            return bug_p5
-
-        # 16. BUG-POLY-01: Kalan Teoreminde Kök İşareti Yanılgısı
-        bug_poly1 = self._check_bug_poly_01(clean_user, clean_prev)
-        if bug_poly1:
-            return bug_poly1
-
-        # 17. BUG-POLY-02: Katsayılar Toplamı ve Sabit Terim Kargaşası
-        bug_poly2 = self._check_bug_poly_02(clean_user, clean_prev)
-        if bug_poly2:
-            return bug_poly2
-
-        # 18. BUG-POLY-03: Polinom Bölmesinde Derece Kuralı İhlali
-        bug_poly3 = self._check_bug_poly_03(clean_user, clean_prev)
-        if bug_poly3:
-            return bug_poly3
-
-        # 19. BUG-POLY-04: Polinom Derece Aritmetiğinde Çarpım/Kuvvet Yanılgısı
-        bug_poly4 = self._check_bug_poly_04(clean_user, clean_prev)
-        if bug_poly4:
-            return bug_poly4
-
-        # 20. BUG-POLY-05: Polinom Bölmesinde Kökü Doğrudan Kalana Eşitleme
-        bug_poly5 = self._check_bug_poly_05(clean_user, clean_prev)
-        if bug_poly5:
-            return bug_poly5
-
-        # 21. BUG-TRIG-01: Trigonometrik Lineerlik Tuzağı
-        bug_t1 = self._check_bug_trig_01(clean_user, clean_prev)
-        if bug_t1:
-            return bug_t1
-
-        # 22. BUG-TRIG-02: Fonksiyon İsim ve Argüman Sadeleştirme Hatası
-        bug_t2 = self._check_bug_trig_02(clean_user, clean_prev)
-        if bug_t2:
-            return bug_t2
-
-        # 23. BUG-TRIG-03: Birim Çember Eksen Karışıklığı
-        bug_t3 = self._check_bug_trig_03(clean_user, clean_prev)
-        if bug_t3:
-            return bug_t3
-
-        # 24. BUG-TRIG-04: Trigonometrik Denklemde Kök/Periyot Kaybı
-        bug_t4 = self._check_bug_trig_04(clean_user, clean_prev)
-        if bug_t4:
-            return bug_t4
-
-        # 25. BUG-TRIG-05: Negatif Açı ve Parite Yanılgısı
-        bug_t5 = self._check_bug_trig_05(clean_user, clean_prev)
-        if bug_t5:
-            return bug_t5
-
-        # 26. BUG-LOG-01: Logaritma Toplam-Dağılma Tuzağı
-        bug_l1 = self._check_bug_log_01(clean_user, clean_prev)
-        if bug_l1:
-            return bug_l1
-
-        # 27. BUG-LOG-02: Logaritma Çarpım/Kuvvet Karışıklığı
-        bug_l2 = self._check_bug_log_02(clean_user, clean_prev)
-        if bug_l2:
-            return bug_l2
-
-        # 28. BUG-LOG-03: Negatif Tanım Kümesi İhmali / Sahte Kök
-        bug_l3 = self._check_bug_log_03(clean_user, clean_prev)
-        if bug_l3:
-            return bug_l3
-
-        # 29. BUG-LOG-04: Taban Değiştirme ve Bölme Hatası
-        bug_l4 = self._check_bug_log_04(clean_user, clean_prev)
-        if bug_l4:
-            return bug_l4
-
-        # 30. BUG-LOG-05: Üstel/Logaritma Taban ve Kuvvet Karışıklığı
-        bug_l5 = self._check_bug_log_05(clean_user, clean_prev)
-        if bug_l5:
-            return bug_l5
-
-        # 31. BUG-CALC-01: Zincir Kuralında İç Türevi Unutma
-        bug_c1 = self._check_bug_calc_01(clean_user, clean_prev)
-        if bug_c1:
-            return bug_c1
-
-        # 32. BUG-CALC-02: Bölümün Türevinde İşaret Hatası
-        bug_c2 = self._check_bug_calc_02(clean_user, clean_prev)
-        if bug_c2:
-            return bug_c2
-
-        # 33. BUG-CALC-03: 0/0 Belirsizliğini Tanımsız veya Sıfır İlan Etme
-        bug_c3 = self._check_bug_calc_03(clean_user, clean_prev)
-        if bug_c3:
-            return bug_c3
-
-        # 34. BUG-CALC-04: f'(x)=0 Noktasını Kesin Ekstremum Sanma
-        bug_c4 = self._check_bug_calc_04(clean_user, clean_prev)
-        if bug_c4:
-            return bug_c4
-
-        # 35. BUG-CALC-05: Çarpımın Türevinde Sahte Doğrusallık ((uv)' = u'v')
-        bug_c5 = self._check_bug_calc_05(clean_user, clean_prev)
-        if bug_c5:
-            return bug_c5
-
-        # 36. BUG-CALC-06: Sabit Sayının Türevini Sıfır Yerine Kendisi Bırakma
-        bug_c6 = self._check_bug_calc_06(clean_user, clean_prev)
-        if bug_c6:
-            return bug_c6
-
-        # 37. BUG-CALC-07: Limiti Fonksiyon Değeriyle Özdeşleştirme Fallacy
-        bug_c7 = self._check_bug_calc_07(clean_user, clean_prev)
-        if bug_c7:
-            return bug_c7
-
-        # 38. BUG-CALC-08: Kosinüs Türevinde Eksi İşareti Hatası
-        bug_c8 = self._check_bug_calc_08(clean_user, clean_prev)
-        if bug_c8:
-            return bug_c8
-
-        # 39. BUG-CALC-09: L'Hôpital ile Bölüm Türevinin Karıştırılması ((f/g)' = f'/g')
-        bug_c9 = self._check_bug_calc_09(clean_user, clean_prev)
-        if bug_c9:
-            return bug_c9
-
-        # 40. BUG-CALC-10: Teğet Doğrusu Eğimini Fonksiyon Değerine Eşitleme
-        bug_c10 = self._check_bug_calc_10(clean_user, clean_prev)
-        if bug_c10:
-            return bug_c10
-
-        # 41. BUG-INT-01: İntegrasyon Sabiti (+C) Unutulması
-        bug_i1 = self._check_bug_int_01(clean_user, clean_prev)
-        if bug_i1:
-            return bug_i1
-
-        # 42. BUG-INT-02: u-İkamesinde Diferansiyel İhmali
-        bug_i2 = self._check_bug_int_02(clean_user, clean_prev)
-        if bug_i2:
-            return bug_i2
-
-        # 43. BUG-INT-03: Belirli İntegralde Sınır Sırasını Ters Çıkarma
-        bug_i3 = self._check_bug_int_03(clean_user, clean_prev)
-        if bug_i3:
-            return bug_i3
-
-        # 44. BUG-INT-04: Negatif Belirli İntegrali Alan Kabul Etme
-        bug_i4 = self._check_bug_int_04(clean_user, clean_prev)
-        if bug_i4:
-            return bug_i4
-
-        # 45. BUG-INT-05: Kısmi İntegrasyon Formülü İşaret Hatası
-        bug_i5 = self._check_bug_int_05(clean_user, clean_prev)
-        if bug_i5:
-            return bug_i5
-
-        # 46. BUG-INT-06: 1/x İntegralinde Kuvvet Kuralı Hatası
-        bug_i6 = self._check_bug_int_06(clean_user, clean_prev)
-        if bug_i6:
-            return bug_i6
-
-        # 47. BUG-INT-07: Belirli u-İkamesinde Sınırları Güncellememe
-        bug_i7 = self._check_bug_int_07(clean_user, clean_prev)
-        if bug_i7:
-            return bug_i7
-
-        # 48. BUG-INT-08: İki Eğri Arası Alan Sırası Hatası
-        bug_i8 = self._check_bug_int_08(clean_user, clean_prev)
-        if bug_i8:
-            return bug_i8
-
-        # 49. BUG-INT-09: İntegralin Çarpma Üzerine Dağılması Sanrısı
-        bug_i9 = self._check_bug_int_09(clean_user, clean_prev)
-        if bug_i9:
-            return bug_i9
-
-        # 50. BUG-INT-10: FTC 1 Zincir Kuralı İhmali
-        bug_i10 = self._check_bug_int_10(clean_user, clean_prev)
-        if bug_i10:
-            return bug_i10
-
-        # 51. BUG-PROB-01: Yaş Problemlerinde Zaman Kayması Hatası
-        bug_prob1 = self._check_bug_prob_01(clean_user, clean_prev)
-        if bug_prob1:
-            return bug_prob1
-
-        # 52. BUG-PROB-02: Hız-Zaman Ters Orantı / Doğru Orantı Çelişkisi
-        bug_prob2 = self._check_bug_prob_02(clean_user, clean_prev)
-        if bug_prob2:
-            return bug_prob2
-
-        # 53. BUG-PROB-03: Ortalama Hızda Aritmetik Ortalama Tuzağı
-        bug_prob3 = self._check_bug_prob_03(clean_user, clean_prev)
-        if bug_prob3:
-            return bug_prob3
-
-        # 54. BUG-PROB-04: Yüzde Artış ve Azalışın Birbirini Sıfırladığı Sanrısı
-        bug_prob4 = self._check_bug_prob_04(clean_user, clean_prev)
-        if bug_prob4:
-            return bug_prob4
-
-        # 55. BUG-PROB-05: Karışımda Saf Madde vs Toplam Karışım Kargaşası
-        bug_prob5 = self._check_bug_prob_05(clean_user, clean_prev)
-        if bug_prob5:
-            return bug_prob5
-
-        # 56. BUG-PROB-06: İşçi Probleminde Süreleri Düz Toplama
-        bug_prob6 = self._check_bug_prob_06(clean_user, clean_prev)
-        if bug_prob6:
-            return bug_prob6
-
-        # 57. BUG-PROB-07: Bağıl Hızda Yön / İşaret Hatası
-        bug_prob7 = self._check_bug_prob_07(clean_user, clean_prev)
-        if bug_prob7:
-            return bug_prob7
-
-        # 58. BUG-PROB-08: Kâr Marjı Tabanı (Maliyet vs Satış Fiyatı) Karışıklığı
-        bug_prob8 = self._check_bug_prob_08(clean_user, clean_prev)
-        if bug_prob8:
-            return bug_prob8
-
-        # 59. BUG-PROB-09: Birim Uyuşmazlığı (km/saat vs dakika)
-        bug_prob9 = self._check_bug_prob_09(clean_user, clean_prev)
-        if bug_prob9:
-            return bug_prob9
-
-        # 60. BUG-PROB-10: Gerçek Dünya Kısıtını Göz Ardı Etme
-        bug_prob10 = self._check_bug_prob_10(clean_user, clean_prev)
-        if bug_prob10:
-            return bug_prob10
-
-        # 61. BUG-FOUND-01: Çift Eksi Tuzağı (-(-4) = -4)
-        bug_f1 = self._check_bug_found_01(clean_user, clean_prev)
-        if bug_f1:
-            return bug_f1
-
-        # 62. BUG-FOUND-02: İşlem Önceliği Körlüğü (3 + 4*2 = 14)
-        bug_f2 = self._check_bug_found_02(clean_user, clean_prev)
-        if bug_f2:
-            return bug_f2
-
-        # 63. BUG-FOUND-03: Kuvvet ile İşaret Çelişkisi (-3^2 = 9)
-        bug_f3 = self._check_bug_found_03(clean_user, clean_prev)
-        if bug_f3:
-            return bug_f3
-
-        # 64. BUG-FOUND-04: Kesir Düz Toplama Hatası (1/2 + 1/3 = 2/5)
-        bug_f4 = self._check_bug_found_04(clean_user, clean_prev)
-        if bug_f4:
-            return bug_f4
-
-        # 65. BUG-FOUND-05: Yarım Dağılma Hatası (2(x+3) = 2x+3)
-        bug_f5 = self._check_bug_found_05(clean_user, clean_prev)
-        if bug_f5:
-            return bug_f5
-
-        # 66. BUG-FOUND-06: Toplama/Çarpma Karışıklığı (x + x = x^2)
-        bug_f6 = self._check_bug_found_06(clean_user, clean_prev)
-        if bug_f6:
-            return bug_f6
-
-        # 67. BUG-FOUND-07: Katsayıyı Çıkarma Sanma (3x = 12 => x = 9)
-        bug_f7 = self._check_bug_found_07(clean_user, clean_prev)
-        if bug_f7:
-            return bug_f7
-
-        # 68. BUG-FOUND-08: Elma ile Armudu Toplama (2x + 3 = 5x)
-        bug_f8 = self._check_bug_found_08(clean_user, clean_prev)
-        if bug_f8:
-            return bug_f8
-
-        # 69. BUG-FOUND-09: Üs ile Tabanı Çarpma (2^3 = 6)
-        bug_f9 = self._check_bug_found_09(clean_user, clean_prev)
-        if bug_f9:
-            return bug_f9
-
-        # 70. BUG-FOUND-10: Negatif Sıralama Yanılgısı (-8 > -3)
-        bug_f10 = self._check_bug_found_10(clean_user, clean_prev)
-        if bug_f10:
-            return bug_f10
-
-        # 71. BUG-FOUND-11: Sıfıra Bölme Hatası (5/0 = 0 veya 5)
-        bug_f11 = self._check_bug_found_11(clean_user, clean_prev)
-        if bug_f11:
-            return bug_f11
-
-        # 72. BUG-FOUND-12: Eksi Parantez Dağılma (-(x - 4) = -x - 4)
-        bug_f12 = self._check_bug_found_12(clean_user, clean_prev)
-        if bug_f12:
-            return bug_f12
-
-        # 73. BUG-FOUND-13: Fonksiyonu Sayı Sanma (f(3) = 23)
-        bug_f13 = self._check_bug_found_13(clean_user, clean_prev)
-        if bug_f13:
-            return bug_f13
-
-        # 74. BUG-FOUND-14: Eşitsizlikte Yön Unutma (-2x < 6 => x < -3)
-        bug_f14 = self._check_bug_found_14(clean_user, clean_prev)
-        if bug_f14:
-            return bug_f14
-
-        # 75. BUG-FOUND-15: Tek Taraflı Terazi Hatası (x + 4 = 10 => x + 4 - 4 = 10)
-        bug_f15 = self._check_bug_found_15(clean_user, clean_prev)
-        if bug_f15:
-            return bug_f15
-
-        # 76. BUG-ANAG-01: Dik Doğrularda Eğim Bağıntısı Hatası (m1 = m2 veya m1*m2 = 1)
-        bug_a1 = self._check_bug_anag_01(clean_user, clean_prev)
-        if bug_a1:
-            return bug_a1
-
-        # 77. BUG-ANAG-02: Geniş Açı ve Eğim İşareti Hatası (theta > 90 fakat m > 0)
-        bug_a2 = self._check_bug_anag_02(clean_user, clean_prev)
-        if bug_a2:
-            return bug_a2
-
-        # 78. BUG-ANAG-03: Çember Merkez Koordinatında İşaret Tersliği (M(-a, -b))
-        bug_a3 = self._check_bug_anag_03(clean_user, clean_prev)
-        if bug_a3:
-            return bug_a3
-
-        # 79. BUG-ANAG-04: Uzaklık Formülünde Karekökü Unutma (d = (x2-x1)^2 + (y2-y1)^2)
-        bug_a4 = self._check_bug_anag_04(clean_user, clean_prev)
-        if bug_a4:
-            return bug_a4
-
-        # 80. BUG-ANAG-05: Vektör İç Çarpımında Vektörel Sonuç Üretme ((u1*v1, u2*v2))
-        bug_a5 = self._check_bug_anag_05(clean_user, clean_prev)
-        if bug_a5:
-            return bug_a5
-
-        # 81. BUG-EUC-01: Üçgen Eşitsizliği İhlali (a >= b + c)
-        bug_e1 = self._check_bug_euc_01(clean_user, clean_prev)
-        if bug_e1:
-            return bug_e1
-
-        # 82. BUG-EUC-02: Çevre Açı ile Merkez Açı Eşitliği Sanrısı
-        bug_e2 = self._check_bug_euc_02(clean_user, clean_prev)
-        if bug_e2:
-            return bug_e2
-
-        # 83. BUG-EUC-03: Benzerlik Oranını Alan Oranına Eşit Sayma (k -> k²)
-        bug_e3 = self._check_bug_euc_03(clean_user, clean_prev)
-        if bug_e3:
-            return bug_e3
-
-        # 84. BUG-EUC-04: Öklid Yükseklik Bağıntısında Kenar Çarpımı Hatası
-        bug_e4 = self._check_bug_euc_04(clean_user, clean_prev)
-        if bug_e4:
-            return bug_e4
-
-        # 85. BUG-EUC-05: Açıortay Teoreminde Orantı Yerine Eşit Bölme Sanrısı
-        bug_e5 = self._check_bug_euc_05(clean_user, clean_prev)
-        if bug_e5:
-            return bug_e5
-
-        # 86. BUG-COMB-01: Sırasız Seçimde Permütasyon Kullanma
-        bug_cb1 = self._check_bug_comb_01(clean_user, clean_prev)
-        if bug_cb1:
-            return bug_cb1
-
-        # 87. BUG-COMB-02: Kumarbaz Yanılgısı (Gambler's Fallacy)
-        bug_cb2 = self._check_bug_comb_02(clean_user, clean_prev)
-        if bug_cb2:
-            return bug_cb2
-
-        # 88. BUG-COMB-03: Koşullu Olasılıkta Örnek Uzayı Daraltmama
-        bug_cb3 = self._check_bug_comb_03(clean_user, clean_prev)
-        if bug_cb3:
-            return bug_cb3
-
-        # 89. BUG-COMB-04: Tekrarlı Permütasyonda Özdeş Bölümünü Unutma
-        bug_cb4 = self._check_bug_comb_04(clean_user, clean_prev)
-        if bug_cb4:
-            return bug_cb4
-
-        # 90. BUG-COMB-05: Ayrık Olmayan Olaylarda Kesişimi Çıkarmama
-        bug_cb5 = self._check_bug_comb_05(clean_user, clean_prev)
-        if bug_cb5:
-            return bug_cb5
-
-        # 91. BUG-LOGIC-01: İse Bağlacında Yanlış Öncül Yanılgısı
-        bug_l1 = self._check_bug_logic_01(clean_user, clean_prev)
-        if bug_l1:
-            return bug_l1
-
-        # 92. BUG-LOGIC-02: Ters ile Karşıt Tersin Karıştırılması
-        bug_l2 = self._check_bug_logic_02(clean_user, clean_prev)
-        if bug_l2:
-            return bug_l2
-
-        # 93. BUG-LOGIC-03: Niceleyici Değillemesinde Kapsam Hatası
-        bug_l3 = self._check_bug_logic_03(clean_user, clean_prev)
-        if bug_l3:
-            return bug_l3
-
-        # 94. BUG-LOGIC-04: Tümevarımda Taban Adımını Atlayarak Doğrulama Sanma
-        bug_l4 = self._check_bug_logic_04(clean_user, clean_prev)
-        if bug_l4:
-            return bug_l4
-
-        # 95. BUG-LOGIC-05: Çelişki İspatında Ters Varsayım Kurma Hatası
-        bug_l5 = self._check_bug_logic_05(clean_user, clean_prev)
-        if bug_l5:
-            return bug_l5
+        clean_prev = (previous_step_str or target_equation_str or "").strip().replace("^", "**")
+
+        checks = [
+            self._check_bug_quad_01,
+            self._check_bug_quad_02,
+            self._check_bug_quad_03,
+            self._check_bug_quad_04,
+            self._check_bug_quad_05,
+            self._check_bug_quad_06,
+            self._check_bug_quad_07,
+            self._check_bug_quad_08,
+            self._check_bug_quad_09,
+            self._check_bug_quad_10,
+            self._check_bug_parab_01,
+            self._check_bug_parab_02,
+            self._check_bug_parab_03,
+            self._check_bug_parab_04,
+            self._check_bug_parab_05,
+            self._check_bug_poly_01,
+            self._check_bug_poly_02,
+            self._check_bug_poly_03,
+            self._check_bug_poly_04,
+            self._check_bug_poly_05,
+            self._check_bug_trig_01,
+            self._check_bug_trig_02,
+            self._check_bug_trig_03,
+            self._check_bug_trig_04,
+            self._check_bug_trig_05,
+            self._check_bug_log_01,
+            self._check_bug_log_02,
+            self._check_bug_log_03,
+            self._check_bug_log_04,
+            self._check_bug_log_05,
+            self._check_bug_calc_01,
+            self._check_bug_calc_02,
+            self._check_bug_calc_03,
+            self._check_bug_calc_04,
+            self._check_bug_calc_05,
+            self._check_bug_calc_06,
+            self._check_bug_calc_07,
+            self._check_bug_calc_08,
+            self._check_bug_calc_09,
+            self._check_bug_calc_10,
+            self._check_bug_int_01,
+            self._check_bug_int_02,
+            self._check_bug_int_03,
+            self._check_bug_int_04,
+            self._check_bug_int_05,
+            self._check_bug_int_06,
+            self._check_bug_int_07,
+            self._check_bug_int_08,
+            self._check_bug_int_09,
+            self._check_bug_int_10,
+            self._check_bug_prob_01,
+            self._check_bug_prob_02,
+            self._check_bug_prob_03,
+            self._check_bug_prob_04,
+            self._check_bug_prob_05,
+            self._check_bug_prob_06,
+            self._check_bug_prob_07,
+            self._check_bug_prob_08,
+            self._check_bug_prob_09,
+            self._check_bug_prob_10,
+            self._check_bug_found_01,
+            self._check_bug_found_02,
+            self._check_bug_found_03,
+            self._check_bug_found_04,
+            self._check_bug_found_05,
+            self._check_bug_found_06,
+            self._check_bug_found_07,
+            self._check_bug_found_08,
+            self._check_bug_found_09,
+            self._check_bug_found_10,
+            self._check_bug_found_11,
+            self._check_bug_found_12,
+            self._check_bug_found_13,
+            self._check_bug_found_14,
+            self._check_bug_found_15,
+            self._check_bug_anag_01,
+            self._check_bug_anag_02,
+            self._check_bug_anag_03,
+            self._check_bug_anag_04,
+            self._check_bug_anag_05,
+            self._check_bug_euc_01,
+            self._check_bug_euc_02,
+            self._check_bug_euc_03,
+            self._check_bug_euc_04,
+            self._check_bug_euc_05,
+            self._check_bug_comb_01,
+            self._check_bug_comb_02,
+            self._check_bug_comb_03,
+            self._check_bug_comb_04,
+            self._check_bug_comb_05,
+            self._check_bug_logic_01,
+            self._check_bug_logic_02,
+            self._check_bug_logic_03,
+            self._check_bug_logic_04,
+            self._check_bug_logic_05,
+        ]
+
+        for check_fn in checks:
+            try:
+                bug = check_fn(clean_user, clean_prev)
+                if bug:
+                    return bug
+            except Exception:
+                continue
 
         return None
 

@@ -51,6 +51,18 @@ class _ProofCanvasState extends State<ProofCanvas> {
   }
 
   @override
+  void didUpdateWidget(covariant ProofCanvas oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialMode != widget.initialMode) {
+      _mode = widget.initialMode;
+    }
+    if (widget.initialTheoremId != null &&
+        widget.initialTheoremId != oldWidget.initialTheoremId) {
+      _selectedTheoremId = widget.initialTheoremId!;
+    }
+  }
+
+  @override
   void dispose() {
     _stepInputController.dispose();
     super.dispose();
@@ -66,7 +78,7 @@ class _ProofCanvasState extends State<ProofCanvas> {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16.0),
-        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -166,7 +178,7 @@ class _ProofCanvasState extends State<ProofCanvas> {
         // Truth Table Widget
         Container(
           decoration: BoxDecoration(
-            color: colorScheme.surfaceVariant.withOpacity(0.3),
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: colorScheme.outlineVariant),
           ),
@@ -183,7 +195,7 @@ class _ProofCanvasState extends State<ProofCanvas> {
                   DataCell(Text(r['q'].toString(), style: const TextStyle(fontWeight: FontWeight.bold))),
                   DataCell(
                     Text(
-                      r['result'].toString(),
+                       r['result'].toString(),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: r['result'] == 1 ? Colors.green : Colors.red,
@@ -204,7 +216,7 @@ class _ProofCanvasState extends State<ProofCanvas> {
                 key: const Key('badge_tautology'),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.2),
+                  color: Colors.green.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.green),
                 ),
@@ -215,7 +227,7 @@ class _ProofCanvasState extends State<ProofCanvas> {
                 key: const Key('badge_contradiction'),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.2),
+                  color: Colors.red.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.red),
                 ),
@@ -226,7 +238,7 @@ class _ProofCanvasState extends State<ProofCanvas> {
                 key: const Key('badge_contingency'),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.2),
+                  color: Colors.blue.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.blue),
                 ),
@@ -278,7 +290,7 @@ class _ProofCanvasState extends State<ProofCanvas> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         DropdownButtonFormField<String>(
-          value: _selectedTheoremId,
+          initialValue: _selectedTheoremId,
           decoration: const InputDecoration(
             labelText: "İspatlanacak Teorem",
             border: OutlineInputBorder(),
@@ -302,7 +314,7 @@ class _ProofCanvasState extends State<ProofCanvas> {
         // Step Reasoning Card
         Card(
           elevation: 0,
-          color: colorScheme.surfaceVariant.withOpacity(0.3),
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
             side: BorderSide(color: colorScheme.outlineVariant),
@@ -326,7 +338,7 @@ class _ProofCanvasState extends State<ProofCanvas> {
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   key: const Key('dropdown_proof_rule'),
-                  value: _selectedRule,
+                  initialValue: _selectedRule,
                   decoration: const InputDecoration(
                     labelText: "Kullanılan Çıkarım Kuralı",
                     border: OutlineInputBorder(),
@@ -371,7 +383,7 @@ class _ProofCanvasState extends State<ProofCanvas> {
             key: const Key('box_step_feedback'),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: _isStepValid ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+              color: _isStepValid ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: _isStepValid ? Colors.green : Colors.red),
             ),
@@ -415,7 +427,7 @@ class _ProofCanvasState extends State<ProofCanvas> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceVariant.withOpacity(0.3),
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: colorScheme.outlineVariant),
           ),
@@ -482,7 +494,7 @@ class _ProofCanvasState extends State<ProofCanvas> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: isActive ? colorScheme.primary : colorScheme.surfaceVariant.withOpacity(0.5),
+            color: isActive ? colorScheme.primary : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Center(

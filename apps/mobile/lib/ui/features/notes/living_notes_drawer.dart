@@ -89,7 +89,7 @@ class LivingNoteData {
   };
 
   static LivingNoteData getNote(String nodeId) {
-    return catalog[nodeId] ?? catalog['N15']!;
+    return catalog[nodeId] ?? catalog.values.first;
   }
 }
 
@@ -149,6 +149,14 @@ class _LivingNotesDrawerState extends State<LivingNotesDrawer> {
     _loadNote(_currentNodeId);
   }
 
+  @override
+  void didUpdateWidget(covariant LivingNotesDrawer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialNodeId != widget.initialNodeId) {
+      _loadNote(widget.initialNodeId);
+    }
+  }
+
   void _loadNote(String nodeId) {
     setState(() {
       _currentNodeId = nodeId;
@@ -167,8 +175,8 @@ class _LivingNotesDrawerState extends State<LivingNotesDrawer> {
   }
 
   void _submitExercise() {
-    final input = _exerciseController.text.trim().toLowerCase().replaceAll(' ', '');
-    final expected = _note.miniExerciseAnswer.trim().toLowerCase().replaceAll(' ', '');
+    final input = _exerciseController.text.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
+    final expected = _note.miniExerciseAnswer.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
 
     if (input.isEmpty) return;
 

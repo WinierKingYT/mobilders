@@ -1,5 +1,6 @@
 import time
 import re
+import math
 from typing import Optional, Dict, Any, List, TYPE_CHECKING
 import sympy as sp
 from app.cas.symbolic_engine import SymbolicEquivalenceEngine
@@ -294,10 +295,12 @@ class SocraticModelingScaffoldEngine:
         # Doğrudan kanonik denkleme veya alternatiflere denk mi?
         if "=" in raw_input and "=" in problem.canonical_equation_str:
             try:
-                is_equiv = self.cas.verify_equivalence(raw_input, problem.canonical_equation_str)
+                res = self.cas.verify_equivalence(raw_input, problem.canonical_equation_str)
+                is_equiv = res[0] if isinstance(res, tuple) else bool(res)
                 if not is_equiv:
                     for alt_eq in problem.alternative_equations:
-                        if self.cas.verify_equivalence(raw_input, alt_eq):
+                        res_alt = self.cas.verify_equivalence(raw_input, alt_eq)
+                        if res_alt[0] if isinstance(res_alt, tuple) else bool(res_alt):
                             is_equiv = True
                             break
             except Exception:
@@ -359,7 +362,7 @@ class SocraticModelingScaffoldEngine:
             )
 
         # Temizle ve x = 10 veya 10 formundaki yanıtı ayrıştır
-        match = re.search(r"=\s*([-\d\.]+)", raw_input)
+        match = re.search(r"=\s*([-\d\./]+)", raw_input)
         num_str = match.group(1) if match else raw_input.replace("x", "").replace("t", "").replace("=", "").strip()
 
         is_correct = False
@@ -367,26 +370,37 @@ class SocraticModelingScaffoldEngine:
         domain_msg = None
 
         try:
-            val = float(num_str)
-            target_val = float(problem.canonical_solution_str)
+            val = None
+            try:
+                val = float(num_str)
+            except (ValueError, TypeError):
+                if num_str:
+                    sym_val = sp.sympify(num_str)
+                    if sym_val.is_number:
+                        val = float(sym_val.evalf())
 
-            # Gerçek dünya kısıtlarını kontrol et
-            constraints = problem.domain_constraints
-            if constraints.get("positive", True) and val <= 0:
-                domain_ok = False
-                domain_msg = "Bulduğun değer negatif veya sıfır. Gerçek hayatta bu büyüklük pozitif olmalıdır."
-            elif constraints.get("integer_only", False) and not (val.is_integer() or abs(val - round(val)) < 1e-5):
-                domain_ok = False
-                domain_msg = "Bu problem için sonuç bir tam sayı olmalıdır."
-            elif constraints.get("min_val") is not None and val < constraints["min_val"]:
-                domain_ok = False
-                domain_msg = f"Bulunan değer minimum sınırın ({constraints['min_val']}) altında."
-            elif constraints.get("max_val") is not None and val > constraints["max_val"]:
-                domain_ok = False
-                domain_msg = f"Bulunan değer maksimum sınırın ({constraints['max_val']}) üstünde."
+            if val is not None and not (math.isnan(val) or math.isinf(val)):
+                target_val = float(problem.canonical_solution_str)
 
-            if abs(val - target_val) < 1e-4:
-                is_correct = True
+                # Gerçek dünya kısıtlarını kontrol et
+                constraints = problem.domain_constraints
+                if constraints.get("positive", True) and val <= 0:
+                    domain_ok = False
+                    domain_msg = "Bulduğun değer negatif veya sıfır. Gerçek hayatta bu büyüklük pozitif olmalıdır."
+                elif constraints.get("integer_only", False) and not (val.is_integer() or abs(val - round(val)) < 1e-5):
+                    domain_ok = False
+                    domain_msg = "Bu problem için sonuç bir tam sayı olmalıdır."
+                elif constraints.get("min_val") is not None and val < constraints["min_val"]:
+                    domain_ok = False
+                    domain_msg = f"Bulunan değer minimum sınırın ({constraints['min_val']}) altında."
+                elif constraints.get("max_val") is not None and val > constraints["max_val"]:
+                    domain_ok = False
+                    domain_msg = f"Bulunan değer maksimum sınırın ({constraints['max_val']}) üstünde."
+
+                if abs(val - target_val) < 1e-4:
+                    is_correct = True
+            else:
+                is_correct = False
         except Exception:
             is_correct = False
 

@@ -202,3 +202,35 @@ def test_api_verify_step_returns_psychometrics():
     assert psy["ddm_drift_rate"] is not None
     assert psy["ddm_boundary_separation"] is not None
     assert psy["ddm_cognitive_state"] is not None
+
+
+def test_bkt_nan_and_extreme_inputs():
+    """Verify that BKT gracefully handles NaN and extreme values without propagating NaNs."""
+    # NaN p_l input
+    post, next_pl = IndividualizedBKT.update_mastery(float("nan"), is_correct=True)
+    assert not math.isnan(post)
+    assert not math.isnan(next_pl)
+    assert 0.0 < post < 1.0
+    assert 0.0 < next_pl < 1.0
+
+    # predict_observation with NaN
+    pred = IndividualizedBKT.predict_observation(float("nan"))
+    assert not math.isnan(pred)
+    assert 0.0 < pred < 1.0
+
+
+def test_ct_bkt_nan_and_boundary_inputs():
+    """Verify that Continuous-Time BKT handles NaN and non-positive stability/elapsed days safely."""
+    # NaN stability
+    rate = ContinuousTimeBKT.calculate_forgetting_rate(float("nan"))
+    assert not math.isnan(rate)
+    assert rate > 0.0
+
+    # NaN initial p_l and NaN elapsed_days
+    decayed = ContinuousTimeBKT.decay_mastery(float("nan"), float("nan"))
+    assert not math.isnan(decayed)
+    assert 0.0 < decayed < 1.0
+
+    # Negative elapsed days
+    assert ContinuousTimeBKT.decay_mastery(0.75, -5.0) == 0.75
+

@@ -19,9 +19,13 @@ class MixtureVesselWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double totalVolume = volume1 + volume2;
-    final double totalSolute = (volume1 * (percentage1 / 100)) + (volume2 * (percentage2 / 100));
-    final double finalPercentage = totalVolume > 0 ? (totalSolute / totalVolume) * 100 : 0;
+    final double safeVol1 = (volume1.isFinite && volume1 >= 0) ? volume1 : 0.0;
+    final double safePct1 = (percentage1.isFinite && percentage1 >= 0) ? percentage1.clamp(0.0, 100.0) : 0.0;
+    final double safeVol2 = (volume2.isFinite && volume2 >= 0) ? volume2 : 0.0;
+    final double safePct2 = (percentage2.isFinite && percentage2 >= 0) ? percentage2.clamp(0.0, 100.0) : 0.0;
+    final double totalVolume = safeVol1 + safeVol2;
+    final double totalSolute = (safeVol1 * (safePct1 / 100.0)) + (safeVol2 * (safePct2 / 100.0));
+    final double finalPercentage = totalVolume > 0 ? (totalSolute / totalVolume) * 100.0 : 0.0;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -75,9 +79,9 @@ class MixtureVesselWidget extends StatelessWidget {
             children: [
               _buildVesselCard(
                 label: '1. Kap',
-                volume: volume1,
-                percentage: percentage1,
-                soluteAmount: volume1 * (percentage1 / 100),
+                volume: safeVol1,
+                percentage: safePct1,
+                soluteAmount: safeVol1 * (safePct1 / 100.0),
                 color: Colors.blueAccent,
               ),
               const Text(
@@ -86,9 +90,9 @@ class MixtureVesselWidget extends StatelessWidget {
               ),
               _buildVesselCard(
                 label: '2. Kap',
-                volume: volume2,
-                percentage: percentage2,
-                soluteAmount: volume2 * (percentage2 / 100),
+                volume: safeVol2,
+                percentage: safePct2,
+                soluteAmount: safeVol2 * (safePct2 / 100.0),
                 color: Colors.tealAccent,
               ),
               const Text(
@@ -116,7 +120,7 @@ class MixtureVesselWidget extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 Text(
-                  'Saf Madde Dengesi: ${volume1.toStringAsFixed(0)}·%${percentage1.toStringAsFixed(0)} + ${volume2.toStringAsFixed(0)}·%${percentage2.toStringAsFixed(0)}',
+                  'Saf Madde Dengesi: ${safeVol1.toStringAsFixed(0)}·%${safePct1.toStringAsFixed(0)} + ${safeVol2.toStringAsFixed(0)}·%${safePct2.toStringAsFixed(0)}',
                   style: const TextStyle(color: Colors.white70, fontSize: 11),
                 ),
                 Text(
@@ -143,7 +147,8 @@ class MixtureVesselWidget extends StatelessWidget {
     required Color color,
     bool isResult = false,
   }) {
-    final double fillRatio = (percentage / 100.0).clamp(0.15, 1.0);
+    final double safePct = (percentage.isFinite && percentage >= 0) ? percentage.clamp(0.0, 100.0) : 0.0;
+    final double fillRatio = (safePct / 100.0).clamp(0.15, 1.0);
 
     return Column(
       children: [
@@ -187,7 +192,7 @@ class MixtureVesselWidget extends StatelessWidget {
               Center(
                 child: Text(
                   '%${percentage.toStringAsFixed(0)}',
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                     fontSize: 11,

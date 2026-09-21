@@ -30,7 +30,8 @@ class UnitCirclePainter extends CustomPainter {
     canvas.drawCircle(center, radius, circlePaint);
 
     // 3. Compute Angle and Coordinates
-    final rad = angleDegrees * math.pi / 180.0;
+    final safeAngle = angleDegrees.isFinite ? angleDegrees : 0.0;
+    final rad = safeAngle * math.pi / 180.0;
     final cosVal = math.cos(rad);
     final sinVal = math.sin(rad);
 
@@ -125,11 +126,20 @@ class _UnitCircleCanvasState extends State<UnitCircleCanvas> {
   @override
   void initState() {
     super.initState();
-    _angleDegrees = widget.initialAngle;
+    _angleDegrees = widget.initialAngle.isFinite ? widget.initialAngle.clamp(0.0, 360.0) : 45.0;
+  }
+
+  @override
+  void didUpdateWidget(covariant UnitCircleCanvas oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialAngle != widget.initialAngle) {
+      _angleDegrees = widget.initialAngle.isFinite ? widget.initialAngle.clamp(0.0, 360.0) : 45.0;
+    }
   }
 
   String _getQuadrantName(double deg) {
-    final norm = deg % 360.0;
+    final safe = deg.isFinite ? deg : 0.0;
+    final norm = safe % 360.0;
     if (norm >= 0 && norm < 90) return "1. Bölge (+, +)";
     if (norm >= 90 && norm < 180) return "2. Bölge (-, +)";
     if (norm >= 180 && norm < 270) return "3. Bölge (-, -)";
@@ -137,7 +147,8 @@ class _UnitCircleCanvasState extends State<UnitCircleCanvas> {
   }
 
   String _getRadianLabel(double deg) {
-    final norm = deg.round() % 360;
+    final safe = deg.isFinite ? deg : 0.0;
+    final norm = safe.round() % 360;
     if (norm == 0) return "0 rad";
     if (norm == 30) return "π/6 rad";
     if (norm == 45) return "π/4 rad";
@@ -151,10 +162,12 @@ class _UnitCircleCanvasState extends State<UnitCircleCanvas> {
 
   @override
   Widget build(BuildContext context) {
-    final rad = _angleDegrees * math.pi / 180.0;
+    final safeAngle = _angleDegrees.isFinite ? _angleDegrees.clamp(0.0, 360.0) : 45.0;
+    final rad = safeAngle * math.pi / 180.0;
     final cosVal = math.cos(rad);
     final sinVal = math.sin(rad);
-    final tanVal = (cosVal.abs() < 1e-4) ? null : math.tan(rad);
+    final tanRaw = math.tan(rad);
+    final tanVal = (cosVal.abs() < 1e-4 || !tanRaw.isFinite) ? null : tanRaw;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -205,9 +218,11 @@ class _UnitCircleCanvasState extends State<UnitCircleCanvas> {
           // Unit Circle Visual Area
           SizedBox(
             height: 220,
-            child: CustomPaint(
-              painter: UnitCirclePainter(angleDegrees: _angleDegrees),
-              size: Size.infinite,
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: UnitCirclePainter(angleDegrees: _angleDegrees),
+                size: Size.infinite,
+              ),
             ),
           ),
 

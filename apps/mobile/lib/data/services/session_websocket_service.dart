@@ -19,11 +19,18 @@ class SessionWebSocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get messageStream => _messageController.stream;
 
+  final StreamController<Map<String, dynamic>> _affectiveAlertController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get affectiveAlerts => _affectiveAlertController.stream;
+
   SessionWebSocketService({
     String? url,
   }) : serverUrl = url ?? "${ApiConstants.baseUrl.replaceFirst('http', 'ws')}/ws/v1/session";
 
   void connect() {
+    if (_isConnected || _channel != null) {
+      disconnect();
+    }
     try {
       final uri = Uri.parse(serverUrl);
       _channel = WebSocketChannel.connect(uri);
@@ -35,6 +42,11 @@ class SessionWebSocketService {
             if (data["type"] == "SESSION_READY") {
               _isConnected = true;
               _flushOfflineQueue();
+            } else if (data["type"] == "AFFECTIVE_ALERT") {
+              final payload = data["payload"];
+              if (payload is Map<String, dynamic>) {
+                _affectiveAlertController.add(payload);
+              }
             }
             _messageController.add(data);
           } catch (e) {
@@ -44,10 +56,16 @@ class SessionWebSocketService {
         onError: (error) {
           debugPrint("WS error: $error");
           _isConnected = false;
+          _subscription?.cancel();
+          _subscription = null;
+          _channel = null;
         },
         onDone: () {
           debugPrint("WS connection closed");
           _isConnected = false;
+          _subscription?.cancel();
+          _subscription = null;
+          _channel = null;
         },
       );
     } catch (e) {
@@ -89,6 +107,7 @@ class SessionWebSocketService {
     required String previousStep,
     required double latencyMs,
     int hesitationPausesCount = 0,
+    String targetEquation = "x**2 + 6*x - 2 = 0",
   }) {
     sendEvent({
       "type": "STEP_SUBMIT",
@@ -96,7 +115,7 @@ class SessionWebSocketService {
       "payload": {
         "raw_latex": rawLatex,
         "previous_canonical": previousStep,
-        "target_equation": "x**2 + 6*x - 2 = 0",
+        "target_equation": targetEquation,
         "input_mode": "touchpad",
         "latency_ms": latencyMs,
         "hesitation_pauses_count": hesitationPausesCount,
@@ -116,24 +135,37 @@ class SessionWebSocketService {
     });
   }
 
-  void sendHintRequest(String currentLatex) {
+  void sendHintRequest(
+    String currentLatex, {
+    String targetEquation = "x**2 + 6*x - 2 = 0",
+  }) {
     sendEvent({
       "type": "HINT_REQUEST",
       "client_msg_id": "cmsg_hint_${DateTime.now().millisecondsSinceEpoch}",
       "payload": {
         "current_latex": currentLatex,
+        "target_equation": targetEquation,
       }
     });
   }
 
   void disconnect() {
     _subscription?.cancel();
-    _channel?.sink.close();
+    _subscription = null;
+    try {
+      _channel?.sink.close();
+    } catch (_) {}
+    _channel = null;
     _isConnected = false;
   }
 
   void dispose() {
     disconnect();
-    _messageController.close();
+    if (!_messageController.isClosed) {
+      _messageController.close();
+    }
+    if (!_affectiveAlertController.isClosed) {
+      _affectiveAlertController.close();
+    }
   }
 }

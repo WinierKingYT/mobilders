@@ -19,9 +19,11 @@ class SymPyFormalVerifier:
         Uses sympy.simplify, trigsimp, and expand.
         """
         try:
-            syms = {s: sp.Symbol(s, real=True) for s in symbol_names}
-            lhs = sp.sympify(lhs_str, locals=syms)
-            rhs = sp.sympify(rhs_str, locals=syms)
+            lhs_clean = str(lhs_str)[:500]
+            rhs_clean = str(rhs_str)[:500]
+            syms = {str(s)[:20]: sp.Symbol(str(s)[:20], real=True) for s in symbol_names[:10]}
+            lhs = sp.sympify(lhs_clean, locals=syms)
+            rhs = sp.sympify(rhs_clean, locals=syms)
 
             # 1. Algebraic simplification difference check
             diff = sp.simplify(lhs - rhs)
@@ -51,13 +53,15 @@ class SymPyFormalVerifier:
         and returns the canonical solution string representations.
         """
         try:
-            var = sp.Symbol(variable_str, real=True)
-            if "=" in equation_str:
-                parts = equation_str.split("=")
-                eq = sp.Eq(sp.sympify(parts[0], locals={variable_str: var}),
-                           sp.sympify(parts[1], locals={variable_str: var}))
+            eq_clean = str(equation_str)[:500]
+            var_clean = str(variable_str)[:20]
+            var = sp.Symbol(var_clean, real=True)
+            if "=" in eq_clean:
+                parts = eq_clean.split("=")
+                eq = sp.Eq(sp.sympify(parts[0], locals={var_clean: var}),
+                           sp.sympify(parts[1], locals={var_clean: var}))
             else:
-                eq = sp.Eq(sp.sympify(equation_str, locals={variable_str: var}), 0)
+                eq = sp.Eq(sp.sympify(eq_clean, locals={var_clean: var}), 0)
 
             solutions = sp.solve(eq, var)
             if not solutions:
@@ -74,10 +78,12 @@ class SymPyFormalVerifier:
     ) -> bool:
         """Formally verifies that lim_{var -> point} expr == expected_limit."""
         try:
-            x = sp.Symbol(var_str, real=True)
-            expr = sp.sympify(expr_str, locals={var_str: x})
-            pt = sp.sympify(point_val)
-            expected = sp.sympify(expected_limit_str)
+            expr_clean = str(expr_str)[:500]
+            var_clean = str(var_str)[:20]
+            x = sp.Symbol(var_clean, real=True)
+            expr = sp.sympify(expr_clean, locals={var_clean: x})
+            pt = sp.sympify(str(point_val)[:100])
+            expected = sp.sympify(str(expected_limit_str)[:100])
 
             computed_lim = sp.limit(expr, x, pt)
             return sp.simplify(computed_lim - expected) == 0

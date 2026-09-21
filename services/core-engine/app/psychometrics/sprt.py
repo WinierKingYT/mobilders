@@ -46,6 +46,8 @@ class WaldSPRT:
         beta: float = 0.10,
         max_trials: int = 12,
     ):
+        if not (math.isfinite(p0) and math.isfinite(p1) and math.isfinite(alpha) and math.isfinite(beta)):
+            raise ValueError("SPRT parametreleri sonlu reel sayılar olmalıdır.")
         if not (0.0 < p0 < p1 < 1.0):
             raise ValueError(f"Probabilities must satisfy 0 < p0 < p1 < 1, got p0={p0}, p1={p1}")
         if not (0.0 < alpha < 0.5 and 0.0 < beta < 0.5):

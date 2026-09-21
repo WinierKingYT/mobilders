@@ -12,6 +12,8 @@ class Point2D:
     """Kartezyen düzlemde 2 boyutlu nokta nesnesi."""
 
     def __init__(self, x: float, y: float):
+        if not (math.isfinite(x) and math.isfinite(y)):
+            raise ValueError("Nokta koordinatları sonlu (finite) reel sayılar olmalıdır.")
         self.x = float(x)
         self.y = float(y)
 
@@ -65,6 +67,8 @@ class Line2D:
     """
 
     def __init__(self, A: float, B: float, C: float):
+        if not (math.isfinite(A) and math.isfinite(B) and math.isfinite(C)):
+            raise ValueError("Doğru katsayıları sonlu (finite) reel sayılar olmalıdır.")
         if math.isclose(A, 0.0, abs_tol=1e-9) and math.isclose(B, 0.0, abs_tol=1e-9):
             raise ValueError("A ve B aynı anda sıfır olamaz!")
         # Standardize: make A >= 0 or first non-zero coefficient positive
@@ -187,7 +191,7 @@ class Circle2D:
     """
 
     def __init__(self, center: Point2D, radius: float):
-        if radius <= 0:
+        if not math.isfinite(radius) or radius <= 0:
             raise ValueError("Çember yarıçapı pozitif olmalıdır!")
         self.center = center
         self.radius = float(radius)
@@ -198,6 +202,8 @@ class Circle2D:
         x² + y² + Dx + Ey + F = 0 genel denkleminden standart çembere dönüşüm.
         Merkez M(-D/2, -E/2), Yarıçap r = 0.5 * sqrt(D² + E² - 4F)
         """
+        if not (math.isfinite(D) and math.isfinite(E) and math.isfinite(F)):
+            raise ValueError("Genel denklem katsayıları sonlu reel sayılar olmalıdır.")
         discriminant = D * D + E * E - 4.0 * F
         if discriminant <= 0:
             raise ValueError(f"D² + E² - 4F = {discriminant} <= 0 olduğundan bir reel çember belirtmez!")
@@ -267,6 +273,8 @@ class Vector2D:
     """
 
     def __init__(self, x: float, y: float):
+        if not (math.isfinite(x) and math.isfinite(y)):
+            raise ValueError("Vektör bileşenleri sonlu (finite) reel sayılar olmalıdır.")
         self.x = float(x)
         self.y = float(y)
 

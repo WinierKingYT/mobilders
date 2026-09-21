@@ -365,22 +365,31 @@ class ExplorableNotesRepository:
         visited: Set[str] = set()
         chain: List[ExplorableNoteCard] = []
 
-        def dfs(curr_id: str):
+        def dfs(curr_id: str, depth: int = 0):
+            if depth > 50:
+                return
             if curr_id in visited or curr_id not in self._notes:
                 return
             visited.add(curr_id)
             curr_card = self._notes[curr_id]
             for prereq_id in curr_card.prerequisites:
-                dfs(prereq_id)
+                dfs(prereq_id, depth + 1)
             chain.append(curr_card)
 
-        dfs(node_id)
+        dfs(node_id, 0)
         return chain
 
     def verify_mini_exercise(self, node_id: str, user_answer: str) -> Tuple[bool, str]:
         card = self.get_note(node_id)
         if not card:
             return False, "Ders notu bulunamadı."
+
+        if not user_answer or not isinstance(user_answer, str):
+            return False, f"Lütfen bir cevap girin. İpucu: {card.one_sentence_intuition}"
+
+        # DoS guard: limit user_answer length to 200 chars
+        if len(user_answer) > 200:
+            return False, "Cevap çok uzun. Lütfen daha kısa bir ifade girin."
 
         clean_user = user_answer.strip().replace(" ", "").lower()
         clean_exp = card.mini_exercise.expected_answer.strip().replace(" ", "").lower()

@@ -41,7 +41,7 @@ class _CountingTreeVennCanvasState extends State<CountingTreeVennCanvas> {
   // Monte Carlo State
   int _monteCarloTrials = 10000;
   double? _observedProb;
-  double _theoreticalProb = 0.5;
+  final double _theoreticalProb = 0.5;
   bool _isSimulating = false;
 
   @override
@@ -50,31 +50,52 @@ class _CountingTreeVennCanvasState extends State<CountingTreeVennCanvas> {
     _mode = widget.initialMode;
   }
 
+  @override
+  void didUpdateWidget(covariant CountingTreeVennCanvas oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialMode != widget.initialMode) {
+      _mode = widget.initialMode;
+    }
+  }
+
   void _runSimulation() {
+    if (_isSimulating) return;
     setState(() {
       _isSimulating = true;
     });
 
     final random = math.Random();
     int successes = 0;
-    for (int i = 0; i < _monteCarloTrials; i++) {
+    final trials = math.max(10, _monteCarloTrials);
+    for (int i = 0; i < trials; i++) {
       if (random.nextDouble() < _theoreticalProb) {
         successes++;
       }
     }
 
-    setState(() {
-      _observedProb = successes / _monteCarloTrials;
-      _isSimulating = false;
-    });
+    if (mounted) {
+      setState(() {
+        _observedProb = successes / trials;
+        _isSimulating = false;
+      });
+    }
   }
 
-  double get _probUnion =>
-      widget.probA + widget.probB - widget.probIntersection;
+  double get _probUnion {
+    final pa = widget.probA.isNaN || widget.probA.isInfinite ? 0.0 : widget.probA;
+    final pb = widget.probB.isNaN || widget.probB.isInfinite ? 0.0 : widget.probB;
+    final pInter = widget.probIntersection.isNaN || widget.probIntersection.isInfinite ? 0.0 : widget.probIntersection;
+    final u = pa + pb - pInter;
+    return math.max(0.0, math.min(1.0, u));
+  }
 
-  double get _probConditional => widget.probB > 0
-      ? widget.probIntersection / widget.probB
-      : 0.0;
+  double get _probConditional {
+    final pb = widget.probB.isNaN || widget.probB.isInfinite ? 0.0 : widget.probB;
+    final pInter = widget.probIntersection.isNaN || widget.probIntersection.isInfinite ? 0.0 : widget.probIntersection;
+    if (pb <= 0) return 0.0;
+    final c = pInter / pb;
+    return math.max(0.0, math.min(1.0, c));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -184,12 +205,14 @@ class _CountingTreeVennCanvasState extends State<CountingTreeVennCanvas> {
             borderRadius: BorderRadius.circular(12.0),
             border: Border.all(color: Colors.grey.shade300),
           ),
-          child: CustomPaint(
-            painter: _VennPainter(
-              highlight: _vennHighlight,
-              probA: widget.probA,
-              probB: widget.probB,
-              probIntersection: widget.probIntersection,
+          child: RepaintBoundary(
+            child: CustomPaint(
+              painter: _VennPainter(
+                highlight: _vennHighlight,
+                probA: widget.probA,
+                probB: widget.probB,
+                probIntersection: widget.probIntersection,
+              ),
             ),
           ),
         ),
@@ -233,8 +256,10 @@ class _CountingTreeVennCanvasState extends State<CountingTreeVennCanvas> {
             borderRadius: BorderRadius.circular(12.0),
             border: Border.all(color: Colors.grey.shade300),
           ),
-          child: CustomPaint(
-            painter: _TreePainter(),
+          child: RepaintBoundary(
+            child: CustomPaint(
+              painter: _TreePainter(),
+            ),
           ),
         ),
         const SizedBox(height: 8.0),

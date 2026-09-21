@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../../../core/services/haptic_feedback_service.dart';
 import '../../../../data/services/engine_api_service.dart';
@@ -10,9 +11,9 @@ class SessionViewModel extends ChangeNotifier {
   final EngineApiService _apiService;
   final OfflineSyncQueue _syncQueue;
 
-  final String sessionId;
-  final String targetEquation;
-  final String nodeId;
+  String _sessionId;
+  String _targetEquation;
+  String _nodeId;
 
   final List<SolutionStep> _steps = [];
   bool _isSubmitting = false;
@@ -26,21 +27,28 @@ class SessionViewModel extends ChangeNotifier {
   bool _isDyscalculiaHelper = false;
   bool _isZenMode = false;
   String? _hesitationWhisper;
+  Timer? _hesitationTimer;
 
   SessionViewModel({
     required EngineApiService apiService,
-    required this.sessionId,
-    required this.targetEquation,
-    this.nodeId = 'N15',
+    required String sessionId,
+    required String targetEquation,
+    String nodeId = 'N15',
     double initialPl = 0.20,
     OfflineSyncQueue? syncQueue,
   })  : _apiService = apiService,
         _syncQueue = syncQueue ?? OfflineSyncQueue(),
+        _sessionId = sessionId,
+        _targetEquation = targetEquation,
+        _nodeId = nodeId,
         _currentPl = initialPl {
     _stepStartTime = DateTime.now();
   }
 
   // Getters
+  String get sessionId => _sessionId;
+  String get targetEquation => _targetEquation;
+  String get nodeId => _nodeId;
   List<SolutionStep> get steps => List.unmodifiable(_steps);
   bool get isSubmitting => _isSubmitting;
   bool get isTargetReached => _isTargetReached;
@@ -53,6 +61,80 @@ class SessionViewModel extends ChangeNotifier {
   String? get hesitationWhisper => _hesitationWhisper;
   int get pendingOfflineCount => _syncQueue.pendingCount;
 
+  void reinitializeSession({
+    required String sessionId,
+    required String targetEquation,
+    required String nodeId,
+    double initialPl = 0.20,
+  }) {
+    _sessionId = sessionId;
+    _targetEquation = targetEquation;
+    _nodeId = nodeId;
+    _currentPl = initialPl;
+    _steps.clear();
+    _isTargetReached = false;
+    _hesitationTimer?.cancel();
+    _hesitationWhisper = null;
+    _stepStartTime = DateTime.now();
+    notifyListeners();
+  }
+
+  void startNewTarget({
+    required String newTargetEquation,
+    String? newNodeId,
+    String? newSessionId,
+  }) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    reinitializeSession(
+      sessionId: newSessionId ?? 'sess_twin_$now',
+      targetEquation: newTargetEquation,
+      nodeId: newNodeId ?? _nodeId,
+    );
+  }
+
+  Future<Map<String, dynamic>> startDailySession({String? userId}) async {
+    try {
+      final data = await _apiService.startDailySession(userId: userId);
+      final newSessionId = data['session_id'] as String? ?? 'sess_daily_${DateTime.now().millisecondsSinceEpoch}';
+      final newTarget = data['target_problem'] as String? ?? _targetEquation;
+      final newNode = data['target_node'] as String? ?? _nodeId;
+
+      reinitializeSession(
+        sessionId: newSessionId,
+        targetEquation: newTarget,
+        nodeId: newNode,
+      );
+      return data;
+    } catch (_) {
+      // Graceful offline fallback: generate local unique session id and keep operating
+      final fallbackId = 'sess_local_${DateTime.now().millisecondsSinceEpoch}';
+      reinitializeSession(
+        sessionId: fallbackId,
+        targetEquation: _targetEquation,
+        nodeId: _nodeId,
+      );
+      return {
+        'session_id': fallbackId,
+        'target_problem': _targetEquation,
+        'target_node': _nodeId,
+        'offline_fallback': true,
+      };
+    }
+  }
+
+  Future<Map<String, dynamic>?> concludeSession() async {
+    try {
+      final res = await _apiService.concludeDailySession(sessionId: _sessionId);
+      return res;
+    } catch (_) {
+      return {
+        'status': 'CONCLUDED',
+        'circadian_lock_active': true,
+        'offline_fallback': true,
+      };
+    }
+  }
+
   void setHesitationWhisper(String? whisper) {
     _hesitationWhisper = whisper;
     notifyListeners();
@@ -60,7 +142,43 @@ class SessionViewModel extends ChangeNotifier {
 
   void dismissHesitationWhisper() {
     _hesitationWhisper = null;
+    _hesitationTimer?.cancel();
     notifyListeners();
+  }
+
+  void startHesitationTimer({Duration duration = const Duration(milliseconds: 8500)}) {
+    _hesitationTimer?.cancel();
+    _hesitationTimer = Timer(duration, () {
+      if (_hesitationWhisper == null && !_isTargetReached && !_isSubmitting) {
+        _hesitationWhisper = generateContextualWhisper(_targetEquation);
+        notifyListeners();
+      }
+    });
+  }
+
+  void resetHesitationTimer({Duration duration = const Duration(milliseconds: 8500)}) {
+    if (_hesitationWhisper != null) {
+      _hesitationWhisper = null;
+      notifyListeners();
+    }
+    startHesitationTimer(duration: duration);
+  }
+
+  static String generateContextualWhisper(String equation) {
+    final clean = equation.replaceAll(' ', '');
+    if (clean.contains('(')) {
+      return 'Önce parantezin önündeki sayıya veya işarete odaklanalım mı?';
+    }
+    if (clean.contains('^2') || clean.contains('x²') || clean.contains('**2')) {
+      return 'Önce tüm terimleri eşitliğin bir tarafına toplayıp sıfır yapalım mı?';
+    }
+    if (clean.contains('/')) {
+      return 'Önce paydaları eşitlemek veya içler-dışlar yapmak işimizi kolaylaştırabilir mi?';
+    }
+    if (clean.contains('=')) {
+      return "Önce x'in yanındaki sabit sayıyı karşıya geçirmeye ne dersin?";
+    }
+    return 'Küçük bir ilk adımla başlayalım mı?';
   }
 
   void toggleZenMode() {
@@ -96,6 +214,8 @@ class SessionViewModel extends ChangeNotifier {
     final trimmed = rawExpression.trim();
     if (trimmed.isEmpty || _isSubmitting) return null;
 
+    _hesitationTimer?.cancel();
+    _hesitationWhisper = null;
     _isSubmitting = true;
     notifyListeners();
 
@@ -135,7 +255,10 @@ class SessionViewModel extends ChangeNotifier {
 
       // Check if there are any pending offline steps to sync in the background
       if (_syncQueue.pendingCount > 0) {
-        _syncQueue.replayQueue(_apiService);
+        _syncQueue.replayBatch(_apiService).then((res) {
+          _reconcileSteps(res);
+          notifyListeners();
+        });
       }
 
       _stepStartTime = DateTime.now();
@@ -175,9 +298,42 @@ class SessionViewModel extends ChangeNotifier {
   }
 
   Future<int> syncPendingOfflineSteps() async {
-    final count = await _syncQueue.replayQueue(_apiService);
+    final result = await _syncQueue.replayBatch(_apiService);
+    _reconcileSteps(result);
     notifyListeners();
-    return count;
+    return result.syncedCount;
+  }
+
+  void _reconcileSteps(BatchReplayResult result) {
+    if (result.syncedCount == 0) return;
+    if (result.latestPl != null) {
+      _currentPl = result.latestPl!;
+    }
+    if (result.isTargetReached) {
+      _isTargetReached = true;
+    }
+
+    for (final replayedJson in result.replayedSteps) {
+      final stepNumber = replayedJson['step_number'] as int?;
+      final isValid = replayedJson['is_valid'] as bool? ?? false;
+      final isTargetReached = replayedJson['is_target_reached'] as bool? ?? false;
+      final canonicalExpr = replayedJson['canonical_expression'] as String?;
+      final errorMsg = replayedJson['error_message'] as String?;
+
+      if (stepNumber != null && stepNumber > 0 && stepNumber <= _steps.length) {
+        final idx = stepNumber - 1;
+        final oldStep = _steps[idx];
+        _steps[idx] = SolutionStep(
+          stepNumber: oldStep.stepNumber,
+          userExpression: oldStep.userExpression,
+          isValid: isValid,
+          isTargetReached: isTargetReached,
+          canonicalExpression: canonicalExpr ?? oldStep.canonicalExpression,
+          errorMessage: errorMsg,
+          elapsedMs: oldStep.elapsedMs,
+        );
+      }
+    }
   }
 
   void rollbackToStep(int stepIndex) {
@@ -192,7 +348,15 @@ class SessionViewModel extends ChangeNotifier {
   void resetSession() {
     _steps.clear();
     _isTargetReached = false;
+    _hesitationTimer?.cancel();
+    _hesitationWhisper = null;
     _stepStartTime = DateTime.now();
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _hesitationTimer?.cancel();
+    super.dispose();
   }
 }

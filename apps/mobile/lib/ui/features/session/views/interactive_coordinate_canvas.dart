@@ -41,6 +41,17 @@ class _InteractiveCoordinateCanvasState
     _pointB = widget.initialPointB;
   }
 
+  @override
+  void didUpdateWidget(covariant InteractiveCoordinateCanvas oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialPointA != widget.initialPointA) {
+      _pointA = widget.initialPointA;
+    }
+    if (oldWidget.initialPointB != widget.initialPointB) {
+      _pointB = widget.initialPointB;
+    }
+  }
+
   double get _dx => _pointB.dx - _pointA.dx;
   double get _dy => _pointB.dy - _pointA.dy;
 
@@ -192,12 +203,14 @@ class _InteractiveCoordinateCanvasState
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12.0),
-            child: CustomPaint(
-              key: const Key("coord_canvas"),
-              painter: _CoordinatePainter(
-                pointA: _pointA,
-                pointB: _pointB,
-                mode: _mode,
+            child: RepaintBoundary(
+              child: CustomPaint(
+                key: const Key("coord_canvas"),
+                painter: _CoordinatePainter(
+                  pointA: _pointA,
+                  pointB: _pointB,
+                  mode: _mode,
+                ),
               ),
             ),
           ),
@@ -335,11 +348,13 @@ class _CoordinatePainter extends CustomPainter {
     } else if (mode == GeometryDisplayMode.circle) {
       // Circle centered at A with radius = distance(A, B)
       final rPixels = (pointB - pointA).distance * gridSpacing;
-      final circlePaint = Paint()
-        ..color = Colors.purpleAccent.withValues(alpha: 0.3)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0;
-      canvas.drawCircle(pA, rPixels, circlePaint);
+      if (rPixels > 0 && !rPixels.isNaN && !rPixels.isInfinite) {
+        final circlePaint = Paint()
+          ..color = Colors.purpleAccent.withValues(alpha: 0.3)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0;
+        canvas.drawCircle(pA, rPixels, circlePaint);
+      }
 
       final radiusLinePaint = Paint()
         ..color = Colors.purpleAccent
@@ -357,7 +372,7 @@ class _CoordinatePainter extends CustomPainter {
       // Projection of u onto v
       final vNormSq = pointB.dx * pointB.dx + pointB.dy * pointB.dy;
       if (vNormSq > 1e-6) {
-        final dot = pointA.dx * pointB.dx + pointA.dy * pointB.dy;
+        final dot = pointA.dx * pointB.dx + pointB.dy * pointB.dy;
         final projCoeff = dot / vNormSq;
         final projPoint = Offset(pointB.dx * projCoeff, pointB.dy * projCoeff);
         final pProj = toScreen(projPoint.dx, projPoint.dy);
@@ -382,6 +397,7 @@ class _CoordinatePainter extends CustomPainter {
   }
 
   void _drawArrow(Canvas canvas, Offset from, Offset to, Color color, double width) {
+    if ((to - from).distance < 1e-4) return;
     final paint = Paint()
       ..color = color
       ..strokeWidth = width

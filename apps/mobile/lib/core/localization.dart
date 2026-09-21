@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 
 /// International Curriculum Standard Selection.
 enum CurriculumType {

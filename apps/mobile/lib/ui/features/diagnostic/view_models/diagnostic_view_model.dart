@@ -4,7 +4,7 @@ import '../../../../domain/models/diagnostic_item.dart';
 
 class DiagnosticViewModel extends ChangeNotifier {
   final EngineApiService _apiService;
-  final String sessionId;
+  String _sessionId;
 
   DiagnosticItem? _currentItem;
   double _thetaHat = 0.0;
@@ -19,10 +19,12 @@ class DiagnosticViewModel extends ChangeNotifier {
 
   DiagnosticViewModel({
     required EngineApiService apiService,
-    required this.sessionId,
-  }) : _apiService = apiService;
+    required String sessionId,
+  })  : _apiService = apiService,
+        _sessionId = sessionId;
 
   // Getters
+  String get sessionId => _sessionId;
   DiagnosticItem? get currentItem => _currentItem;
   double get thetaHat => _thetaHat;
   double get standardError => _standardError;
@@ -70,6 +72,41 @@ class DiagnosticViewModel extends ChangeNotifier {
       discriminationA: 2.2,
     ),
   ];
+
+  Future<void> startCatSession() async {
+    if (_isLoading) return;
+    _isLoading = true;
+    _errorMessage = null;
+    _isComplete = false;
+    _administeredHistory.clear();
+    _seededMastery = null;
+    _zpdCandidates = null;
+    _thetaHat = 0.0;
+    _standardError = 1.0;
+    notifyListeners();
+
+    try {
+      final data = await _apiService.startCatSession(sessionId: _sessionId);
+      if (data.containsKey('cat_session_id')) {
+        _sessionId = data['cat_session_id'] as String;
+      }
+      if (data['first_item'] != null) {
+        _currentItem = DiagnosticItem.fromJson(data['first_item'] as Map<String, dynamic>);
+      } else {
+        _currentItem = _offlineBank.first;
+      }
+      _thetaHat = (data['initial_theta'] as num?)?.toDouble() ?? 0.0;
+      _standardError = (data['initial_se'] as num?)?.toDouble() ?? 1.0;
+      _isLoading = false;
+      notifyListeners();
+    } catch (_) {
+      // Seamless offline fallback
+      _sessionId = 'cat_local_${DateTime.now().millisecondsSinceEpoch}';
+      _currentItem = _offlineBank.first;
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> loadFirstItem() async {
     if (_isLoading) return;

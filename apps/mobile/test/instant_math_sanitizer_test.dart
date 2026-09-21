@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_learning_engine/ui/features/touchpad/instant_math_sanitizer.dart';
 
@@ -66,7 +65,7 @@ void main() {
     });
 
     test('Double operator input replaces previous operator cleanly', () {
-      final current = '2x + ';
+      const current = '2x + ';
       final sanitized = InstantMathSanitizer.sanitizeInput(
         currentText: current,
         incomingToken: '-',
@@ -113,5 +112,55 @@ void main() {
       // Execution time must be < 5000 microseconds (5ms)
       expect(report.executionTimeMicros, lessThan(5000));
     });
+
+    test('Unicode operators (minus, times, divide) are recognized and canonicalized to ASCII', () {
+      // Unicode minus −
+      expect(InstantMathSanitizer.isOperatorChar('−'), isTrue);
+      final withMinus = InstantMathSanitizer.sanitizeInput(
+        currentText: '2x',
+        incomingToken: '−',
+      );
+      expect(withMinus, '2x - ');
+
+      // Unicode times ×
+      expect(InstantMathSanitizer.isOperatorChar('×'), isTrue);
+      final withTimes = InstantMathSanitizer.sanitizeInput(
+        currentText: '2x',
+        incomingToken: '×',
+      );
+      expect(withTimes, '2x * ');
+
+      // Unicode divide ÷
+      expect(InstantMathSanitizer.isOperatorChar('÷'), isTrue);
+      final withDiv = InstantMathSanitizer.sanitizeInput(
+        currentText: '6',
+        incomingToken: '÷',
+      );
+      expect(withDiv, '6 / ');
+    });
+
+    test('Decimal comma is normalized and duplicate separators are blocked', () {
+      // First decimal comma: 2, -> 2.
+      final once = InstantMathSanitizer.sanitizeInput(
+        currentText: '2',
+        incomingToken: ',',
+      );
+      expect(once, '2.');
+
+      // Block duplicate comma if number already has decimal point
+      final blockedComma = InstantMathSanitizer.sanitizeInput(
+        currentText: '2.5',
+        incomingToken: ',',
+      );
+      expect(blockedComma, '2.5');
+
+      // Block duplicate dot if number already has decimal point
+      final blockedDot = InstantMathSanitizer.sanitizeInput(
+        currentText: '2.5',
+        incomingToken: '.',
+      );
+      expect(blockedDot, '2.5');
+    });
   });
 }
+

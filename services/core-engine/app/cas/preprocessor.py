@@ -1,10 +1,15 @@
 import re
 
+SUPERSCRIPT_MAP = {
+    '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4',
+    '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9'
+}
+
 
 class ImplicitMultiplicationPreprocessor:
     """
     Mobil cihazlarda öğrencinin sürekli '*' tuşuna basmasını önlemek amacıyla,
-    doğal cebirsel yazımları ('2x', '(x+1)(x+3)', '4ac', 'x^2', 'x2')
+    doğal cebirsel yazımları ('2x', '(x+1)(x+3)', '4ac', 'x^2', 'x2', 'x²', '\\frac{1}{2}')
     SymPy ve Python AST ile uyumlu kanonik ifadelere dönüştürür.
     """
 
@@ -13,11 +18,53 @@ class ImplicitMultiplicationPreprocessor:
         if not text:
             return ""
 
-        s = text.strip()
+        # DoS guard: limit text length to 1000 chars
+        s = text.strip()[:1000]
 
-        # 1. LaTeX ve özel sembol temizliği
-        s = s.replace("^", "**")
+        # 1. Unicode operatör ve karakter normalizasyonu
+        s = s.replace("−", "-").replace("–", "-").replace("—", "-")
+        s = s.replace("×", "*").replace("·", "*").replace("•", "*")
+        s = s.replace("÷", "/")
         s = s.replace("±", "+")
+        s = s.replace("^", "**")
+
+        # 2. LaTeX operatör ve ayraç temizliği
+        s = s.replace(r"\cdot", "*").replace(r"\times", "*")
+        s = s.replace(r"\left(", "(").replace(r"\right)", ")")
+        s = s.replace(r"\left[", "(").replace(r"\right]", ")")
+        s = s.replace(r"\{", "(").replace(r"\}", ")")
+        s = s.replace("[", "(").replace("]", ")")
+
+        # 3. LaTeX kesirleri: \frac{a}{b} -> ((a)/(b))
+        frac_iter = 0
+        while r"\frac" in s and frac_iter < 20:
+            frac_iter += 1
+            new_s = re.sub(r"\\frac\{([^{}]+)\}\{([^{}]+)\}", r"((\1)/(\2))", s)
+            if new_s == s:
+                new_s = re.sub(r"\\frac\s*([a-zA-Z0-9])\s*([a-zA-Z0-9])", r"((\1)/(\2))", s)
+                if new_s == s:
+                    break
+            s = new_s
+
+        # 4. LaTeX karekök: \sqrt{a} -> sqrt(a)
+        sqrt_iter = 0
+        while r"\sqrt{" in s and sqrt_iter < 20:
+            sqrt_iter += 1
+            new_s = re.sub(r"\\sqrt\{([^{}]+)\}", r"sqrt(\1)", s)
+            if new_s == s:
+                break
+            s = new_s
+        s = s.replace(r"\sqrt", "sqrt")
+
+        # 5. Unicode üst simgeler: x² -> x**2, (x+1)³ -> (x+1)**3
+        def _replace_superscripts(match):
+            digits = "".join(SUPERSCRIPT_MAP[c] for c in match.group(1))
+            return f"**{digits}"
+
+        s = re.sub(r"([⁰¹²³⁴⁵⁶⁷⁸⁹]+)", _replace_superscripts, s)
+
+        # 6. Türkçe ondalık virgül desteği: 2,5 -> 2.5
+        s = re.sub(r"(\d+),(\d+)", r"\1.\2", s)
 
         # Eşittir içeren denklemlerde LHS ve RHS'yi ayrı işle
         if "=" in s:

@@ -6,6 +6,7 @@ Provides a gentle, non-condescending 1-sentence focus whisper to unblock student
 """
 
 from __future__ import annotations
+import math
 from typing import Optional
 from pydantic import BaseModel, Field
 
@@ -28,7 +29,15 @@ class CognitiveHesitationSensor:
         current_input: str,
         target_equation: str = "",
     ) -> HesitationSignal:
-        trimmed = current_input.strip()
+        if not math.isfinite(elapsed_ms) or elapsed_ms < 0.0:
+            return HesitationSignal(
+                is_hesitating=False,
+                elapsed_ms=0.0,
+                whisper_message=None,
+                confidence=0.0,
+            )
+
+        trimmed = str(current_input or "").strip()
 
         # If student is actively writing, there is no hesitation
         if len(trimmed) > 0:
@@ -49,7 +58,7 @@ class CognitiveHesitationSensor:
             )
 
         # Generate gentle, supportive 1-sentence whisper based on formula context
-        whisper = cls._generate_contextual_whisper(target_equation)
+        whisper = cls._generate_contextual_whisper(str(target_equation or ""))
 
         confidence = min(1.0, (elapsed_ms - cls.HESITATION_THRESHOLD_MS) / 10000.0 + 0.6)
 

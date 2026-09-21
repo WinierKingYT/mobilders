@@ -15,16 +15,13 @@ import '../../modeling/problem_modeling_view.dart';
 import '../../analytics/views/cognitive_health_atlas_screen.dart';
 import '../../vault/mistake_autopsy_view.dart';
 import '../../../../data/services/mistake_vault_service.dart';
-import '../../../../core/localization.dart';
 import '../../../../core/services/haptic_feedback_service.dart';
-import '../../touchpad/math_touchpad.dart';
 import '../view_models/session_view_model.dart';
-import 'focus_session_screen.dart';
-import '../view_models/focus_session_view_model.dart';
-import '../../../../data/services/focus_api_service.dart';
-
-import '../../atlas/living_knowledge_atlas_view.dart';
-import '../../math_lab/views/math_lab_hub_screen.dart';
+import 'components/warmup_phase_view.dart';
+import 'components/reflection_phase_view.dart';
+import 'components/session_settings_modal.dart';
+import 'components/focus_topic_selection_modal.dart';
+import '../../touchpad/math_touchpad.dart';
 
 enum DailyPhase {
   warmup,      // Phase 1: 3 min (Spaced Retrieval)
@@ -34,26 +31,58 @@ enum DailyPhase {
   completed,   // Circadian Sleep Lock Active
 }
 
+enum ActiveVisualCanvas {
+  none,
+  geometric,
+  unitCircle,
+  tangent,
+  riemann,
+  coordinate,
+  euclidean,
+}
+
 class DailyJourneyScreen extends StatefulWidget {
   final void Function(int tabIndex)? onNavigateToTab;
+  final DailyPhase initialPhase;
 
-  const DailyJourneyScreen({super.key, this.onNavigateToTab});
+  const DailyJourneyScreen({
+    super.key,
+    this.onNavigateToTab,
+    this.initialPhase = DailyPhase.warmup,
+  });
 
   @override
   State<DailyJourneyScreen> createState() => _DailyJourneyScreenState();
 }
 
 class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
-  DailyPhase _currentPhase = DailyPhase.warmup;
+  late DailyPhase _currentPhase;
   bool _showScratchpad = false;
-  bool _showGeometricCanvas = false;
-  bool _showUnitCircleCanvas = false;
-  bool _showTangentCanvas = false;
-  bool _showRiemannCanvas = false;
-  bool _showCoordinateCanvas = false;
-  bool _showEuclideanCanvas = false;
-  double _confidenceLevel = 0.85;
-  int? _selectedWarmupOption;
+  ActiveVisualCanvas _activeCanvas = ActiveVisualCanvas.none;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPhase = widget.initialPhase;
+  }
+
+  bool get _showGeometricCanvas => _activeCanvas == ActiveVisualCanvas.geometric;
+  bool get _showUnitCircleCanvas => _activeCanvas == ActiveVisualCanvas.unitCircle;
+  bool get _showTangentCanvas => _activeCanvas == ActiveVisualCanvas.tangent;
+  bool get _showRiemannCanvas => _activeCanvas == ActiveVisualCanvas.riemann;
+  bool get _showCoordinateCanvas => _activeCanvas == ActiveVisualCanvas.coordinate;
+  bool get _showEuclideanCanvas => _activeCanvas == ActiveVisualCanvas.euclidean;
+
+  void _toggleCanvas(ActiveVisualCanvas canvas) {
+    HapticFeedbackService().selectionClick();
+    setState(() {
+      if (_activeCanvas == canvas) {
+        _activeCanvas = ActiveVisualCanvas.none;
+      } else {
+        _activeCanvas = canvas;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +95,9 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
               children: [
                 // Top 20-Min Session Header
                 _buildSessionProgressHeader(),
+
+                // Offline Pending Sync Notification Banner
+                _buildOfflineSyncBanner(),
 
                 // Active Phase Body
                 Expanded(
@@ -137,10 +169,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                             color: _showGeometricCanvas ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
                           ),
                           tooltip: "El-Harezmi Karoları",
-                          onPressed: () {
-                            HapticFeedbackService().selectionClick();
-                            setState(() => _showGeometricCanvas = !_showGeometricCanvas);
-                          },
+                          onPressed: () => _toggleCanvas(ActiveVisualCanvas.geometric),
                         ),
                       // Unit Circle Canvas Toggle Button (Hedef 5)
                       if (_currentPhase == DailyPhase.problemBoard)
@@ -150,10 +179,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                             color: _showUnitCircleCanvas ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8),
                           ),
                           tooltip: "Birim Çember Kanvası",
-                          onPressed: () {
-                            HapticFeedbackService().selectionClick();
-                            setState(() => _showUnitCircleCanvas = !_showUnitCircleCanvas);
-                          },
+                          onPressed: () => _toggleCanvas(ActiveVisualCanvas.unitCircle),
                         ),
                       // Dynamic Tangent Canvas Toggle Button (Hedef 6)
                       if (_currentPhase == DailyPhase.problemBoard)
@@ -163,10 +189,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                             color: _showTangentCanvas ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
                           ),
                           tooltip: "Dinamik Teğet Eğimi (Türev)",
-                          onPressed: () {
-                            HapticFeedbackService().selectionClick();
-                            setState(() => _showTangentCanvas = !_showTangentCanvas);
-                          },
+                          onPressed: () => _toggleCanvas(ActiveVisualCanvas.tangent),
                         ),
                       // Riemann Integral Canvas Toggle Button (Hedef 7)
                       if (_currentPhase == DailyPhase.problemBoard)
@@ -176,10 +199,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                             color: _showRiemannCanvas ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
                           ),
                           tooltip: "Riemann İntegral Kanvası",
-                          onPressed: () {
-                            HapticFeedbackService().selectionClick();
-                            setState(() => _showRiemannCanvas = !_showRiemannCanvas);
-                          },
+                          onPressed: () => _toggleCanvas(ActiveVisualCanvas.riemann),
                         ),
                       // Interactive Coordinate Canvas Toggle Button (Hedef 10)
                       if (_currentPhase == DailyPhase.problemBoard)
@@ -190,10 +210,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                             color: _showCoordinateCanvas ? const Color(0xFF6366F1) : const Color(0xFF94A3B8),
                           ),
                           tooltip: "Analitik Koordinat & Vektör Kanvası",
-                          onPressed: () {
-                            HapticFeedbackService().selectionClick();
-                            setState(() => _showCoordinateCanvas = !_showCoordinateCanvas);
-                          },
+                          onPressed: () => _toggleCanvas(ActiveVisualCanvas.coordinate),
                         ),
                       // Euclidean & Auxiliary Line Canvas Toggle Button (Hedef 11)
                       if (_currentPhase == DailyPhase.problemBoard)
@@ -204,10 +221,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                             color: _showEuclideanCanvas ? const Color(0xFFF43F5E) : const Color(0xFF94A3B8),
                           ),
                           tooltip: "Sentetik Öklid & Ek Çizim Kanvası",
-                          onPressed: () {
-                            HapticFeedbackService().selectionClick();
-                            setState(() => _showEuclideanCanvas = !_showEuclideanCanvas);
-                          },
+                          onPressed: () => _toggleCanvas(ActiveVisualCanvas.euclidean),
                         ),
                       // Vector Inking Canvas Quick Toggle Button
                       if (_currentPhase == DailyPhase.problemBoard)
@@ -312,7 +326,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         tooltip: "Focus Kernel: Bilişsel Seanslar",
                         onPressed: () {
                           HapticFeedbackService().selectionClick();
-                          _showFocusTopicSelectionModal(context);
+                          showFocusTopicSelectionModal(context);
                         },
                       ),
                       // Accessibility & Curriculum Settings Button
@@ -324,7 +338,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                         tooltip: "Erişilebilirlik & Müfredat Ayarları",
                         onPressed: () {
                           HapticFeedbackService().selectionClick();
-                          _showSettingsModal(context);
+                          showSessionSettingsModal(context);
                         },
                       ),
                     ],
@@ -387,10 +401,31 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     return const SizedBox(width: 4);
   }
 
+  Widget _buildActiveCanvasWidget() {
+    switch (_activeCanvas) {
+      case ActiveVisualCanvas.geometric:
+        return const AlKhwarizmiCanvas(bCoefficient: 6.0);
+      case ActiveVisualCanvas.unitCircle:
+        return const UnitCircleCanvas();
+      case ActiveVisualCanvas.tangent:
+        return const DynamicTangentCanvas();
+      case ActiveVisualCanvas.riemann:
+        return const RiemannIntegralCanvas();
+      case ActiveVisualCanvas.coordinate:
+        return const InteractiveCoordinateCanvas();
+      case ActiveVisualCanvas.euclidean:
+        return const EuclideanCanvas();
+      case ActiveVisualCanvas.none:
+        return const SizedBox.shrink();
+    }
+  }
+
   Widget _buildPhaseContent() {
     switch (_currentPhase) {
       case DailyPhase.warmup:
-        return _buildWarmupView();
+        return WarmupPhaseView(
+          onCompleted: () => setState(() => _currentPhase = DailyPhase.diagnostic),
+        );
       case DailyPhase.diagnostic:
         return Consumer<DiagnosticViewModel>(
           builder: (context, vm, child) {
@@ -406,35 +441,16 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
       case DailyPhase.problemBoard:
         return Column(
           children: [
-            if (_showGeometricCanvas)
-              const Padding(
-                padding: EdgeInsets.all(12),
-                child: AlKhwarizmiCanvas(bCoefficient: 6.0),
-              ),
-            if (_showUnitCircleCanvas)
-              const Padding(
-                padding: EdgeInsets.all(12),
-                child: UnitCircleCanvas(),
-              ),
-            if (_showTangentCanvas)
-              const Padding(
-                padding: EdgeInsets.all(12),
-                child: DynamicTangentCanvas(),
-              ),
-            if (_showRiemannCanvas)
-              const Padding(
-                padding: EdgeInsets.all(12),
-                child: RiemannIntegralCanvas(),
-              ),
-            if (_showCoordinateCanvas)
-              const Padding(
-                padding: EdgeInsets.all(12),
-                child: InteractiveCoordinateCanvas(),
-              ),
-            if (_showEuclideanCanvas)
-              const Padding(
-                padding: EdgeInsets.all(12),
-                child: EuclideanCanvas(),
+            if (_activeCanvas != ActiveVisualCanvas.none)
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 280),
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: _buildActiveCanvasWidget(),
+                  ),
+                ),
               ),
             const Expanded(
               child: SessionScreen(),
@@ -442,213 +458,71 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               color: const Color(0xFF0F172A),
-              child: Row(
-                children: [
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFF59E0B),
-                      side: const BorderSide(color: Color(0xFFF59E0B)),
-                    ),
-                    onPressed: () {
-                      HapticFeedbackService().selectionClick();
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const Scaffold(
-                            body: SafeArea(child: ProblemModelingView()),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: [
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFF59E0B),
+                        side: const BorderSide(color: Color(0xFFF59E0B)),
+                      ),
+                      onPressed: () {
+                        HapticFeedbackService().selectionClick();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const Scaffold(
+                              body: SafeArea(child: ProblemModelingView()),
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.auto_stories_outlined, size: 16),
-                    label: const Text("Modelleme İskelesi"),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    key: const Key('focus_session_trigger_button'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF38BDF8),
-                      side: const BorderSide(color: Color(0xFF38BDF8)),
+                        );
+                      },
+                      icon: const Icon(Icons.auto_stories_outlined, size: 16),
+                      label: const Text("Modelleme İskelesi"),
                     ),
-                    onPressed: () {
-                      HapticFeedbackService().selectionClick();
-                      _showFocusTopicSelectionModal(context);
-                    },
-                    icon: const Icon(Icons.psychology_outlined, size: 16),
-                    label: const Text("Focus Seansı"),
-                  ),
-                  const Spacer(),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
-                      foregroundColor: Colors.white,
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      key: const Key('focus_session_trigger_button'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF38BDF8),
+                        side: const BorderSide(color: Color(0xFF38BDF8)),
+                      ),
+                      onPressed: () {
+                        HapticFeedbackService().selectionClick();
+                        showFocusTopicSelectionModal(context);
+                      },
+                      icon: const Icon(Icons.psychology_outlined, size: 16),
+                      label: const Text("Focus Seansı"),
                     ),
-                    onPressed: () {
-                      HapticFeedbackService().selectionClick();
-                      setState(() => _currentPhase = DailyPhase.reflection);
-                    },
-                    icon: const Icon(Icons.arrow_forward, size: 16),
-                    label: const Text("Metabilişsel Kapanışa Geç"),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () {
+                        HapticFeedbackService().selectionClick();
+                        setState(() => _currentPhase = DailyPhase.reflection);
+                      },
+                      icon: const Icon(Icons.arrow_forward, size: 16),
+                      label: const Text("Metabilişsel Kapanışa Geç"),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
         );
       case DailyPhase.reflection:
-        return _buildReflectionView();
+        return ReflectionPhaseView(
+          onCompleted: () => setState(() => _currentPhase = DailyPhase.completed),
+        );
       case DailyPhase.completed:
-        return _buildCircadianLockView();
+        return CircadianLockView(
+          onNavigateToTab: widget.onNavigateToTab,
+        );
     }
-  }
-
-  Widget _buildWarmupView() {
-    final options = [4, 6, 8, 10];
-    final isCorrect = _selectedWarmupOption == 8;
-
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Icon(Icons.fitness_center, color: Color(0xFF38BDF8), size: 48),
-          const SizedBox(height: 16),
-          const Text(
-            "Faz 1: Bilişsel Isınma (3 Dakika)",
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            "FSRS-4.5 aralıklı tekrar algoritması, doğrusal önkoşul hafızasını canlı tutmak için zihnini hazırlıyor.",
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-          ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF334155)),
-            ),
-            child: const Text(
-              "Hatırlama Sorusu: 3(x - 4) = 12 ise x kaçtır?",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // 4 Interactive Options
-          Row(
-            children: options.map((opt) {
-              final isSelected = _selectedWarmupOption == opt;
-              Color bg = const Color(0xFF1E293B);
-              Color border = const Color(0xFF334155);
-              if (isSelected) {
-                if (opt == 8) {
-                  bg = const Color(0xFF065F46);
-                  border = const Color(0xFF10B981);
-                } else {
-                  bg = const Color(0xFF7F1D1D);
-                  border = const Color(0xFFEF4444);
-                }
-              }
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () {
-                      if (opt == 8) {
-                        HapticFeedbackService().stepSuccess();
-                      } else {
-                        HapticFeedbackService().keyPress();
-                      }
-                      setState(() => _selectedWarmupOption = opt);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: bg,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: border, width: isSelected ? 2 : 1),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        "x = $opt",
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : const Color(0xFFE2E8F0),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-
-          if (_selectedWarmupOption != null) ...[
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: isCorrect ? const Color(0xFF064E3B) : const Color(0xFF450A0A),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: isCorrect ? const Color(0xFF10B981) : const Color(0xFFEF4444)),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    isCorrect ? Icons.check_circle : Icons.info_outline,
-                    color: isCorrect ? const Color(0xFF34D399) : const Color(0xFFF87171),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      isCorrect
-                          ? "Harika! 3(8 - 4) = 3(4) = 12. Bilişsel hazırlık tamamlandı!"
-                          : "3(x - 4) = 12 ise x - 4 = 4 olmalı. Tekrar dene!",
-                      style: TextStyle(
-                        color: isCorrect ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 24),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isCorrect ? const Color(0xFF10B981) : const Color(0xFF2563EB),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-            onPressed: () {
-              HapticFeedbackService().selectionClick();
-              setState(() => _currentPhase = DailyPhase.diagnostic);
-            },
-            child: const Text("Isınmayı Tamamla -> CAT Teşhise Başla"),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildDiagnosticCompletedView() {
@@ -689,787 +563,31 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     );
   }
 
-  Widget _buildReflectionView() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Icon(Icons.psychology, color: Color(0xFFF59E0B), size: 48),
-          const SizedBox(height: 16),
-          const Text(
-            "Faz 4: Metabilişsel Kalibrasyon (3 Dk)",
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            "Brier Proper Scoring kuralına göre çözüm adımlarındaki kendi güven düzeyini değerlendir:",
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-          ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                Text(
-                  "Zihinsel Güven Skoru: %${(_confidenceLevel * 100).toInt()}",
-                  style: const TextStyle(
-                    color: Color(0xFF38BDF8),
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Slider(
-                  value: _confidenceLevel,
-                  min: 0.0,
-                  max: 1.0,
-                  divisions: 20,
-                  activeColor: const Color(0xFF38BDF8),
-                  inactiveColor: const Color(0xFF334155),
-                  onChanged: (val) {
-                    HapticFeedbackService().selectionClick();
-                    setState(() => _confidenceLevel = val);
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 28),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFF59E0B),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-            onPressed: () {
-              HapticFeedbackService().stepSuccess();
-              setState(() => _currentPhase = DailyPhase.completed);
-            },
-            child: const Text("Seansı Tamamla ve Kilitle"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCircadianLockView() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.nightlight_round, color: Color(0xFF818CF8), size: 64),
-          const SizedBox(height: 20),
-          const Text(
-            "20 Dakikalık Günlük Seans Tamamlandı!",
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            "Walker & Stickgold sirkadiyen konsolidasyon bariyeri devrede. NREM/REM uykusu gerçekleşmeden aynı gün içinde yapılan ek tekrarlar hafıza stabilitesine katkı sağlamaz.",
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14, height: 1.5),
-          ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF312E81)),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.lock_clock, color: Color(0xFF818CF8), size: 20),
-                SizedBox(width: 10),
-                Text(
-                  "Sirkadiyen Kilit: 14 Saat Aktif",
-                  style: TextStyle(color: Color(0xFFC7D2FE), fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-          const Text(
-            "Seans kilitli olsa da diğer bilişsel merkezleri serbestçe keşfedebilirsiniz:",
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-          ),
-          const SizedBox(height: 16),
-          // Hub Navigation Action Buttons
-          _buildCircadianActionTile(
-            key: const Key('circadian_to_atlas_button'),
-            title: "Zihin Atlasını İncele (246 Düğüm)",
-            subtitle: "Öğrenme rotanı, ZPD sınırlarını ve düğüm ustalıklarını keşfet.",
-            icon: Icons.hub_outlined,
-            accentColor: const Color(0xFF10B981),
-            onTap: () {
-              HapticFeedbackService().selectionClick();
-              if (widget.onNavigateToTab != null) {
-                widget.onNavigateToTab!(1);
-              } else {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const Scaffold(body: SafeArea(child: LivingKnowledgeAtlasView()))),
-                );
-              }
-            },
-          ),
-          const SizedBox(height: 10),
-          _buildCircadianActionTile(
-            key: const Key('circadian_to_math_lab_button'),
-            title: "Matematik Laboratuvarında Çalış",
-            subtitle: "El-Harezmi, Birim Çember, Türev ve Riemann kanvaslarını serbestçe dene.",
-            icon: Icons.architecture,
-            accentColor: const Color(0xFF38BDF8),
-            onTap: () {
-              HapticFeedbackService().selectionClick();
-              if (widget.onNavigateToTab != null) {
-                widget.onNavigateToTab!(2);
-              } else {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const MathLabHubScreen()),
-                );
-              }
-            },
-          ),
-          const SizedBox(height: 10),
-          _buildCircadianActionTile(
-            key: const Key('circadian_to_vault_button'),
-            title: "Hata Kasası & Bilişsel Analiz",
-            subtitle: "Geçmiş hata otopsilerini incele ve Paas bilişsel yük eğrilerini gör.",
-            icon: Icons.biotech_rounded,
-            accentColor: const Color(0xFFF43F5E),
-            onTap: () {
-              HapticFeedbackService().selectionClick();
-              if (widget.onNavigateToTab != null) {
-                widget.onNavigateToTab!(3);
-              } else {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => MistakeAutopsyView(
-                      mistakes: MistakeVaultService.instance.mistakes,
-                      onStartBossBattle: () => HapticFeedbackService().stepSuccess(),
-                    ),
-                  ),
-                );
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCircadianActionTile({
-    required Key key,
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color accentColor,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildOfflineSyncBanner() {
+    final SessionViewModel vm;
+    try {
+      vm = Provider.of<SessionViewModel>(context);
+    } catch (_) {
+      return const SizedBox.shrink();
+    }
+    if (vm.pendingOfflineCount == 0) return const SizedBox.shrink();
     return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF334155)),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          key: key,
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: accentColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, color: accentColor, size: 22),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.arrow_forward_ios, color: Color(0xFF64748B), size: 14),
-              ],
-            ),
+      color: const Color(0xFFF59E0B).withValues(alpha: 0.18),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: [
+          const Icon(Icons.cloud_off, color: Color(0xFFF59E0B), size: 16),
+          const SizedBox(width: 8),
+          Text(
+            '${vm.pendingOfflineCount} işlem çevrimdışı kuyrukta bekliyor',
+            style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 12, fontWeight: FontWeight.w600),
           ),
-        ),
-      ),
-    );
-  }
-
-  void _showSettingsModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF0F172A),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return Consumer<SessionViewModel>(
-          builder: (context, sessionVm, _) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.tune_rounded, color: Color(0xFF38BDF8)),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: Text(
-                            "Erişilebilirlik & Müfredat Ayarları",
-                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white60, size: 20),
-                          onPressed: () => Navigator.pop(ctx),
-                        ),
-                      ],
-                    ),
-                    const Divider(color: Color(0xFF1E293B)),
-
-                    // ADHD Tunnel Focus Mode Toggle
-                    SwitchListTile(
-                      value: sessionVm.isTunnelFocusMode,
-                      activeColor: const Color(0xFF38BDF8),
-                      title: const Text("DEHB Tünel Odak Modu", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                      subtitle: const Text("Obsidyen siyahı ve yüksek kontrast ile dikkat dağıtıcıları sıfırlar.", style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                      onChanged: (_) {
-                        HapticFeedbackService().selectionClick();
-                        sessionVm.toggleTunnelFocusMode();
-                      },
-                    ),
-
-                    // Dyscalculia Visual Aids Toggle
-                    SwitchListTile(
-                      value: sessionVm.isDyscalculiaHelper,
-                      activeColor: const Color(0xFF10B981),
-                      title: const Text("Diskalkuli Görsel Desteği", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                      subtitle: const Text("Uzamsal sayı çizgisi ve renk kodlu cebirsel terim rozetleri.", style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                      onChanged: (_) {
-                        HapticFeedbackService().selectionClick();
-                        sessionVm.toggleDyscalculiaHelper();
-                      },
-                    ),
-
-                    const SizedBox(height: 12),
-                    const Text("Girdi Modu & Çizim Tuvali", style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        _buildInputModeOption(
-                          label: "Touchpad",
-                          icon: Icons.grid_view_rounded,
-                          mode: InputMode.touchpad,
-                          selectedMode: sessionVm.inputMode,
-                          onSelect: () {
-                            HapticFeedbackService().modeSwitch();
-                            sessionVm.setInputMode(InputMode.touchpad);
-                          },
-                        ),
-                        const SizedBox(width: 8),
-                        _buildInputModeOption(
-                          label: "Klavye",
-                          icon: Icons.keyboard_outlined,
-                          mode: InputMode.virtualKeyboard,
-                          selectedMode: sessionVm.inputMode,
-                          onSelect: () {
-                            HapticFeedbackService().modeSwitch();
-                            sessionVm.setInputMode(InputMode.virtualKeyboard);
-                          },
-                        ),
-                        const SizedBox(width: 8),
-                        _buildInputModeOption(
-                          label: "Çizim (İnk)",
-                          icon: Icons.draw_rounded,
-                          mode: InputMode.inkingCanvas,
-                          selectedMode: sessionVm.inputMode,
-                          onSelect: () {
-                            HapticFeedbackService().modeSwitch();
-                            sessionVm.setInputMode(InputMode.inkingCanvas);
-                          },
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 12),
-                    const Text("Müfredat Standardı", style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 8),
-
-                    // Curriculum Standard Dropdown
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E293B),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: DropdownButton<CurriculumType>(
-                        value: AppLocalization.currentCurriculum,
-                        dropdownColor: const Color(0xFF1E293B),
-                        isExpanded: true,
-                        underline: const SizedBox(),
-                        style: const TextStyle(color: Colors.white, fontSize: 13),
-                        items: CurriculumType.values.map((type) {
-                          return DropdownMenuItem<CurriculumType>(
-                            value: type,
-                            child: Text(type.displayName),
-                          );
-                        }).toList(),
-                        onChanged: (newType) {
-                          if (newType != null) {
-                            setState(() {
-                              AppLocalization.setCurriculum(newType);
-                            });
-                          }
-                        },
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-                    // Offline Queue Status
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E293B),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            sessionVm.pendingOfflineCount > 0 ? Icons.cloud_off : Icons.cloud_done,
-                            color: sessionVm.pendingOfflineCount > 0 ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
-                            size: 20,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              sessionVm.pendingOfflineCount > 0
-                                  ? "${sessionVm.pendingOfflineCount} adım çevrimdışı kuyrukta bekliyor"
-                                  : "Tüm adımlar bulutla senkronize",
-                              style: const TextStyle(color: Colors.white70, fontSize: 12),
-                            ),
-                          ),
-                          if (sessionVm.pendingOfflineCount > 0)
-                            TextButton(
-                              onPressed: () => sessionVm.syncPendingOfflineSteps(),
-                              child: const Text("Eşzamanla", style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12)),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildInputModeOption({
-    required String label,
-    required IconData icon,
-    required InputMode mode,
-    required InputMode selectedMode,
-    required VoidCallback onSelect,
-  }) {
-    final isSelected = mode == selectedMode;
-    return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: onSelect,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF38BDF8).withValues(alpha: 0.2) : const Color(0xFF1E293B),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF334155),
-              width: isSelected ? 2 : 1,
-            ),
+          const Spacer(),
+          TextButton(
+            onPressed: () => vm.syncPendingOfflineSteps(),
+            child: const Text('Şimdi Senkronize Et', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12)),
           ),
-          child: Column(
-            children: [
-              Icon(icon, size: 18, color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8)),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected ? Colors.white : const Color(0xFF94A3B8),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showFocusTopicSelectionModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF0F172A),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.psychology_outlined, color: Color(0xFF38BDF8), size: 24),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'Focus Kernel: Pedagojik Konu Seçimi',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white70, size: 20),
-                      onPressed: () => Navigator.of(ctx).pop(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                _buildTopicTile(
-                  ctx: ctx,
-                  topicId: 'CT-QF1',
-                  title: '2. Dereceden Denklem Çarpanlara Ayırma',
-                  subtitle: 'x² + 5x + 6 = 0 (Çarpan, Dal, Çözüm Kümeleri)',
-                  icon: Icons.functions,
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => FocusSessionScreen(
-                          topicId: 'CT-QF1',
-                          b: 5,
-                          c: 6,
-                          viewModel: FocusSessionViewModel(apiService: FocusApiService()),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 10),
-                _buildTopicTile(
-                  ctx: ctx,
-                  topicId: 'CT-LIN1',
-                  title: '1. Dereceden Doğrusal Denklem & Terazi Modeli',
-                  subtitle: '2x + 4 = 10 (Terim Yalıtımı, Katsayı Bölme)',
-                  icon: Icons.balance,
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => FocusSessionScreen(
-                          topicId: 'CT-LIN1',
-                          a: 2,
-                          b: 4,
-                          c: 10,
-                          viewModel: FocusSessionViewModel(apiService: FocusApiService()),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 10),
-                _buildTopicTile(
-                  ctx: ctx,
-                  topicId: 'CT-INEQ1',
-                  title: '1. Dereceden Doğrusal Eşitsizlikler',
-                  subtitle: '-3x + 5 ≤ 14 (Negatif Bölmede Yön Değiştirme)',
-                  icon: Icons.compare_arrows,
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => FocusSessionScreen(
-                          topicId: 'CT-INEQ1',
-                          a: -3,
-                          b: 5,
-                          c: 14,
-                          comparator: '<=',
-                          viewModel: FocusSessionViewModel(apiService: FocusApiService()),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 10),
-                _buildTopicTile(
-                  ctx: ctx,
-                  topicId: 'CT-PAR1',
-                  title: 'Paraboller & Tepe Noktası (r, k)',
-                  subtitle: 'f(x) = x² - 4x + 3 (r = -b/2a, k = f(r), Ekstremum)',
-                  icon: Icons.show_chart,
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => FocusSessionScreen(
-                          topicId: 'CT-PAR1',
-                          a: 1,
-                          b: -4,
-                          c: 3,
-                          viewModel: FocusSessionViewModel(apiService: FocusApiService()),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 10),
-                _buildTopicTile(
-                  ctx: ctx,
-                  topicId: 'CT-POLY1',
-                  title: 'Polinomlar & Kalan Teoremi',
-                  subtitle: 'P(x) = x² + 2x - 3, Bölen: x - 1 (Kök & Kalan P(d))',
-                  icon: Icons.calculate_outlined,
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => FocusSessionScreen(
-                          topicId: 'CT-POLY1',
-                          a: 1,
-                          b: 2,
-                          c: -3,
-                          viewModel: FocusSessionViewModel(apiService: FocusApiService()),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 10),
-                _buildTopicTile(
-                  ctx: ctx,
-                  topicId: 'CT-TRIG1',
-                  title: 'Trigonometri & Birim Çember',
-                  subtitle: '2sin(x) - 1 = 0 (Oran, 1. Bölge Açısı, 2. Bölge Simetrik Kökü)',
-                  icon: Icons.change_circle_outlined,
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => FocusSessionScreen(
-                          topicId: 'CT-TRIG1',
-                          a: 2,
-                          b: 0,
-                          c: 1,
-                          viewModel: FocusSessionViewModel(apiService: FocusApiService()),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 10),
-                _buildTopicTile(
-                  ctx: ctx,
-                  topicId: 'CT-LOG1',
-                  title: 'Logaritma & Tanım Kümesi',
-                  subtitle: 'log₂(x - 3) = 3 (Üstel Dönüşüm, Kök Çözümü, Tanım Doğrulama)',
-                  icon: Icons.auto_graph,
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => FocusSessionScreen(
-                          topicId: 'CT-LOG1',
-                          a: 2,
-                          b: 3,
-                          c: 3,
-                          viewModel: FocusSessionViewModel(apiService: FocusApiService()),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 10),
-                _buildTopicTile(
-                  ctx: ctx,
-                  topicId: 'CT-LIM1',
-                  title: 'Limit & 0/0 Belirsizliği',
-                  subtitle: 'lim_{x→2} (x² - 4)/(x - 2) (Belirsizlik, Sadeleştirme, Reel Limit)',
-                  icon: Icons.functions_rounded,
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => FocusSessionScreen(
-                          topicId: 'CT-LIM1',
-                          a: 2,
-                          viewModel: FocusSessionViewModel(apiService: FocusApiService()),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 10),
-                _buildTopicTile(
-                  ctx: ctx,
-                  topicId: 'CT-DERIV1',
-                  title: 'Polinom Türevi & Teğet Doğrusu',
-                  subtitle: 'f(x) = x² + 2x + 1, x₀ = 1 (Kuvvet Kuralı, Eğim, Teğet Denklemi)',
-                  icon: Icons.show_chart_rounded,
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => FocusSessionScreen(
-                          topicId: 'CT-DERIV1',
-                          a: 1,
-                          b: 2,
-                          c: 1,
-                          x0: 1,
-                          viewModel: FocusSessionViewModel(apiService: FocusApiService()),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 10),
-                _buildTopicTile(
-                  ctx: ctx,
-                  topicId: 'CT-INT1',
-                  title: 'Belirli İntegral & Alan Hesabı',
-                  subtitle: '∫₀³ (2x) dx (Ters Türev, Sınırlar F(b)-F(a), Net Alan)',
-                  icon: Icons.area_chart_rounded,
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => FocusSessionScreen(
-                          topicId: 'CT-INT1',
-                          a: 2,
-                          b: 0,
-                          c: 3,
-                          divisorRoot: 0,
-                          viewModel: FocusSessionViewModel(apiService: FocusApiService()),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildTopicTile({
-    required BuildContext ctx,
-    required String topicId,
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: () {
-        HapticFeedbackService().selectionClick();
-        onTap();
-      },
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E293B).withValues(alpha: 0.6),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: const Color(0xFF38BDF8), size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right, color: Color(0xFF94A3B8), size: 18),
-          ],
-        ),
+        ],
       ),
     );
   }

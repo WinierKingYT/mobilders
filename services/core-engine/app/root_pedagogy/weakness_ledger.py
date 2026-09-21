@@ -62,6 +62,8 @@ class CognitiveWeaknessLedger:
 
         if student_id not in self.ledger:
             self.ledger[student_id] = []
+        elif len(self.ledger[student_id]) >= 500:
+            self.ledger[student_id].pop(0)
         self.ledger[student_id].append(entry)
         return entry
 

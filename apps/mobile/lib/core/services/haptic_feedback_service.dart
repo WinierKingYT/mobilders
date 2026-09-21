@@ -13,6 +13,8 @@ class HapticFeedbackService {
   factory HapticFeedbackService() => _instance;
   HapticFeedbackService._internal();
 
+  static const int maxHistoryLength = 100;
+
   bool isEnabled = true;
 
   /// Hook for unit and widget testing to verify triggers without hardware.
@@ -60,6 +62,9 @@ class HapticFeedbackService {
   Future<void> _trigger(HapticType type, Future<void> Function() hapticCall) async {
     if (!isEnabled) return;
     triggeredHistory.add(type);
+    if (triggeredHistory.length > maxHistoryLength) {
+      triggeredHistory.removeAt(0);
+    }
     testListener?.call(type);
     try {
       await hapticCall();

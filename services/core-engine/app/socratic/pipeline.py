@@ -25,6 +25,10 @@ class SocraticRequest(BaseModel):
     affective_state: Optional[str] = "FLOW"
     scaffolding_level: int = Field(1, ge=1, le=4)
     language: str = Field("tr", description="Dil seçeneği: 'tr' veya 'en'")
+    conversation_history: List[Dict[str, str]] = Field(
+        default_factory=list,
+        description="Önceki Sokratik konuşma turları: [{'role': 'assistant'|'user', 'content': '...'}]"
+    )
 
 
 class InnerMonologueLog(BaseModel):
@@ -48,63 +52,90 @@ class SocraticPipeline:
     def process(self, request: SocraticRequest) -> InnerMonologueLog:
         t0 = time.perf_counter()
 
-        # -------------------------------------------------------------
-        # KATMAN 1: Pedagojik Stratejist (ZPD, Niyet ve İskele Seviyesi)
-        # -------------------------------------------------------------
-        if request.diagnostic_bug:
-            layer1_intent = f"MISCONCEPTION_REMEDIATION:{request.diagnostic_bug.bug_id}"
-        elif request.affective_state == "FRUSTRATION":
-            layer1_intent = "AFFECTIVE_CIRCUIT_BREAKER_EMPATHY"
-        elif any(w in request.user_input.lower() for w in ["neden", "nasıl", "why", "how"]):
-            layer1_intent = "CONCEPTUAL_DEEPENING_PROBE"
-        else:
-            layer1_intent = "SOCRATIC_STEP_SCAFFOLDING"
+        try:
+            user_input = (request.user_input or "").strip()
+            turns_count = len(request.conversation_history)
 
-        # -------------------------------------------------------------
-        # KATMAN 2: Matematiksel CAS ve Hata Bağlamı
-        # -------------------------------------------------------------
-        cas_context = {
-            "target_equation": request.target_equation,
-            "solution_roots": request.solution_roots,
-            "bug_id": request.diagnostic_bug.bug_id if request.diagnostic_bug else None,
-            "offending_term": request.diagnostic_bug.offending_term if request.diagnostic_bug else None,
-            "language": request.language,
-        }
+            # -------------------------------------------------------------
+            # KATMAN 1: Pedagojik Stratejist (ZPD, Niyet ve İskele Seviyesi)
+            # -------------------------------------------------------------
+            if turns_count > 0:
+                layer1_intent = f"MULTI_TURN_CONVERSATIONAL_SCAFFOLDING:turn_{turns_count + 1}"
+            elif request.diagnostic_bug:
+                layer1_intent = f"MISCONCEPTION_REMEDIATION:{request.diagnostic_bug.bug_id}"
+            elif request.affective_state == "FRUSTRATION":
+                layer1_intent = "AFFECTIVE_CIRCUIT_BREAKER_EMPATHY"
+            elif any(w in user_input.lower() for w in ["neden", "nasıl", "why", "how"]):
+                layer1_intent = "CONCEPTUAL_DEEPENING_PROBE"
+            else:
+                layer1_intent = "SOCRATIC_STEP_SCAFFOLDING"
 
-        # -------------------------------------------------------------
-        # KATMAN 3: Sokratik İletişimci (Soru / Açıklama Oranı >= 2.0)
-        # -------------------------------------------------------------
-        raw_dialogue = self._generate_socratic_response(request, layer1_intent)
+            # -------------------------------------------------------------
+            # KATMAN 2: Matematiksel CAS ve Hata Bağlamı
+            # -------------------------------------------------------------
+            cas_context = {
+                "target_equation": request.target_equation,
+                "solution_roots": request.solution_roots,
+                "bug_id": request.diagnostic_bug.bug_id if request.diagnostic_bug else None,
+                "offending_term": request.diagnostic_bug.offending_term if request.diagnostic_bug else None,
+                "language": request.language,
+                "turns_count": turns_count,
+            }
 
-        # -------------------------------------------------------------
-        # KATMAN 4: Güvenlik Sübapı (Zero-Leakage Interceptor)
-        # -------------------------------------------------------------
-        final_output, was_intercepted = self.guardrail.enforce_zero_leakage(
-            raw_dialogue, request.solution_roots, language=request.language
-        )
+            # -------------------------------------------------------------
+            # KATMAN 3: Sokratik İletişimci (Soru / Açıklama Oranı >= 2.0)
+            # -------------------------------------------------------------
+            raw_dialogue = self._generate_socratic_response(request, layer1_intent)
 
-        socratic_ratio = self.guardrail.calculate_socratic_ratio(final_output)
-        latency_ms = (time.perf_counter() - t0) * 1000.0
+            # -------------------------------------------------------------
+            # KATMAN 4: Güvenlik Sübapı (Zero-Leakage Interceptor)
+            # -------------------------------------------------------------
+            final_output, was_intercepted = self.guardrail.enforce_zero_leakage(
+                raw_dialogue, request.solution_roots, language=request.language
+            )
 
-        return InnerMonologueLog(
-            layer1_pedagogical_intent=layer1_intent,
-            layer2_cas_context=cas_context,
-            layer3_raw_dialogue=raw_dialogue,
-            layer4_intercepted=was_intercepted,
-            socratic_ratio=socratic_ratio,
-            final_output=final_output,
-            latency_ms=round(latency_ms, 2),
-        )
+            socratic_ratio = self.guardrail.calculate_socratic_ratio(final_output)
+            latency_ms = (time.perf_counter() - t0) * 1000.0
+
+            return InnerMonologueLog(
+                layer1_pedagogical_intent=layer1_intent,
+                layer2_cas_context=cas_context,
+                layer3_raw_dialogue=raw_dialogue,
+                layer4_intercepted=was_intercepted,
+                socratic_ratio=socratic_ratio,
+                final_output=final_output,
+                latency_ms=round(latency_ms, 2),
+            )
+        except Exception as exc:
+            # Resilient fallback: Asla oturumu veya soketi düşürme
+            latency_ms = (time.perf_counter() - t0) * 1000.0
+            is_en = (request.language or "tr").lower() == "en"
+            fallback_output = (
+                "What algebraic operation should we apply to both sides now to maintain balance? Can you explain your reasoning?"
+                if is_en
+                else "Bu aşamada eşitliği korumak için her iki tarafa hangi işlemi uygulamalıyız? Düşünceni açıklayabilir misin?"
+            )
+            return InnerMonologueLog(
+                layer1_pedagogical_intent="SOCRATIC_RESILIENT_FALLBACK",
+                layer2_cas_context={"target_equation": request.target_equation, "fallback": True, "error": str(exc)},
+                layer3_raw_dialogue=fallback_output,
+                layer4_intercepted=False,
+                socratic_ratio=2.0,
+                final_output=fallback_output,
+                latency_ms=round(latency_ms, 2),
+            )
 
     def _generate_socratic_response(self, request: SocraticRequest, intent: str) -> str:
         """
         Deterministik yüksek kaliteli Sokratik şablon sentezleyici (Türkçe & İngilizce).
         Daima yüksek Sokratik soru oranı (soru/açıklama >= 2.0) üretir.
+        Çok turlu konuşma geçmişini (conversation_history) dikkate alarak aşamalı yönlendirme yapar.
         """
-        user_lower = request.user_input.lower()
+        user_lower = (request.user_input or "").lower()
         is_en = request.language.lower() == "en"
+        history = request.conversation_history
 
-        # Jailbreak / direct demand detection
+        # 1. Jailbreak / direct demand detection
         direct_demands_tr = [
             "cevabı söyle", "cevabı ver", "x kaç", "x nedir", "çözümü ver", "çöz", "kök nedir",
             "hesapla", "dan mode", "ignore all previous", "jailbreak", "bana cevabı yaz",
@@ -128,7 +159,103 @@ class SocraticPipeline:
                 "Sol taraftaki terimleri incelediğinde dikkatini çeken ortak bir çarpan var mı?"
             )
 
-        # Misconception remediation responses
+        # 2. Çok Turlu Konuşma İlerlemesi (Multi-Turn Progression)
+        if history:
+            bug_id = request.diagnostic_bug.bug_id if request.diagnostic_bug else None
+
+            # Öğrenci "neden", "nasıl", "anlamadım" dediyse somutlaştırıcı açıklama + soru
+            if any(w in user_lower for w in ["neden", "nasıl", "anlamadım", "why", "how", "don't understand"]):
+                if bug_id == "BUG-QUAD-03":
+                    if is_en:
+                        return (
+                            "Think of a square of side (x + a): its area is (x + a) * (x + a) = x² + ax + ax + a². "
+                            "Notice how there are two rectangular pieces of area ax? "
+                            "What do you get when you combine those two middle ax terms?"
+                        )
+                    return (
+                        "Bir kenarı (x + a) olan bir kare hayal et: alanı (x + a) * (x + a) = x² + ax + ax + a² olur. "
+                        "Fark ettin mi, orada iki adet ax alanında dikdörtgen var? "
+                        "O iki ortadaki ax terimini topladığında ne elde edersin?"
+                    )
+                elif bug_id == "BUG-QUAD-02":
+                    if is_en:
+                        return (
+                            "Remember that multiplying two negative numbers gives a positive result: (-5) * (-5) = +25. "
+                            "Does that mean there are two different numbers whose square is 25? "
+                            "Which two symmetrical numbers have this exact property?"
+                        )
+                    return (
+                        "İki negatif sayının çarpımının pozitif olduğunu hatırla: (-5) * (-5) = +25 eder. "
+                        "Bu durumda karesi 25 olan iki farklı sayı olduğunu görebiliyor musun? "
+                        "Bu simetrik iki sayı sence hangileridir?"
+                    )
+                elif bug_id == "BUG-QUAD-01":
+                    if is_en:
+                        return (
+                            "If A * B = 6, A and B could be 2 and 3, or 1 and 6 — there are infinite pairs! "
+                            "Only when A * B = 0 can we be certain that A = 0 or B = 0. "
+                            "So how should we move the constant term to make the right side 0?"
+                        )
+                    return (
+                        "Eğer A * B = 6 ise A ve B 2 ile 3, ya da 1 ile 6 olabilir; sonsuz seçenek var! "
+                        "Yalnızca A * B = 0 olduğunda kesinlikle A = 0 veya B = 0 diyebiliriz. "
+                        "Öyleyse sağ tarafı 0 yapmak için karşıdaki sayıyı sol tarafa nasıl geçirmeliyiz?"
+                    )
+
+            # Öğrenci doğru ipucunu yakaladıysa (örneğin ortadaki terimi veya negatif kökü fark ettiyse)
+            if bug_id == "BUG-QUAD-03" and any(k in user_lower for k in ["6x", "2ab", "3x", "orta", "ortadaki", "middle"]):
+                if is_en:
+                    return (
+                        "Brilliant catch! You found the missing middle term! "
+                        "Now, how would you write the complete expanded expression correctly? "
+                        "Can you write down that full step?"
+                    )
+                return (
+                    "Harika yakaladın! Eksik olan ortadaki terimi buldun! "
+                    "Şimdi ifadenin tam açılımını eksiksiz olarak nasıl yazarsın? "
+                    "Bu doğru adımı çözüme eklemeye ne dersin?"
+                )
+
+            if bug_id == "BUG-QUAD-02" and any(k in user_lower for k in ["eksi", "negatif", "-", "±", "ikiz", "twin"]):
+                if is_en:
+                    return (
+                        "Spot on! Both positive and negative roots are valid solutions! "
+                        "How would you express both solutions together using the ± symbol? "
+                        "What are the two final values for x?"
+                    )
+                return (
+                    "Tam isabet! Hem pozitif hem de negatif kök geçerli çözümlerdir! "
+                    "Bu iki kökü ± sembolüyle veya 'veya' bağlacıyla nasıl ifade edersin? "
+                    "x için bulduğun bu iki değeri yazabilir misin?"
+                )
+
+            if bug_id == "BUG-QUAD-01" and any(k in user_lower for k in ["sol", "sıfır", "0", "çıkar", "eksi", "left"]):
+                if is_en:
+                    return (
+                        "Exactly the right move! Bringing all terms to the left sets the stage for factoring! "
+                        "What does your equation look like once the right side equals 0? "
+                        "Can you write out the new quadratic equation?"
+                    )
+                return (
+                    "Kesinlikle doğru hamle! Tüm terimleri sol tarafa toplamak çarpanlara ayırmanın ilk şartıdır! "
+                    "Sağ taraf 0 olduğunda yeni denklemin tam olarak neye benzer? "
+                    "Bu yeni adımı yazabilir misin?"
+                )
+
+            # Genel çok turlu ilerleme
+            if is_en:
+                return (
+                    "Great train of thought! How does that help us move closer to isolating x? "
+                    "What would be the next algebraic statement you would write? "
+                    "Can you test your hypothesis on this equation?"
+                )
+            return (
+                "Harika bir akıl yürütme! Bu düşünce bizi x'i yalnız bırakmaya nasıl yaklaştırır? "
+                "Şimdi yazacağın bir sonraki cebirsel adım ne olurdu? "
+                "Bu fikrini denklem üzerinde denemeye ne dersin?"
+            )
+
+        # 3. İlk Tur: Bozuk Kural Açılış Sokratik Yönlendirmeleri (Misconception remediation)
         if request.diagnostic_bug:
             bug_id = request.diagnostic_bug.bug_id
             if bug_id == "BUG-QUAD-01":

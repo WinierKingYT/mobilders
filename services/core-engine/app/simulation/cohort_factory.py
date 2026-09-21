@@ -5,6 +5,7 @@ Implements vectorized iBKT knowledge transitions, FSRS memory decay, and DDM res
 """
 
 from __future__ import annotations
+import math
 import time
 from typing import Dict, List, Any, Optional
 import numpy as np
@@ -25,10 +26,10 @@ class VectorizedCohortSimulationFactory:
 
     def run_simulation(self, request: SimulationCohortRequest) -> SimulationCohortResponse:
         t0 = time.perf_counter()
-        n = request.cohort_size
-        days = request.virtual_days
+        n = max(1, min(int(request.cohort_size) if math.isfinite(request.cohort_size) else 1000, 500_000))
+        days = max(1, min(int(request.virtual_days) if math.isfinite(request.virtual_days) else 30, 365))
 
-        # 1. Assign Personas across the 100,000 agents
+        # 1. Assign Personas across the agents
         dist = request.personas_distribution or {
             CognitivePersonaType.FAST_FORGETTER.value: 0.20,
             CognitivePersonaType.OVERCONFIDENT.value: 0.25,
@@ -37,9 +38,22 @@ class VectorizedCohortSimulationFactory:
             CognitivePersonaType.FLUENT_MASTER.value: 0.15,
         }
 
+        clean_dist = {}
+        for k, v in dist.items():
+            if isinstance(v, (int, float)) and math.isfinite(v) and v > 0:
+                clean_dist[k] = float(v)
+        if not clean_dist or sum(clean_dist.values()) <= 0:
+            clean_dist = {
+                CognitivePersonaType.FAST_FORGETTER.value: 0.20,
+                CognitivePersonaType.OVERCONFIDENT.value: 0.25,
+                CognitivePersonaType.IMPOSTER.value: 0.20,
+                CognitivePersonaType.SLIP_PRONE.value: 0.20,
+                CognitivePersonaType.FLUENT_MASTER.value: 0.15,
+            }
+
         # Normalize probabilities
-        tot_prob = sum(dist.values())
-        norm_dist = {k: v / tot_prob for k, v in dist.items()}
+        tot_prob = sum(clean_dist.values())
+        norm_dist = {k: v / tot_prob for k, v in clean_dist.items()}
 
         persona_keys = list(norm_dist.keys())
         persona_probs = [norm_dist[k] for k in persona_keys]
@@ -104,7 +118,7 @@ class VectorizedCohortSimulationFactory:
 
                 posterior_L = np.where(is_correct, post_correct, post_incorrect)
                 next_L = posterior_L + (1.0 - posterior_L) * p_t_arr
-                L[np.arange(n), node_idx] = np.clip(next_L, 0.01, 0.99)
+                L[np.arange(n), node_idx] = np.clip(np.nan_to_num(next_L, nan=0.01), 0.01, 0.99)
 
                 # Frontier advance condition: student masters node (L >= 0.85)
                 advanced = (L[np.arange(n), node_idx] >= 0.85) & (current_active_node < 9)
@@ -113,8 +127,9 @@ class VectorizedCohortSimulationFactory:
 
             # End of day: FSRS Memory Decay on non-practiced nodes
             # R(elapsed) = (1 + elapsed / (9*S))^-1
-            fsrs_decay_factor = 1.0 / (1.0 + (1.0 / (9.0 * fsrs_s0_arr[:, np.newaxis])))
-            L = L * (0.92 + (0.08 * fsrs_decay_factor))
+            safe_s0 = np.maximum(0.1, np.nan_to_num(fsrs_s0_arr[:, np.newaxis], nan=2.0))
+            fsrs_decay_factor = 1.0 / (1.0 + (1.0 / (9.0 * safe_s0)))
+            L = np.clip(np.nan_to_num(L * (0.92 + (0.08 * fsrs_decay_factor)), nan=0.01), 0.01, 0.99)
 
         # 4. Synthesize Node Health & Detect Bottlenecks
         pass_rates = {}
@@ -164,7 +179,9 @@ class VectorizedCohortSimulationFactory:
 
             sub_L = L[mask]
             sub_mastery_pct = float(np.mean(sub_L >= 0.80) * 100.0)
-            sub_retention_30d = float(np.mean(1.0 / (1.0 + 30.0 / (9.0 * fsrs_s0_arr[mask]))))
+            safe_s0_mask = np.maximum(0.1, np.nan_to_num(fsrs_s0_arr[mask], nan=2.0))
+            safe_v_mask = np.maximum(0.1, np.nan_to_num(ddm_v_arr[mask], nan=1.0))
+            sub_retention_30d = float(np.mean(1.0 / (1.0 + 30.0 / (9.0 * safe_s0_mask))))
             
             # ECE Calibration: perceived confidence vs actual task performance (accounting for slips and guesses)
             sub_mean_L = sub_L.mean(axis=1)
@@ -173,18 +190,18 @@ class VectorizedCohortSimulationFactory:
             sub_ece = float(np.mean(np.abs(sub_conf - sub_acc)))
 
             # Reaction time MRT = boundary_a / drift_v
-            sub_rt = float(np.mean((self.profiles[CognitivePersonaType(k)].ddm_boundary_a / ddm_v_arr[mask]) * 2.8))
+            sub_rt = float(np.mean((self.profiles[CognitivePersonaType(k)].ddm_boundary_a / safe_v_mask) * 2.8))
             sub_dropout = float(np.mean(current_active_node[mask] < 4) * 100.0)
 
             persona_outcomes.append(
                 PersonaOutcomeMetrics(
                     persona_name=k,
                     count=sub_count,
-                    mean_mastery_pct=round(sub_mastery_pct, 1),
-                    mean_retention_30d=round(sub_retention_30d, 3),
-                    mean_ece_calibration=round(sub_ece, 3),
-                    mean_rt_seconds=round(sub_rt, 2),
-                    dropout_or_quarantine_pct=round(sub_dropout, 1),
+                    mean_mastery_pct=round(sub_mastery_pct if math.isfinite(sub_mastery_pct) else 0.0, 1),
+                    mean_retention_30d=round(sub_retention_30d if math.isfinite(sub_retention_30d) else 0.0, 3),
+                    mean_ece_calibration=round(sub_ece if math.isfinite(sub_ece) else 0.0, 3),
+                    mean_rt_seconds=round(sub_rt if math.isfinite(sub_rt) else 1.0, 2),
+                    dropout_or_quarantine_pct=round(sub_dropout if math.isfinite(sub_dropout) else 0.0, 1),
                 )
             )
 

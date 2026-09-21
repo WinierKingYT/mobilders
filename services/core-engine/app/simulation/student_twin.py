@@ -5,6 +5,7 @@ and metacognitive calibration archetypes.
 """
 
 from __future__ import annotations
+import math
 from enum import Enum
 from dataclasses import dataclass
 from typing import Dict, Any
@@ -30,6 +31,16 @@ class StudentTwinProfile:
     confidence_bias: float # Metacognitive bias (+ for overconfident, - for imposter)
     ddm_boundary_a: float  # DDM threshold / caution
     ddm_drift_v: float     # DDM information accumulation rate
+
+    def __post_init__(self) -> None:
+        self.p_l0 = min(max(float(self.p_l0) if math.isfinite(self.p_l0) else 0.2, 0.001), 0.999)
+        self.p_t = min(max(float(self.p_t) if math.isfinite(self.p_t) else 0.2, 0.001), 0.999)
+        self.p_s = min(max(float(self.p_s) if math.isfinite(self.p_s) else 0.1, 0.001), 0.999)
+        self.p_g = min(max(float(self.p_g) if math.isfinite(self.p_g) else 0.1, 0.001), 0.999)
+        self.fsrs_s0 = max(float(self.fsrs_s0) if math.isfinite(self.fsrs_s0) else 5.0, 0.1)
+        self.confidence_bias = min(max(float(self.confidence_bias) if math.isfinite(self.confidence_bias) else 0.0, -1.0), 1.0)
+        self.ddm_boundary_a = max(float(self.ddm_boundary_a) if math.isfinite(self.ddm_boundary_a) else 1.0, 0.1)
+        self.ddm_drift_v = max(float(self.ddm_drift_v) if math.isfinite(self.ddm_drift_v) else 1.0, 0.1)
 
     @staticmethod
     def get_defaults() -> Dict[CognitivePersonaType, StudentTwinProfile]:

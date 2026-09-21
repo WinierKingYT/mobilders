@@ -43,7 +43,8 @@ class RiemannIntegralPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final origin = Offset(size.width * 0.15, size.height * 0.78);
-    final scaleX = (size.width * 0.75) / (b - a + 0.8);
+    final denom = b - a + 0.8;
+    final scaleX = denom > 0 ? (size.width * 0.75) / denom : 1.0;
     final scaleY = (size.height * 0.65) / 3.2;
 
     Offset toScreen(double x, double y) {
@@ -78,7 +79,8 @@ class RiemannIntegralPainter extends CustomPainter {
     _drawText(canvas, "y", toScreen(0.1, 2.9), 11, Colors.white54);
 
     // 3. Riemann Rectangles / Trapezoids
-    final dx = (b - a) / n;
+    final effectiveN = math.max(1, n);
+    final dx = (b - a) / effectiveN;
     final rectFillPaint = Paint()
       ..color = _getMethodColor(method).withValues(alpha: 0.22)
       ..style = PaintingStyle.fill;
@@ -88,7 +90,7 @@ class RiemannIntegralPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
 
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < effectiveN; i++) {
       final xLeft = a + i * dx;
       final xRight = a + (i + 1) * dx;
 
@@ -249,6 +251,20 @@ class _RiemannIntegralCanvasState extends State<RiemannIntegralCanvas> {
     _funcType = widget.initialFunc;
   }
 
+  @override
+  void didUpdateWidget(covariant RiemannIntegralCanvas oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialN != widget.initialN) {
+      _n = widget.initialN;
+    }
+    if (oldWidget.initialMethod != widget.initialMethod) {
+      _method = widget.initialMethod;
+    }
+    if (oldWidget.initialFunc != widget.initialFunc) {
+      _funcType = widget.initialFunc;
+    }
+  }
+
   double _f(double x) {
     switch (_funcType) {
       case IntegralFunctionType.parabola:
@@ -275,10 +291,11 @@ class _RiemannIntegralCanvasState extends State<RiemannIntegralCanvas> {
   }
 
   double _calculateRiemannSum() {
-    final dx = (_b - _a) / _n;
+    final effectiveN = math.max(1, _n);
+    final dx = (_b - _a) / effectiveN;
     double sum = 0.0;
 
-    for (int i = 0; i < _n; i++) {
+    for (int i = 0; i < effectiveN; i++) {
       final xLeft = _a + i * dx;
       final xRight = _a + (i + 1) * dx;
 
@@ -329,12 +346,12 @@ class _RiemannIntegralCanvasState extends State<RiemannIntegralCanvas> {
             // Title & Convergence Badge
             Row(
               children: [
-                Expanded(
+                const Expanded(
                   child: Row(
                     children: [
-                      const Icon(Icons.area_chart, color: Color(0xFF38BDF8), size: 20),
-                      const SizedBox(width: 8),
-                      const Flexible(
+                      Icon(Icons.area_chart, color: Color(0xFF38BDF8), size: 20),
+                      SizedBox(width: 8),
+                      Flexible(
                         child: Text(
                           "Riemann İntegral & Alan Simülatörü",
                           overflow: TextOverflow.ellipsis,
@@ -416,13 +433,15 @@ class _RiemannIntegralCanvasState extends State<RiemannIntegralCanvas> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: CustomPaint(
-                  painter: RiemannIntegralPainter(
-                    funcType: _funcType,
-                    method: _method,
-                    n: _n,
-                    a: _a,
-                    b: _b,
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: RiemannIntegralPainter(
+                      funcType: _funcType,
+                      method: _method,
+                      n: _n,
+                      a: _a,
+                      b: _b,
+                    ),
                   ),
                 ),
               ),

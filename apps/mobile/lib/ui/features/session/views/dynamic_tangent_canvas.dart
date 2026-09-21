@@ -119,7 +119,7 @@ class DynamicTangentPainter extends CustomPainter {
     canvas.drawLine(tanP1, tanP2, tangentPaint);
 
     // 6. Draw Secant Line through P and Q (m_sec = (y1 - y0)/h)
-    final mSec = (y1 - y0) / (x1 - x0);
+    final mSec = h.abs() < 1e-6 ? mTan : (y1 - y0) / (x1 - x0);
     final secXMin = x0 - 2.0;
     final secXMax = x1 + 2.0;
     final secP1 = toScreen(secXMin, y0 + mSec * (secXMin - x0));
@@ -226,7 +226,21 @@ class _DynamicTangentCanvasState extends State<DynamicTangentCanvas> {
     _h = widget.initialH;
   }
 
+  @override
+  void didUpdateWidget(covariant DynamicTangentCanvas oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialX0 != widget.initialX0) {
+      _x0 = widget.initialX0;
+    }
+    if (oldWidget.initialH != widget.initialH) {
+      _h = widget.initialH;
+    }
+  }
+
   double _computeSecantSlope() {
+    if (_h.abs() < 1e-6) {
+      return _computeTangentSlope();
+    }
     double f(double x) {
       switch (_curveType) {
         case CalculusCurveType.parabola:
@@ -248,17 +262,6 @@ class _DynamicTangentCanvasState extends State<DynamicTangentCanvas> {
         return 0.75 * _x0 * _x0;
       case CalculusCurveType.sine:
         return 1.8 * math.cos(_x0);
-    }
-  }
-
-  String _getCurveTitle() {
-    switch (_curveType) {
-      case CalculusCurveType.parabola:
-        return "f(x) = 0.5x²";
-      case CalculusCurveType.cubic:
-        return "f(x) = 0.25x³";
-      case CalculusCurveType.sine:
-        return "f(x) = 1.8 sin(x)";
     }
   }
 
@@ -393,11 +396,13 @@ class _DynamicTangentCanvasState extends State<DynamicTangentCanvas> {
               height: 240,
               width: double.infinity,
               color: const Color(0xFF0B1120),
-              child: CustomPaint(
-                painter: DynamicTangentPainter(
-                  curveType: _curveType,
-                  x0: _x0,
-                  h: _h,
+              child: RepaintBoundary(
+                child: CustomPaint(
+                  painter: DynamicTangentPainter(
+                    curveType: _curveType,
+                    x0: _x0,
+                    h: _h,
+                  ),
                 ),
               ),
             ),

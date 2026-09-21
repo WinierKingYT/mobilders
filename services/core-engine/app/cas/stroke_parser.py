@@ -20,10 +20,11 @@ class StrokeFeatureExtractor:
 
     @staticmethod
     def compute_bounding_box(points: List[StrokePoint]) -> Dict[str, float]:
-        if not points:
-            return {"min_x": 0.0, "max_x": 0.0, "min_y": 0.0, "max_y": 0.0, "width": 0.0, "height": 0.0, "center_x": 0.0, "center_y": 0.0}
-        xs = [p.x for p in points]
-        ys = [p.y for p in points]
+        valid_points = [p for p in points if math.isfinite(p.x) and math.isfinite(p.y)]
+        if not valid_points:
+            return {"min_x": 0.0, "max_x": 0.0, "min_y": 0.0, "max_y": 0.0, "width": 0.0, "height": 0.0, "center_x": 0.0, "center_y": 0.0, "aspect_ratio": 1.0}
+        xs = [p.x for p in valid_points]
+        ys = [p.y for p in valid_points]
         min_x, max_x = min(xs), max(xs)
         min_y, max_y = min(ys), max(ys)
         w = max(1e-3, max_x - min_x)
@@ -42,12 +43,13 @@ class StrokeFeatureExtractor:
 
     @staticmethod
     def arc_length(points: List[StrokePoint]) -> float:
-        if len(points) < 2:
+        valid_points = [p for p in points if math.isfinite(p.x) and math.isfinite(p.y)]
+        if len(valid_points) < 2:
             return 0.0
         total = 0.0
-        for i in range(1, len(points)):
-            dx = points[i].x - points[i - 1].x
-            dy = points[i].y - points[i - 1].y
+        for i in range(1, len(valid_points)):
+            dx = valid_points[i].x - valid_points[i - 1].x
+            dy = valid_points[i].y - valid_points[i - 1].y
             total += math.hypot(dx, dy)
         return total
 
@@ -70,6 +72,23 @@ class StrokeToASTParser:
 
     def parse_strokes(self, strokes: List[InkingStroke]) -> StrokeRecognitionResponse:
         t0 = time.perf_counter()
+
+        if not strokes:
+            return StrokeRecognitionResponse(
+                raw_latex="",
+                sympy_expression="",
+                confidence=0.0,
+                segmented_tokens=[],
+                parsing_latency_ms=0.0,
+            )
+
+        # DoS guard: limit to 200 strokes and filter valid points
+        safe_strokes = []
+        for s in strokes[:200]:
+            safe_pts = [p for p in s.points[:1000] if math.isfinite(p.x) and math.isfinite(p.y)]
+            if safe_pts:
+                safe_strokes.append(InkingStroke(id=s.id, points=safe_pts))
+        strokes = safe_strokes
 
         if not strokes:
             return StrokeRecognitionResponse(

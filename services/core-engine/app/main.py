@@ -15,7 +15,48 @@ app = FastAPI(
     debug=settings.DEBUG,
 )
 
+import uuid
+import time
+import logging
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from app.core.logging_config import ErrorTaxonomy
+
+class CorrelationIdMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        trace_id = request.headers.get("X-Request-ID") or request.headers.get("X-Correlation-ID") or str(uuid.uuid4())
+        request.state.trace_id = trace_id
+        start_time = time.perf_counter()
+
+        logger = logging.getLogger("core-engine.http")
+        try:
+            response = await call_next(request)
+            duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            response.headers["X-Request-ID"] = trace_id
+            logger.info(
+                f"{request.method} {request.url.path} -> {response.status_code} ({duration_ms}ms)",
+                extra={
+                    "trace_id": trace_id,
+                    "duration_ms": duration_ms,
+                    "status_code": response.status_code,
+                },
+            )
+            return response
+        except Exception as exc:
+            duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            logger.error(
+                f"Unhandled Exception on {request.method} {request.url.path}: {exc}",
+                exc_info=True,
+                extra={
+                    "trace_id": trace_id,
+                    "duration_ms": duration_ms,
+                    "error_code": ErrorTaxonomy.ERR_CAS_PARSE_FAILED if "SympifyError" in type(exc).__name__ else 5000,
+                },
+            )
+            raise
+
 # Sıkılaştırılmış CORS ayarları (app/core/config.py ve .env kaynaklı)
+app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,

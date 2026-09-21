@@ -58,6 +58,8 @@ class EmpiricalMMLECalibrator:
             Dict[item_id, (calibrated_a, calibrated_b)]
         """
         n_examinees, n_items = response_matrix.shape
+        if n_examinees == 0 or n_items == 0:
+            return {}
         assert len(item_ids) == n_items, "Length of item_ids must match columns in response_matrix"
 
         # Initialize item parameters
@@ -130,6 +132,8 @@ class EmpiricalMMLECalibrator:
                 # Negative log-likelihood objective function for item i
                 def item_obj(p_vec):
                     a_val, b_val = p_vec
+                    if not math.isfinite(a_val) or not math.isfinite(b_val):
+                        return 1e8
                     if a_val < 0.2 or a_val > 4.5 or b_val < -4.0 or b_val > 4.0:
                         return 1e8
                     loss = 0.0
@@ -196,19 +200,29 @@ class FSRSCalibrator:
         factor = 19.0 / 81.0
 
         def loss_func(w_vec):
+            if not all(math.isfinite(w) for w in w_vec):
+                return 1e8
             total_loss = 0.0
+            valid_count = 0
             for r in review_logs:
-                t = r["elapsed_days"]
-                s = max(0.01, r["current_stability"])
-                y = 1.0 if r["was_remembered"] else 0.0
+                t = r.get("elapsed_days", 0.0)
+                s = r.get("current_stability", 1.0)
+                if not math.isfinite(t) or not math.isfinite(s) or s <= 0.0 or t < 0.0:
+                    continue
+                s = max(0.01, s)
+                y = 1.0 if r.get("was_remembered", False) else 0.0
 
                 pred_r = (1.0 + factor * (t / s)) ** -0.5
                 pred_r = max(1e-5, min(1.0 - 1e-5, pred_r))
                 bce = -(y * math.log(pred_r) + (1.0 - y) * math.log(1.0 - pred_r))
                 total_loss += bce
+                valid_count += 1
+
+            if valid_count == 0:
+                return 1e8
 
             reg = 0.01 * sum((w - w_init) ** 2 for w, w_init in zip(w_vec, base_weights))
-            return (total_loss / len(review_logs)) + reg
+            return (total_loss / valid_count) + reg
 
         bounds = [
             (0.1, 2.0), (0.2, 3.0), (0.5, 6.0), (2.0, 20.0),  # w0..w3: S0
@@ -251,8 +265,16 @@ class DDMCalibrator:
             - a_low: Threshold for impulsive guessing
             - a_high: Threshold for cautious/imposter effort
         """
-        v_list = [t["ddm_drift_v"] for t in telemetry_trials if t.get("ddm_drift_v") is not None]
-        a_list = [t["ddm_boundary_a"] for t in telemetry_trials if t.get("ddm_boundary_a") is not None]
+        v_list = [
+            float(t["ddm_drift_v"])
+            for t in telemetry_trials
+            if t.get("ddm_drift_v") is not None and math.isfinite(t["ddm_drift_v"])
+        ]
+        a_list = [
+            float(t["ddm_boundary_a"])
+            for t in telemetry_trials
+            if t.get("ddm_boundary_a") is not None and math.isfinite(t["ddm_boundary_a"])
+        ]
 
         if len(v_list) < 5:
             return {

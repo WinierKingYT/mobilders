@@ -1,7 +1,6 @@
-import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import '../../core/app_theme.dart';
+import 'package:personal_learning_engine/core/services/haptic_feedback_service.dart';
 
 /// Single high-frequency point captured from touch or stylus input.
 class VectorInkingPoint {
@@ -47,6 +46,61 @@ class VectorInkingStroke {
   };
 }
 
+/// Ramer-Douglas-Peucker (RDP) stroke decimation for high-speed vector compaction.
+class VectorInkingStrokeSimplifier {
+  static List<VectorInkingPoint> simplify(List<VectorInkingPoint> points, {double epsilon = 0.8}) {
+    if (points.length <= 2) return points;
+    return _rdp(points, 0, points.length - 1, epsilon * epsilon);
+  }
+
+  static List<VectorInkingPoint> _rdp(
+    List<VectorInkingPoint> points,
+    int first,
+    int last,
+    double sqEpsilon,
+  ) {
+    double maxSqDist = 0.0;
+    int index = first;
+
+    final p1 = points[first];
+    final p2 = points[last];
+    final dx = p2.x - p1.x;
+    final dy = p2.y - p1.y;
+    final segLengthSq = dx * dx + dy * dy;
+
+    for (int i = first + 1; i < last; i++) {
+      final p = points[i];
+      double sqDist;
+      if (segLengthSq == 0.0) {
+        final dX = p.x - p1.x;
+        final dY = p.y - p1.y;
+        sqDist = dX * dX + dY * dY;
+      } else {
+        final t = ((p.x - p1.x) * dx + (p.y - p1.y) * dy) / segLengthSq;
+        final clampedT = t.clamp(0.0, 1.0);
+        final projX = p1.x + clampedT * dx;
+        final projY = p1.y + clampedT * dy;
+        final dX = p.x - projX;
+        final dY = p.y - projY;
+        sqDist = dX * dX + dY * dY;
+      }
+
+      if (sqDist > maxSqDist) {
+        maxSqDist = sqDist;
+        index = i;
+      }
+    }
+
+    if (maxSqDist > sqEpsilon) {
+      final rec1 = _rdp(points, first, index, sqEpsilon);
+      final rec2 = _rdp(points, index, last, sqEpsilon);
+      return [...rec1.sublist(0, rec1.length - 1), ...rec2];
+    } else {
+      return [points[first], points[last]];
+    }
+  }
+}
+
 /// 60 FPS Low-latency (<16ms) hardware-accelerated Vector Inking Custom Painter.
 /// Uses Quadratic Bezier smoothing to prevent jagged polyline rendering.
 class VectorInkingPainter extends CustomPainter {
@@ -71,6 +125,11 @@ class VectorInkingPainter extends CustomPainter {
   void _paintStroke(Canvas canvas, VectorInkingStroke stroke) {
     if (stroke.points.isEmpty) return;
 
+    final pts = stroke.points
+        .where((p) => p.x.isFinite && !p.x.isNaN && p.y.isFinite && !p.y.isNaN)
+        .toList();
+    if (pts.isEmpty) return;
+
     final paint = Paint()
       ..color = stroke.color
       ..strokeCap = StrokeCap.round
@@ -78,8 +137,8 @@ class VectorInkingPainter extends CustomPainter {
       ..strokeWidth = stroke.strokeWidth
       ..style = PaintingStyle.stroke;
 
-    if (stroke.points.length == 1) {
-      final p = stroke.points.first;
+    if (pts.length == 1) {
+      final p = pts.first;
       final radius = (stroke.strokeWidth * p.pressure).clamp(1.0, 10.0) / 2.0;
       canvas.drawCircle(Offset(p.x, p.y), radius, paint..style = PaintingStyle.fill);
       return;
@@ -87,7 +146,6 @@ class VectorInkingPainter extends CustomPainter {
 
     // Bezier curve interpolation between touch sample midpoints
     final path = Path();
-    final pts = stroke.points;
     path.moveTo(pts[0].x, pts[0].y);
 
     for (int i = 1; i < pts.length - 1; i++) {
@@ -103,7 +161,9 @@ class VectorInkingPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant VectorInkingPainter oldDelegate) => true;
+  bool shouldRepaint(covariant VectorInkingPainter oldDelegate) {
+    return !listEquals(strokes, oldDelegate.strokes) || activeStroke != oldDelegate.activeStroke;
+  }
 }
 
 /// Interactive Multi-modal Freehand Handwriting Inking Canvas.
@@ -125,12 +185,14 @@ class VectorInkingCanvas extends StatefulWidget {
 }
 
 class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
+  static const int maxStrokes = 300;
+  static const int maxPointsPerStroke = 1500;
+
   final List<VectorInkingStroke> _strokes = [];
   VectorInkingStroke? _activeStroke;
   Color _penColor = const Color(0xFF38BDF8); // Electric Sky Blue
   double _baseStrokeWidth = 3.2;
   String _recognizedPreview = "";
-  bool _isRecognizing = false;
 
   final List<Color> _palette = const [
     Color(0xFF38BDF8), // Sky Blue (Default)
@@ -141,10 +203,13 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
   ];
 
   void _onPointerDown(PointerDownEvent event) {
-    HapticFeedback.selectionClick();
+    final pos = event.localPosition;
+    if (!pos.dx.isFinite || pos.dx.isNaN || !pos.dy.isFinite || pos.dy.isNaN) return;
+
+    HapticFeedbackService().selectionClick();
     final point = VectorInkingPoint(
-      x: event.localPosition.dx,
-      y: event.localPosition.dy,
+      x: pos.dx,
+      y: pos.dy,
       timestampMs: DateTime.now().millisecondsSinceEpoch,
       pressure: event.pressure > 0 ? event.pressure : 1.0,
     );
@@ -161,9 +226,21 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
 
   void _onPointerMove(PointerMoveEvent event) {
     if (_activeStroke == null) return;
+    final pos = event.localPosition;
+    if (!pos.dx.isFinite || pos.dx.isNaN || !pos.dy.isFinite || pos.dy.isNaN) return;
+    if (_activeStroke!.points.length >= maxPointsPerStroke) return;
+
+    if (_activeStroke!.points.isNotEmpty) {
+      final last = _activeStroke!.points.last;
+      final dx = pos.dx - last.x;
+      final dy = pos.dy - last.y;
+      // Filter out sub-pixel touch jitter (< 1.5px Euclidean distance)
+      if (dx * dx + dy * dy < 2.25) return;
+    }
+
     final point = VectorInkingPoint(
-      x: event.localPosition.dx,
-      y: event.localPosition.dy,
+      x: pos.dx,
+      y: pos.dy,
       timestampMs: DateTime.now().millisecondsSinceEpoch,
       pressure: event.pressure > 0 ? event.pressure : 1.0,
     );
@@ -175,8 +252,19 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
 
   void _onPointerUp(PointerUpEvent event) {
     if (_activeStroke != null) {
+      final simplifiedPoints = VectorInkingStrokeSimplifier.simplify(_activeStroke!.points);
+      final finalStroke = VectorInkingStroke(
+        id: _activeStroke!.id,
+        points: simplifiedPoints,
+        color: _activeStroke!.color,
+        strokeWidth: _activeStroke!.strokeWidth,
+        isEraser: _activeStroke!.isEraser,
+      );
       setState(() {
-        _strokes.add(_activeStroke!);
+        if (_strokes.length >= maxStrokes) {
+          _strokes.removeAt(0);
+        }
+        _strokes.add(finalStroke);
         _activeStroke = null;
       });
       widget.onStrokesUpdated?.call(_strokes);
@@ -211,7 +299,7 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
 
   void _undo() {
     if (_strokes.isNotEmpty) {
-      HapticFeedback.lightImpact();
+      HapticFeedbackService().lightImpact();
       setState(() {
         _strokes.removeLast();
       });
@@ -222,7 +310,7 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
 
   void _clear() {
     if (_strokes.isNotEmpty) {
-      HapticFeedback.mediumImpact();
+      HapticFeedbackService().mediumImpact();
       setState(() {
         _strokes.clear();
         _recognizedPreview = "";
@@ -232,7 +320,7 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
   }
 
   void _commitRecognition() {
-    HapticFeedback.heavyImpact();
+    HapticFeedbackService().heavyImpact();
     if (_recognizedPreview.isNotEmpty) {
       widget.onExpressionRecognized?.call(_recognizedPreview);
     }
@@ -258,15 +346,18 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
               children: [
                 const Icon(Icons.draw_rounded, color: Color(0xFF38BDF8), size: 18),
                 const SizedBox(width: 8),
-                const Text(
-                  "Vektörel El Yazısı (Multimodal Inking)",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                const Expanded(
+                  child: Text(
+                    "Vektörel El Yazısı (Multimodal Inking)",
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 // Undo Button
                 IconButton(
                   icon: const Icon(Icons.undo, color: Color(0xFF94A3B8), size: 18),
@@ -305,12 +396,14 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
                 onPointerDown: _onPointerDown,
                 onPointerMove: _onPointerMove,
                 onPointerUp: _onPointerUp,
-                child: CustomPaint(
-                  painter: VectorInkingPainter(
-                    strokes: _strokes,
-                    activeStroke: _activeStroke,
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: VectorInkingPainter(
+                      strokes: _strokes,
+                      activeStroke: _activeStroke,
+                    ),
+                    size: Size.infinite,
                   ),
-                  size: Size.infinite,
                 ),
               ),
             ),
@@ -319,36 +412,41 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
           // Live Recognized Math Preview & Commit Action
           if (_recognizedPreview.isNotEmpty)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               color: const Color(0xFF0F172A),
-              child: Row(
-                children: [
-                  const Text(
-                    "Tanınan İfade: ",
-                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-                  ),
-                  Text(
-                    _recognizedPreview,
-                    style: const TextStyle(
-                      color: Color(0xFF38BDF8),
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'monospace',
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      "Tanınan İfade: ",
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
                     ),
-                  ),
-                  const Spacer(),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.check, size: 16),
-                    label: const Text("Adımı Aktar", style: TextStyle(fontSize: 12)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0284C7),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      minimumSize: Size.zero,
+                    Text(
+                      _recognizedPreview,
+                      style: const TextStyle(
+                        color: Color(0xFF38BDF8),
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace',
+                      ),
                     ),
-                    onPressed: _commitRecognition,
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.check, size: 16),
+                      label: const Text("Adımı Aktar", style: TextStyle(fontSize: 12)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0284C7),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: _commitRecognition,
+                    ),
+                  ],
+                ),
               ),
             ),
 
@@ -359,49 +457,52 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
               color: Color(0xFF0F172A),
               border: Border(top: BorderSide(color: Color(0xFF1E293B))),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ..._palette.map((color) {
-                  final isSelected = color == _penColor;
-                  return GestureDetector(
-                    onTap: () => setState(() => _penColor = color),
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 6),
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isSelected ? Colors.white : Colors.transparent,
-                          width: 2.0,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ..._palette.map((color) {
+                    final isSelected = color == _penColor;
+                    return GestureDetector(
+                      onTap: () => setState(() => _penColor = color),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 6),
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected ? Colors.white : Colors.transparent,
+                            width: 2.0,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }),
-                const SizedBox(width: 16),
-                // Stroke Width Switcher
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _baseStrokeWidth = _baseStrokeWidth == 3.2 ? 6.0 : 3.2;
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      _baseStrokeWidth == 3.2 ? "İnce Uç" : "Kalın Uç",
-                      style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                    );
+                  }),
+                  const SizedBox(width: 16),
+                  // Stroke Width Switcher
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _baseStrokeWidth = _baseStrokeWidth == 3.2 ? 6.0 : 3.2;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        _baseStrokeWidth == 3.2 ? "İnce Uç" : "Kalın Uç",
+                        style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

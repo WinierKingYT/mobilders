@@ -2,6 +2,7 @@
 ///
 /// Encodes domain judgments, input kinds, state transitions,
 /// server decisions, and learner profiles according to the frozen contract.
+library;
 
 enum AttemptJudgment {
   validExpected,

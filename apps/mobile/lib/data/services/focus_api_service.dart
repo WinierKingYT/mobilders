@@ -15,28 +15,28 @@ class FocusApiException implements Exception {
 }
 
 class FocusConflictException extends FocusApiException {
-  const FocusConflictException(String message, {String? code})
-      : super(message, statusCode: 409, code: code ?? 'FOCUS_STREAM_CONFLICT');
+  const FocusConflictException(super.message, {String? code})
+      : super(statusCode: 409, code: code ?? 'FOCUS_STREAM_CONFLICT');
 }
 
 class FocusRateLimitException extends FocusApiException {
-  const FocusRateLimitException(String message, {String? code})
-      : super(message, statusCode: 429, code: code ?? 'FOCUS_RATE_LIMIT_EXCEEDED');
+  const FocusRateLimitException(super.message, {String? code})
+      : super(statusCode: 429, code: code ?? 'FOCUS_RATE_LIMIT_EXCEEDED');
 }
 
 class FocusValidationException extends FocusApiException {
-  const FocusValidationException(String message, {String? code})
-      : super(message, statusCode: 422, code: code ?? 'FOCUS_VALIDATION_ERROR');
+  const FocusValidationException(super.message, {String? code})
+      : super(statusCode: 422, code: code ?? 'FOCUS_VALIDATION_ERROR');
 }
 
 class FocusDisabledException extends FocusApiException {
-  const FocusDisabledException(String message, {String? code})
-      : super(message, statusCode: 503, code: code ?? 'FOCUS_DISABLED');
+  const FocusDisabledException(super.message, {String? code})
+      : super(statusCode: 503, code: code ?? 'FOCUS_DISABLED');
 }
 
 class FocusNotFoundException extends FocusApiException {
-  const FocusNotFoundException(String message, {String? code})
-      : super(message, statusCode: 404, code: code ?? 'FOCUS_EPISODE_NOT_FOUND');
+  const FocusNotFoundException(super.message, {String? code})
+      : super(statusCode: 404, code: code ?? 'FOCUS_EPISODE_NOT_FOUND');
 }
 
 /// Robust HTTP client service for the event-sourced MOBILDERS Focus Kernel (/focus/v1).
@@ -58,6 +58,7 @@ class FocusApiService {
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'X-Request-ID': 'req_${DateTime.now().microsecondsSinceEpoch}',
     };
     if (authToken != null) {
       headers['Authorization'] = authToken!;
@@ -439,5 +440,15 @@ class FocusApiService {
       return FocusEvaluationResponse.fromJson(data);
     }
     _handleError(response);
+  }
+
+  /// Closes the underlying HTTP client to release network sockets.
+  void close() {
+    _client.close();
+  }
+
+  /// Alias for close() to match Flutter's dispose convention.
+  void dispose() {
+    close();
   }
 }

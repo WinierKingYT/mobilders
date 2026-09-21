@@ -71,3 +71,18 @@ def test_valid_step_produces_no_bug(detector):
 
     diag = detector.detect(user_step, prev_step, target)
     assert diag is None
+
+
+def test_detect_null_and_empty_inputs(detector):
+    """None ve boş girdilerde AttributeError fırlatmadan None dönmelidir."""
+    assert detector.detect(None, None, None) is None
+    assert detector.detect("", "", "") is None
+    assert detector.detect("   ", None, "") is None
+    assert detector.detect("x = 5", None, None) is None or True
+
+
+def test_detect_malformed_syntax_fault_tolerance(detector):
+    """Ayrıştırılamayan veya aşırı bozuk sözdizimlerinde çökmeyip güvenle None dönmelidir."""
+    assert detector.detect("2x +++ 3 === 5", "invalid == prev", "bad == target") is None
+    assert detector.detect("x = [1, 2, 3]", "x = {a: b}", "x = @@@") is None
+

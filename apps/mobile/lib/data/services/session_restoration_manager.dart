@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/widgets.dart';
 import '../../../domain/models/solution_step.dart';
 import '../../ui/features/touchpad/math_touchpad.dart';
@@ -205,6 +206,74 @@ class InMemorySessionStorageBackend implements SessionStorageBackend {
   }
 }
 
+/// File-based storage backend using asynchronous dart:io for persistent crash recovery
+class FileSessionStorageBackend implements SessionStorageBackend {
+  final String baseDirectoryPath;
+
+  FileSessionStorageBackend({required this.baseDirectoryPath});
+
+  File _getFile(String key) {
+    final safeKey = key.replaceAll(RegExp(r'[^a-zA-Z0-9_\-]'), '_');
+    return File('$baseDirectoryPath/$safeKey.json');
+  }
+
+  /// Exposes file reference for testing and diagnostic verification.
+  File getFile(String key) => _getFile(key);
+
+  @override
+  Future<void> write(String key, String data) async {
+    try {
+      final file = _getFile(key);
+      await file.parent.create(recursive: true);
+      final tmpFile = File('${file.path}.tmp');
+      await tmpFile.writeAsString(data, flush: true);
+      if (await file.exists()) {
+        await file.delete();
+      }
+      await tmpFile.rename(file.path);
+    } catch (e) {
+      debugPrint("FileSessionStorageBackend write warning: $e");
+    }
+  }
+
+  @override
+  Future<String?> read(String key) async {
+    try {
+      final file = _getFile(key);
+      final tmpFile = File('${file.path}.tmp');
+      if (await file.exists()) {
+        return await file.readAsString();
+      } else if (await tmpFile.exists()) {
+        try {
+          await tmpFile.rename(file.path);
+          return await file.readAsString();
+        } catch (_) {
+          return await tmpFile.readAsString();
+        }
+      }
+    } catch (e) {
+      debugPrint("FileSessionStorageBackend read warning: $e");
+    }
+    return null;
+  }
+
+  @override
+  Future<void> delete(String key) async {
+    try {
+      final file = _getFile(key);
+      final tmpFile = File('${file.path}.tmp');
+      if (await file.exists()) {
+        await file.delete();
+      }
+      if (await tmpFile.exists()) {
+        await tmpFile.delete();
+      }
+    } catch (e) {
+      debugPrint("FileSessionStorageBackend delete warning: $e");
+    }
+  }
+}
+
 /// SessionRestorationManager: Observes app lifecycle, handles atomic saves, and ensures zero data loss.
 class SessionRestorationManager with WidgetsBindingObserver {
   static const String defaultDraftKey = 'ple_active_session_draft';
@@ -287,7 +356,21 @@ class SessionRestorationManager with WidgetsBindingObserver {
         return null;
       }
 
-      final map = jsonDecode(raw) as Map<String, dynamic>;
+      final Map<String, dynamic> map;
+      try {
+        map = jsonDecode(raw) as Map<String, dynamic>;
+      } on FormatException {
+        if (_storage is FileSessionStorageBackend) {
+          try {
+            final f = (_storage as FileSessionStorageBackend).getFile(defaultDraftKey);
+            final bak = File('${f.path}.corrupt.bak');
+            await bak.writeAsString(raw, flush: true);
+          } catch (_) {}
+        }
+        await clearDraft();
+        return null;
+      }
+
       final state = RestoredSessionState.fromJson(map);
 
       // Check expiration
@@ -340,7 +423,21 @@ class SessionRestorationManager with WidgetsBindingObserver {
         return null;
       }
 
-      final map = jsonDecode(raw) as Map<String, dynamic>;
+      final Map<String, dynamic> map;
+      try {
+        map = jsonDecode(raw) as Map<String, dynamic>;
+      } on FormatException {
+        if (_storage is FileSessionStorageBackend) {
+          try {
+            final f = (_storage as FileSessionStorageBackend).getFile(defaultFocusDraftKey);
+            final bak = File('${f.path}.corrupt.bak');
+            await bak.writeAsString(raw, flush: true);
+          } catch (_) {}
+        }
+        await clearFocusDraft();
+        return null;
+      }
+
       final state = RestoredFocusSessionState.fromJson(map);
 
       // Check expiration

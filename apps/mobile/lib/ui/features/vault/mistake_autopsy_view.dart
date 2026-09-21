@@ -24,6 +24,34 @@ class MistakeAutopsyItem {
     required this.stabilityDays,
     this.isDue = true,
   });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'bug_id': bugId,
+        'node_id': nodeId,
+        'problem': problem,
+        'offending_step': offendingStep,
+        'correct_principle': correctPrinciple,
+        'status': status,
+        'stability_days': stabilityDays,
+        'is_due': isDue,
+      };
+
+  factory MistakeAutopsyItem.fromJson(Map<String, dynamic> json) {
+    final rawStab = (json['stability_days'] as num?)?.toDouble() ?? 0.5;
+    final safeStab = rawStab.isFinite && !rawStab.isNaN && rawStab >= 0.0 ? rawStab : 0.5;
+    return MistakeAutopsyItem(
+      id: json['id'] as String? ?? '',
+      bugId: json['bug_id'] as String? ?? '',
+      nodeId: json['node_id'] as String? ?? '',
+      problem: json['problem'] as String? ?? '',
+      offendingStep: json['offending_step'] as String? ?? '',
+      correctPrinciple: json['correct_principle'] as String? ?? '',
+      status: json['status'] as String? ?? 'open',
+      stabilityDays: safeStab,
+      isDue: json['is_due'] as bool? ?? true,
+    );
+  }
 }
 
 class MistakeAutopsyView extends StatefulWidget {
@@ -46,6 +74,20 @@ class _MistakeAutopsyViewState extends State<MistakeAutopsyView> {
   MistakeFilter _filter = MistakeFilter.all;
   MistakeAutopsyItem? _activeSelfCorrectionItem;
   int _selfCorrectionStage = 1; // 1: Teşhis, 2: İlke, 3: Temiz Çözüm
+
+  @override
+  void didUpdateWidget(covariant MistakeAutopsyView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_activeSelfCorrectionItem != null) {
+      final stillExists = widget.mistakes.any((m) => m.id == _activeSelfCorrectionItem!.id);
+      if (!stillExists) {
+        setState(() {
+          _activeSelfCorrectionItem = null;
+          _selfCorrectionStage = 1;
+        });
+      }
+    }
+  }
 
   List<MistakeAutopsyItem> get _filteredMistakes {
     switch (_filter) {

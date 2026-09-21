@@ -25,7 +25,6 @@ class _NumberLineBalanceCanvasState extends State<NumberLineBalanceCanvas> {
 
   // 1. Sayı Doğrusu Durumu
   int _currentPos = 0;
-  final List<String> _walkHistory = [];
 
   // 2. Pasta Kesir Durumu
   int _fractionSlices = 4;
@@ -34,12 +33,20 @@ class _NumberLineBalanceCanvasState extends State<NumberLineBalanceCanvas> {
   // 3. Terazi Durumu
   int _leftWeight = 3;
   int _rightWeight = 11;
-  int _boxValue = 4; // 2x + 3 = 11 => 2x = 8 => x = 4
+  final int _boxValue = 4; // 2x + 3 = 11 => 2x = 8 => x = 4
 
   @override
   void initState() {
     super.initState();
     _currentMode = widget.initialMode;
+  }
+
+  @override
+  void didUpdateWidget(covariant NumberLineBalanceCanvas oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialMode != widget.initialMode) {
+      _currentMode = widget.initialMode;
+    }
   }
 
   @override
@@ -58,8 +65,8 @@ class _NumberLineBalanceCanvasState extends State<NumberLineBalanceCanvas> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: const [
+              const Row(
+                children: [
                   Icon(Icons.toys, color: Colors.amberAccent, size: 20),
                   SizedBox(width: 8),
                   Text(

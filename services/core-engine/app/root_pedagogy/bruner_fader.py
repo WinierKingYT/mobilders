@@ -5,6 +5,7 @@ Controls the fading of concrete representations into pure symbolic algebra.
 """
 
 from __future__ import annotations
+import math
 from enum import Enum
 from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
@@ -104,6 +105,15 @@ class BrunerFadingOrchestrator:
         """
         Determines the optimal Bruner stage based on BKT mastery and friction indicators.
         """
+        # Input sanitization
+        if not math.isfinite(bkt_mastery_p_l):
+            bkt_mastery_p_l = 0.0
+        else:
+            bkt_mastery_p_l = max(0.0, min(1.0, float(bkt_mastery_p_l)))
+
+        if consecutive_errors < 0:
+            consecutive_errors = 0
+
         # Friction fallback: 2 or more consecutive errors triggers scaffold fallback to Enactive
         if consecutive_errors >= 2:
             return BrunerStage.ENACTIVE
