@@ -60,6 +60,12 @@ class SyntheticTwinGenerator:
         },
     }
 
+    @staticmethod
+    def _normalize_equation_for_comparison(eq: Optional[str]) -> str:
+        if not eq:
+            return ""
+        return eq.strip().lower().replace(" ", "").replace("²", "^2")
+
     @classmethod
     def generate(
         cls,
@@ -70,22 +76,40 @@ class SyntheticTwinGenerator:
         b = bug_id.upper().strip()
 
         if b == "BUG-QUAD-01":
-            return cls._generate_bug_quad_01(difficulty_level)
+            return cls._generate_bug_quad_01(difficulty_level, original_equation)
         elif b == "BUG-QUAD-02":
-            return cls._generate_bug_quad_02(difficulty_level)
+            return cls._generate_bug_quad_02(difficulty_level, original_equation)
         elif b == "BUG-QUAD-03":
-            return cls._generate_bug_quad_03(difficulty_level)
+            return cls._generate_bug_quad_03(difficulty_level, original_equation)
         elif b == "BUG-QUAD-04":
-            return cls._generate_bug_quad_04(difficulty_level)
+            return cls._generate_bug_quad_04(difficulty_level, original_equation)
         elif b == "BUG-QUAD-05":
-            return cls._generate_bug_quad_05(difficulty_level)
+            return cls._generate_bug_quad_05(difficulty_level, original_equation)
         elif "SIGN" in b:
-            return cls._generate_sign_flip(difficulty_level)
+            return cls._generate_sign_flip(difficulty_level, original_equation)
         else:
-            return cls._generate_generic_quadratic(b, difficulty_level)
+            return cls._generate_generic_quadratic(b, difficulty_level, original_equation)
 
     @classmethod
-    def _generate_bug_quad_01(cls, difficulty: int) -> TwinQuestionResponse:
+    def _pick_preset(
+        cls,
+        presets: List[Dict[str, Any]],
+        original_equation: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        norm_orig = cls._normalize_equation_for_comparison(original_equation)
+        if norm_orig:
+            filtered = [
+                p for p in presets
+                if cls._normalize_equation_for_comparison(p["eq"]) != norm_orig
+            ]
+            if filtered:
+                return random.choice(filtered)
+        return random.choice(presets)
+
+    @classmethod
+    def _generate_bug_quad_01(
+        cls, difficulty: int, original_equation: Optional[str] = None
+    ) -> TwinQuestionResponse:
         """
         Sağ tarafı sıfır OLMAYAN kuadratik denklem:
         (x - a)(x - b) = c  (c != 0)
@@ -108,7 +132,7 @@ class SyntheticTwinGenerator:
                 "hint": "Önce parantezleri çarp: x² - 3x - 4 = 6. 6'yı sola al: x² - 3x - 10 = 0.",
             },
         ]
-        choice = random.choice(presets)
+        choice = cls._pick_preset(presets, original_equation)
         return TwinQuestionResponse(
             target_equation=choice["eq"],
             canonical_roots=choice["roots"],
@@ -120,7 +144,9 @@ class SyntheticTwinGenerator:
         )
 
     @classmethod
-    def _generate_bug_quad_02(cls, difficulty: int) -> TwinQuestionResponse:
+    def _generate_bug_quad_02(
+        cls, difficulty: int, original_equation: Optional[str] = None
+    ) -> TwinQuestionResponse:
         """
         x² = c veya ax² = b formatında negatif ikiz kökü hatırlatan denklem.
         """
@@ -141,7 +167,7 @@ class SyntheticTwinGenerator:
                 "hint": "x² = 64 eşitliğini yaz. x = 8 veya x = -8 köklerini unutma.",
             },
         ]
-        choice = random.choice(presets)
+        choice = cls._pick_preset(presets, original_equation)
         return TwinQuestionResponse(
             target_equation=choice["eq"],
             canonical_roots=choice["roots"],
@@ -153,7 +179,9 @@ class SyntheticTwinGenerator:
         )
 
     @classmethod
-    def _generate_bug_quad_03(cls, difficulty: int) -> TwinQuestionResponse:
+    def _generate_bug_quad_03(
+        cls, difficulty: int, original_equation: Optional[str] = None
+    ) -> TwinQuestionResponse:
         """
         (x ± a)² açılımı gerektiren ve orta terimi sınayan denklem.
         """
@@ -174,7 +202,7 @@ class SyntheticTwinGenerator:
                 "hint": "(x - 5)² açılımında ortadaki -10x terimini hatırla.",
             },
         ]
-        choice = random.choice(presets)
+        choice = cls._pick_preset(presets, original_equation)
         return TwinQuestionResponse(
             target_equation=choice["eq"],
             canonical_roots=choice["roots"],
@@ -186,7 +214,9 @@ class SyntheticTwinGenerator:
         )
 
     @classmethod
-    def _generate_bug_quad_04(cls, difficulty: int) -> TwinQuestionResponse:
+    def _generate_bug_quad_04(
+        cls, difficulty: int, original_equation: Optional[str] = None
+    ) -> TwinQuestionResponse:
         """
         Tam kareye tamamlama: x² + 2kx = m
         """
@@ -202,7 +232,7 @@ class SyntheticTwinGenerator:
                 "hint": "(-8/2)² = 16. Her iki tarafa 16 ekle: x² - 8x + 16 = 9 + 16 => (x - 4)² = 25.",
             },
         ]
-        choice = random.choice(presets)
+        choice = cls._pick_preset(presets, original_equation)
         return TwinQuestionResponse(
             target_equation=choice["eq"],
             canonical_roots=choice["roots"],
@@ -214,7 +244,9 @@ class SyntheticTwinGenerator:
         )
 
     @classmethod
-    def _generate_bug_quad_05(cls, difficulty: int) -> TwinQuestionResponse:
+    def _generate_bug_quad_05(
+        cls, difficulty: int, original_equation: Optional[str] = None
+    ) -> TwinQuestionResponse:
         """
         Kuadratik formül: ax² + bx + c = 0 (a > 1)
         """
@@ -230,7 +262,7 @@ class SyntheticTwinGenerator:
                 "hint": "Δ = b² - 4ac = 49 - 24 = 25. Kökler: (7 ± 5) / 4.",
             },
         ]
-        choice = random.choice(presets)
+        choice = cls._pick_preset(presets, original_equation)
         return TwinQuestionResponse(
             target_equation=choice["eq"],
             canonical_roots=choice["roots"],
@@ -242,7 +274,9 @@ class SyntheticTwinGenerator:
         )
 
     @classmethod
-    def _generate_sign_flip(cls, difficulty: int) -> TwinQuestionResponse:
+    def _generate_sign_flip(
+        cls, difficulty: int, original_equation: Optional[str] = None
+    ) -> TwinQuestionResponse:
         """
         İşaret dağılımı: -(ax - b) içeren denklem.
         """
@@ -258,7 +292,7 @@ class SyntheticTwinGenerator:
                 "hint": "-(x - 6) açılımı -x + 6 olur. 3x + 2 - x + 6 = 14 => 2x + 8 = 14 => x = 3.",
             },
         ]
-        choice = random.choice(presets)
+        choice = cls._pick_preset(presets, original_equation)
         return TwinQuestionResponse(
             target_equation=choice["eq"],
             canonical_roots=choice["roots"],
@@ -270,17 +304,64 @@ class SyntheticTwinGenerator:
         )
 
     @classmethod
-    def _generate_generic_quadratic(cls, bug_id: str, difficulty: int) -> TwinQuestionResponse:
+    def _format_monic_quadratic(cls, r1: int, r2: int) -> str:
+        """
+        r1 ve r2 köklerine sahip x² + bx + c = 0 denklemini cebirsel olarak kusursuz formatlar:
+        b = -(r1 + r2), c = r1 * r2
+        - 0x, + 1x, - 1x gibi çirkin formatları ortadan kaldırır.
+        """
+        b = -(r1 + r2)
+        c = r1 * r2
+        parts = ["x²"]
+
+        if b != 0:
+            if b == 1:
+                parts.append("+ x")
+            elif b == -1:
+                parts.append("- x")
+            elif b > 0:
+                parts.append(f"+ {b}x")
+            else:
+                parts.append(f"- {abs(b)}x")
+
+        if c != 0:
+            if c > 0:
+                parts.append(f"+ {c}")
+            else:
+                parts.append(f"- {abs(c)}")
+
+        if len(parts) == 1:
+            return "x² = 0"
+        return " ".join(parts) + " = 0"
+
+    @classmethod
+    def _generate_generic_quadratic(
+        cls,
+        bug_id: str,
+        difficulty: int,
+        original_equation: Optional[str] = None,
+    ) -> TwinQuestionResponse:
         """
         Genel temiz tamsayı köklü kuadratik denklem.
         """
-        r1 = random.choice([2, 3, 4, 5])
-        r2 = random.choice([-1, -2, 1, 6])
+        r1_pool = [2, 3, 4, 5, -2, -3, 6]
+        r2_pool = [-1, -2, 1, 6, -3, 4, -4]
+        norm_orig = cls._normalize_equation_for_comparison(original_equation)
+
+        eq = ""
+        r1, r2 = 2, 3
+        for _ in range(12):
+            r1 = random.choice(r1_pool)
+            r2 = random.choice(r2_pool)
+            candidate_eq = cls._format_monic_quadratic(r1, r2)
+            if not norm_orig or cls._normalize_equation_for_comparison(candidate_eq) != norm_orig:
+                eq = candidate_eq
+                break
+        if not eq:
+            eq = cls._format_monic_quadratic(r1, r2)
+
         sum_r = r1 + r2
         prod_r = r1 * r2
-        b_sign = f"- {sum_r}" if sum_r >= 0 else f"+ {abs(sum_r)}"
-        c_sign = f"+ {prod_r}" if prod_r >= 0 else f"- {abs(prod_r)}"
-        eq = f"x² {b_sign}x {c_sign} = 0"
 
         return TwinQuestionResponse(
             target_equation=eq,
