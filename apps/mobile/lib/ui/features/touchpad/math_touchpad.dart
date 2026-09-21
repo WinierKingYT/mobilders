@@ -37,6 +37,18 @@ class MathTouchpad extends StatelessWidget {
     final start = selection.start >= 0 ? selection.start : value.text.length;
     final end = selection.end >= 0 ? selection.end : value.text.length;
 
+    // Selection wrap with parentheses
+    if (start != end && text == '(') {
+      final selectedText = value.text.substring(start, end);
+      final wrapped = '($selectedText)';
+      final newText = value.text.replaceRange(start, end, wrapped);
+      controller.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: start + wrapped.length),
+      );
+      return;
+    }
+
     // Check if inserting an operator or dot at the end
     if (start == value.text.length && end == value.text.length) {
       final sanitized = InstantMathSanitizer.sanitizeInput(
@@ -71,20 +83,47 @@ class MathTouchpad extends StatelessWidget {
         selection: TextSelection.collapsed(offset: start),
       );
     } else if (start > 0) {
-      // Check if deleting multi-char tokens like "x^2" or "sqrt("
-      String toDelete = value.text.substring(0, start);
+      // 1. If cursor is between matching empty brackets: "(|)" -> delete both
+      if (start < value.text.length) {
+        final prevChar = value.text[start - 1];
+        final nextChar = value.text[start];
+        if ((prevChar == '(' && nextChar == ')') ||
+            (prevChar == '[' && nextChar == ']') ||
+            (prevChar == '{' && nextChar == '}')) {
+          final newText = value.text.replaceRange(start - 1, start + 1, '');
+          controller.value = TextEditingValue(
+            text: newText,
+            selection: TextSelection.collapsed(offset: start - 1),
+          );
+          return;
+        }
+      }
+
+      // Check if deleting multi-char tokens like "x^2", "sqrt(", "+-", etc.
+      final toDelete = value.text.substring(0, start);
       int deleteLength = 1;
       if (toDelete.endsWith('sqrt(')) {
         deleteLength = 5;
-      } else if (toDelete.endsWith('x^2')) {
-        deleteLength = 3;
-      } else if (toDelete.endsWith(' = ')) {
-        deleteLength = 3;
-      } else if (toDelete.endsWith(' + ') ||
+      } else if (toDelete.endsWith(' == ')) {
+        deleteLength = 4;
+      } else if (toDelete.endsWith(' = ') ||
+          toDelete.endsWith(' + ') ||
           toDelete.endsWith(' - ') ||
           toDelete.endsWith(' * ') ||
           toDelete.endsWith(' / ')) {
         deleteLength = 3;
+      } else if (toDelete.endsWith('x^2') || toDelete.endsWith('**2')) {
+        deleteLength = 3;
+      } else if (toDelete.endsWith('+-') ||
+          toDelete.endsWith('^2') ||
+          toDelete.endsWith('x²') ||
+          toDelete.endsWith('==') ||
+          toDelete.endsWith('!=') ||
+          toDelete.endsWith('<=') ||
+          toDelete.endsWith('>=') ||
+          toDelete.endsWith('()') ||
+          toDelete.endsWith('**')) {
+        deleteLength = 2;
       }
 
       final safeStart = (start - deleteLength).clamp(0, value.text.length);

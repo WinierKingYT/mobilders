@@ -148,5 +148,88 @@ void main() {
       // Back to keypad grid
       expect(find.widgetWithText(ElevatedButton, 'x'), findsOneWidget);
     });
+
+    testWidgets('Tapping ± inserts +- and backspace removes entire +- token', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: Scaffold(
+            body: MathTouchpad(
+              controller: controller,
+              inputMode: InputMode.touchpad,
+              onModeChanged: (_) {},
+              onSubmit: () {},
+            ),
+          ),
+        ),
+      );
+
+      // Tap '±'
+      await tester.tap(find.widgetWithText(ElevatedButton, '±'));
+      await tester.pump();
+      expect(controller.text, '+-');
+
+      // Tap backspace
+      await tester.tap(find.byIcon(Icons.backspace_outlined));
+      await tester.pump();
+      expect(controller.text, '');
+    });
+
+    testWidgets('Cursor between matching parentheses removes both brackets on backspace', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: Scaffold(
+            body: MathTouchpad(
+              controller: controller,
+              inputMode: InputMode.touchpad,
+              onModeChanged: (_) {},
+              onSubmit: () {},
+            ),
+          ),
+        ),
+      );
+
+      // Set text to "()" with cursor between: offset 1
+      controller.value = const TextEditingValue(
+        text: '()',
+        selection: TextSelection.collapsed(offset: 1),
+      );
+
+      // Tap backspace
+      await tester.tap(find.byIcon(Icons.backspace_outlined));
+      await tester.pump();
+      expect(controller.text, '');
+      expect(controller.selection.baseOffset, 0);
+    });
+
+    testWidgets('Tapping ( with text selected wraps the selection in parentheses', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: Scaffold(
+            body: MathTouchpad(
+              controller: controller,
+              inputMode: InputMode.touchpad,
+              onModeChanged: (_) {},
+              onSubmit: () {},
+            ),
+          ),
+        ),
+      );
+
+      // Set text to "x + 2" with entire text selected
+      controller.value = const TextEditingValue(
+        text: 'x + 2',
+        selection: TextSelection(baseOffset: 0, extentOffset: 5),
+      );
+
+      // Tap '('
+      await tester.tap(find.widgetWithText(ElevatedButton, '('));
+      await tester.pump();
+      expect(controller.text, '(x + 2)');
+      expect(controller.selection.baseOffset, 7);
+    });
   });
 }
+
