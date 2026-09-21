@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:personal_learning_engine/data/services/engine_api_service.dart';
+import 'package:personal_learning_engine/data/services/mistake_vault_service.dart';
+import 'package:personal_learning_engine/domain/models/twin_question_model.dart';
+
 
 enum MistakeFilter { all, open, inRemediation, cured }
 
@@ -58,12 +62,16 @@ class MistakeAutopsyView extends StatefulWidget {
   final List<MistakeAutopsyItem> mistakes;
   final VoidCallback? onStartBossBattle;
   final ValueChanged<MistakeAutopsyItem>? onSelfCorrectionCompleted;
+  final Future<void> Function(MistakeAutopsyItem item, String twinEquation)? onLaunchTwinPractice;
+  final EngineApiService? apiService;
 
   const MistakeAutopsyView({
     super.key,
     required this.mistakes,
     this.onStartBossBattle,
     this.onSelfCorrectionCompleted,
+    this.onLaunchTwinPractice,
+    this.apiService,
   });
 
   @override
@@ -74,6 +82,17 @@ class _MistakeAutopsyViewState extends State<MistakeAutopsyView> {
   MistakeFilter _filter = MistakeFilter.all;
   MistakeAutopsyItem? _activeSelfCorrectionItem;
   int _selfCorrectionStage = 1; // 1: Teşhis, 2: İlke, 3: Temiz Çözüm
+  bool _isGeneratingTwin = false;
+  TwinQuestionModel? _generatedTwin;
+
+  void _resetSelfCorrection() {
+    setState(() {
+      _activeSelfCorrectionItem = null;
+      _selfCorrectionStage = 1;
+      _isGeneratingTwin = false;
+      _generatedTwin = null;
+    });
+  }
 
   @override
   void didUpdateWidget(covariant MistakeAutopsyView oldWidget) {
@@ -81,10 +100,7 @@ class _MistakeAutopsyViewState extends State<MistakeAutopsyView> {
     if (_activeSelfCorrectionItem != null) {
       final stillExists = widget.mistakes.any((m) => m.id == _activeSelfCorrectionItem!.id);
       if (!stillExists) {
-        setState(() {
-          _activeSelfCorrectionItem = null;
-          _selfCorrectionStage = 1;
-        });
+        _resetSelfCorrection();
       }
     }
   }
@@ -449,7 +465,7 @@ class _MistakeAutopsyViewState extends State<MistakeAutopsyView> {
               ),
               IconButton(
                 icon: const Icon(Icons.close, color: Colors.white54, size: 18),
-                onPressed: () => setState(() => _activeSelfCorrectionItem = null),
+                onPressed: _resetSelfCorrection,
               ),
             ],
           ),
@@ -489,16 +505,151 @@ class _MistakeAutopsyViewState extends State<MistakeAutopsyView> {
               style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 13),
             ),
             const SizedBox(height: 6),
-            const Text("Taze soru hazırlanıyor. Doğru adımı uygulayarak soruyu çöz."),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              key: const Key('btn_stage_3_complete'),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent, foregroundColor: Colors.black),
-              onPressed: () {
-                widget.onSelfCorrectionCompleted?.call(item);
-                setState(() => _activeSelfCorrectionItem = null);
-              },
-              child: const Text("Temiz Çözümü Tamamla", style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              "Bu kavram yanılgısını kalıcı olarak gidermek için sentetik ikiz soru çözebilir veya doğrudan temiz çözümü onaylayabilirsin.",
+              style: TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+            const SizedBox(height: 10),
+            if (_isGeneratingTwin)
+              Container(
+                key: const Key('stage_3_generating_twin'),
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.black26,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.cyanAccent),
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      "İzomorfik ikiz soru üretiliyor...",
+                      style: TextStyle(color: Colors.cyanAccent, fontSize: 12),
+                    ),
+                  ],
+                ),
+              )
+            else if (_generatedTwin != null) ...[
+              Container(
+                key: const Key('stage_3_twin_equation_card'),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.6)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.psychology_outlined, color: Colors.cyanAccent, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            "İkiz Soru: ${_generatedTwin!.targetEquation}",
+                            style: const TextStyle(
+                              color: Colors.cyanAccent,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_generatedTwin!.pedagogicalFocus.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        "Odak: ${_generatedTwin!.pedagogicalFocus}",
+                        style: const TextStyle(color: Colors.white70, fontSize: 11),
+                      ),
+                    ],
+                    if (_generatedTwin!.hint.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        "İpucu: ${_generatedTwin!.hint}",
+                        style: const TextStyle(color: Colors.amberAccent, fontSize: 11),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              if (widget.onLaunchTwinPractice != null) ...[
+                ElevatedButton.icon(
+                  key: const Key('btn_stage_3_start_practice'),
+                  icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                  label: const Text("Tuvalde Alıştırmayı Çöz", style: TextStyle(fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.cyanAccent,
+                    foregroundColor: Colors.black,
+                  ),
+                  onPressed: () async {
+                    await widget.onLaunchTwinPractice!(item, _generatedTwin!.targetEquation);
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+            ],
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8.0,
+              runSpacing: 8.0,
+              children: [
+                OutlinedButton.icon(
+                  key: const Key('btn_stage_3_launch_twin'),
+                  icon: const Icon(Icons.autorenew, size: 16),
+                  label: Text(_generatedTwin != null ? "Yeniden İkiz Üret" : "🎯 İkiz Soru Üret"),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.cyanAccent,
+                    side: const BorderSide(color: Colors.cyanAccent),
+                  ),
+                  onPressed: _isGeneratingTwin
+                      ? null
+                      : () async {
+                          setState(() => _isGeneratingTwin = true);
+                          try {
+                            final api = widget.apiService ?? EngineApiService();
+                            final twin = await api.generateTwinQuestion(
+                              bugId: item.bugId,
+                              originalEquation: item.problem,
+                            );
+                            if (mounted) {
+                              setState(() {
+                                _isGeneratingTwin = false;
+                                _generatedTwin = twin;
+                              });
+                            }
+                          } catch (_) {
+                            if (mounted) {
+                              setState(() => _isGeneratingTwin = false);
+                            }
+                          }
+                        },
+                ),
+                ElevatedButton.icon(
+                  key: const Key('btn_stage_3_complete'),
+                  icon: const Icon(Icons.check_circle_outline, size: 16),
+                  label: const Text("Temiz Çözümü Tamamla", style: TextStyle(fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.greenAccent,
+                    foregroundColor: Colors.black,
+                  ),
+                  onPressed: () {
+                    if (widget.onSelfCorrectionCompleted != null) {
+                      widget.onSelfCorrectionCompleted!(item);
+                    } else {
+                      MistakeVaultService.instance.updateMistakeStatus(item.id, 'cured');
+                    }
+                    _resetSelfCorrection();
+                  },
+                ),
+              ],
             ),
           ],
         ],

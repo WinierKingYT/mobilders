@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:personal_learning_engine/data/services/engine_api_service.dart';
+import 'package:personal_learning_engine/data/services/mistake_vault_service.dart';
 import 'package:personal_learning_engine/ui/features/vault/mistake_autopsy_view.dart';
 
 void main() {
@@ -315,5 +316,127 @@ void main() {
       expect(find.text('Kayıtlı Bilişsel Hata Yok'), findsOneWidget);
       expect(find.textContaining('Harika! Henüz tespit edilen kavram yanılgısı'), findsOneWidget);
     });
+
+    testWidgets('MistakeAutopsyView Stage 3 generates synthetic twin question and triggers practice callback',
+        (WidgetTester tester) async {
+      String? launchedEquation;
+      MistakeAutopsyItem? launchedItem;
+
+      final mockClient = MockClient((request) async {
+        if (request.url.path == '/api/v1/twin/generate') {
+          return http.Response(
+            jsonEncode({
+              'twin_id': 'twin_test_01',
+              'target_equation': '(x - 3)(x + 2) = 6',
+              'canonical_roots': [4.0, -3.0],
+              'targeted_bug_id': 'BUG-QUAD-01',
+              'targeted_bug_title': 'Sıfır-Çarpım Kuralı İhlali',
+              'pedagogical_focus': 'Eşitliğin sağ tarafı sıfırdan farklıdır.',
+              'hint': 'Önce parantezleri aç.',
+            }),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }
+        return http.Response('Not Found', 404);
+      });
+      final mockApi = EngineApiService(client: mockClient);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MistakeAutopsyView(
+            mistakes: testMistakes,
+            apiService: mockApi,
+            onLaunchTwinPractice: (item, eq) async {
+              launchedItem = item;
+              launchedEquation = eq;
+            },
+          ),
+        ),
+      );
+
+      // Open self correction on m2 (BUG-QUAD-01)
+      final btnStartM2 = find.byKey(const Key('btn_start_self_correction_m2'));
+      await tester.ensureVisible(btnStartM2);
+      await tester.pumpAndSettle();
+      await tester.tap(btnStartM2);
+      await tester.pumpAndSettle();
+
+      // Step through stage 1 and 2
+      await tester.tap(find.byKey(const Key('btn_stage_1_confirm')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('btn_stage_2_confirm')));
+      await tester.pumpAndSettle();
+
+      // We are at Stage 3
+      expect(find.byKey(const Key('stage_3_view')), findsOneWidget);
+      expect(find.byKey(const Key('btn_stage_3_launch_twin')), findsOneWidget);
+      expect(find.byKey(const Key('stage_3_twin_equation_card')), findsNothing);
+
+      // Tap launch twin button
+      await tester.tap(find.byKey(const Key('btn_stage_3_launch_twin')));
+      await tester.pumpAndSettle();
+
+      // Twin equation card should now be visible
+      expect(find.byKey(const Key('stage_3_twin_equation_card')), findsOneWidget);
+      expect(find.textContaining('(x - 3)(x + 2) = 6'), findsOneWidget);
+      expect(find.byKey(const Key('btn_stage_3_start_practice')), findsOneWidget);
+
+      // Tap practice button
+      final btnPractice = find.byKey(const Key('btn_stage_3_start_practice'));
+      await tester.ensureVisible(btnPractice);
+      await tester.pumpAndSettle();
+      await tester.tap(btnPractice);
+      await tester.pumpAndSettle();
+
+      expect(launchedItem?.id, equals('m2'));
+      expect(launchedEquation, equals('(x - 3)(x + 2) = 6'));
+
+      // Tap complete
+      final btnComplete = find.byKey(const Key('btn_stage_3_complete'));
+      await tester.ensureVisible(btnComplete);
+      await tester.pumpAndSettle();
+      await tester.tap(btnComplete);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('self_correction_flow')), findsNothing);
+    });
+
+    testWidgets('MistakeAutopsyView Stage 3 fallback updates MistakeVaultService status',
+        (WidgetTester tester) async {
+      MistakeVaultService.instance.clearMistakes(persist: false);
+      MistakeVaultService.instance.recordMistake(
+        bugId: 'BUG-QUAD-01',
+        nodeId: 'N30',
+        problem: 'x(x+2)=3',
+        offendingStep: 'x=3',
+        correctPrinciple: 'ax^2+bx+c=0',
+      );
+
+      final item = MistakeVaultService.instance.mistakes.first;
+      expect(item.status, equals('open'));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MistakeAutopsyView(
+            mistakes: MistakeVaultService.instance.mistakes,
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(Key('btn_start_self_correction_${item.id}')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('btn_stage_1_confirm')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('btn_stage_2_confirm')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('btn_stage_3_complete')));
+      await tester.pumpAndSettle();
+
+      expect(MistakeVaultService.instance.mistakes.first.status, equals('cured'));
+    });
   });
 }
+
