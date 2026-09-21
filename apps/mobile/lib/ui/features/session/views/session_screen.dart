@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/app_theme.dart';
+import '../../../../core/services/haptic_feedback_service.dart';
+import '../../../../data/services/engine_api_service.dart';
 import '../../../../data/services/session_restoration_manager.dart';
 import '../../../../domain/models/solution_step.dart';
 import '../../touchpad/instant_math_sanitizer.dart';
@@ -28,6 +30,7 @@ class _SessionScreenState extends State<SessionScreen> {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final SessionRestorationManager _restorationManager = SessionRestorationManager();
+  final EngineApiService _api = EngineApiService();
   bool _isRestored = false;
   SessionViewModel? _viewModel;
 
@@ -198,26 +201,7 @@ class _SessionScreenState extends State<SessionScreen> {
 
           // Solution Completed Banner
           if (viewModel.isTargetReached)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-              color: AppColors.accentCorrect.withValues(alpha: 0.15),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.check_circle_rounded, color: AppColors.accentCorrect, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Tebrikler! Denklem Çözüldü.',
-                    style: TextStyle(
-                      color: AppColors.accentCorrect,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _buildTargetCelebrationBanner(context, viewModel),
 
           // Cognitive Hesitation Whisper Bubble (Bölüm 1)
           if (viewModel.hesitationWhisper != null)
@@ -584,6 +568,97 @@ class _SessionScreenState extends State<SessionScreen> {
             ),
 
           const SizedBox(height: 6),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTargetCelebrationBanner(BuildContext context, SessionViewModel viewModel) {
+    return Container(
+      key: const Key('target_reached_celebration_banner'),
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.accentCorrect.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.accentCorrect.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.check_circle_rounded, color: AppColors.accentCorrect, size: 22),
+              SizedBox(width: 8),
+              Text(
+                'Tebrikler! Denklem Çözüldü.',
+                style: TextStyle(
+                  color: AppColors.accentCorrect,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton.icon(
+                key: const Key('celebration_twin_practice_button'),
+                icon: const Icon(Icons.track_changes, size: 16),
+                label: const Text('🎯 İkiz Soruyla Pekiştir', style: TextStyle(fontSize: 12)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0284C7),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () async {
+                  HapticFeedbackService().selectionClick();
+                  final messenger = ScaffoldMessenger.of(context);
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('İkiz soru hazırlanıyor...'),
+                      backgroundColor: Color(0xFF0284C7),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                  final twin = await _api.generateTwinQuestion(
+                    bugId: 'GENERIC',
+                    originalEquation: viewModel.targetEquation,
+                  );
+                  if (mounted) {
+                    viewModel.startNewTarget(
+                      newTargetEquation: twin.targetEquation,
+                      newNodeId: 'TWIN-${viewModel.nodeId}',
+                    );
+                    _inputController.clear();
+                    _scrollToBottom();
+                  }
+                },
+              ),
+              const SizedBox(width: 10),
+              OutlinedButton.icon(
+                key: const Key('celebration_next_target_button'),
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('Yeni Alıştırma', style: TextStyle(fontSize: 12)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.accentCorrect,
+                  side: BorderSide(color: AppColors.accentCorrect.withValues(alpha: 0.5)),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  HapticFeedbackService().selectionClick();
+                  viewModel.resetSession();
+                  _inputController.clear();
+                },
+              ),
+            ],
+          ),
         ],
       ),
     );
