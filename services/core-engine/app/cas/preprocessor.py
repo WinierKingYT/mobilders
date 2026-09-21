@@ -28,12 +28,22 @@ class ImplicitMultiplicationPreprocessor:
         s = s.replace("±", "+")
         s = s.replace("^", "**")
 
+        # Çift veya çoklu eşitlik normalizasyonu: == -> =
+        s = re.sub(r"={2,}", "=", s)
+
+        # İki nokta üst üste bölme normalizasyonu: 6 : 2 -> 6 / 2
+        s = re.sub(r"(?<!:):(?!=)", "/", s)
+
         # 2. LaTeX operatör ve ayraç temizliği
         s = s.replace(r"\cdot", "*").replace(r"\times", "*")
         s = s.replace(r"\left(", "(").replace(r"\right)", ")")
         s = s.replace(r"\left[", "(").replace(r"\right]", ")")
         s = s.replace(r"\{", "(").replace(r"\}", ")")
         s = s.replace("[", "(").replace("]", ")")
+
+        # 3. Bağımsız büyük harf değişkenleri küçük harfe normalize et (X -> x, Y -> y, Z -> z)
+        # Kelime sınırı (\b) sayesinde Abs, Poly vb. fonksiyon isimleri bozulmaz
+        s = re.sub(r"\b([XYZ])\b", lambda m: m.group(1).lower(), s)
 
         # 3. LaTeX kesirleri: \frac{a}{b} -> ((a)/(b))
         frac_iter = 0

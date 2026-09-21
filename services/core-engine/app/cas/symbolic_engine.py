@@ -29,7 +29,8 @@ class SymbolicEquivalenceEngine:
     ALLOWED_VARIABLES = {
         "x", "y", "z", "a", "b", "c", "k", "n", "m", "r", "p", "q", "d", "Delta", "P", "Q", "R",
         "theta", "alpha", "beta", "pi", "e",
-        "h", "dx", "dy", "dt", "u", "v", "w", "t", "oo", "inf", "C"
+        "h", "dx", "dy", "dt", "u", "v", "w", "t", "oo", "inf", "C",
+        "X", "Y", "Z", "A", "B", "T"
     }
     ALLOWED_FUNCTIONS = {
         "sqrt", "Abs", "degree", "rem", "quo", "Poly",
@@ -51,6 +52,10 @@ class SymbolicEquivalenceEngine:
 
         # SymPy sembolleri
         self.symbols = {name: sp.Symbol(name) for name in self.ALLOWED_VARIABLES}
+        # Büyük harf değişkenleri küçük harf sembollerine bağla (X -> x)
+        for cap in ["X", "Y", "Z", "A", "B", "T"]:
+            if cap.lower() in self.symbols:
+                self.symbols[cap] = self.symbols[cap.lower()]
         self.symbols["pi"] = sp.pi
         self.symbols["e"] = sp.E
         self.symbols["oo"] = sp.oo
@@ -201,9 +206,11 @@ class SymbolicEquivalenceEngine:
         if "=" in expr_str:
             parts = expr_str.split("=")
             if len(parts) != 2:
-                raise ValueError("Denklemde birden fazla '=' işareti bulunamaz.")
+                raise ValueError("Denklemde tam olarak bir '=' işareti bulunmalıdır.")
             lhs_str = parts[0].strip()
             rhs_str = parts[1].strip()
+            if not lhs_str or not rhs_str:
+                raise ValueError("Eşitliğin her iki tarafında da geçerli bir matematiksel ifade bulunmalıdır.")
             lhs = sp.sympify(lhs_str, locals=self.symbols)
             rhs = sp.sympify(rhs_str, locals=self.symbols)
             return sp.simplify(lhs - rhs)
@@ -218,7 +225,7 @@ class SymbolicEquivalenceEngine:
 
         # 1. Doğrudan fark testi: user_expr - target_expr == 0 ?
         diff = sp.simplify(user_expr - target_expr)
-        if diff == 0:
+        if diff == 0 or getattr(diff, "is_zero", False):
             return True, "0"
 
         # 2. Skaler kat denklem eşdeğerliği (c * target_expr == user_expr, c != 0)
