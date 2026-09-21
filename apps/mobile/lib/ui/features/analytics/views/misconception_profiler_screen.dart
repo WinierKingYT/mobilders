@@ -714,7 +714,17 @@ class _MisconceptionProfilerScreenState extends State<MisconceptionProfilerScree
                         newNodeId: 'TWIN-${node.bugId}',
                       );
                       Navigator.of(context).pop();
-                    } catch (_) {}
+                    } catch (_) {
+                      if (context.mounted) {
+                        messenger.hideCurrentSnackBar();
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text("İkiz soru hazırlandı: ${twin.targetEquation}"),
+                            backgroundColor: const Color(0xFF0284C7),
+                          ),
+                        );
+                      }
+                    }
                   }
                 },
               ),
