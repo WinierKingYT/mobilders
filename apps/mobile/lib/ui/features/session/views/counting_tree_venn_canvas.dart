@@ -289,14 +289,14 @@ class _CountingTreeVennCanvasState extends State<CountingTreeVennCanvas> {
           ],
         ),
         Slider(
-          value: _monteCarloTrials.toDouble(),
+          value: _monteCarloTrials.clamp(1000, 100000).toDouble(),
           min: 1000,
           max: 100000,
           divisions: 99,
           label: "$_monteCarloTrials",
           onChanged: (val) {
             setState(() {
-              _monteCarloTrials = val.round();
+              _monteCarloTrials = val.round().clamp(1000, 100000);
             });
           },
         ),
@@ -374,6 +374,7 @@ class _VennPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
     final borderPaint = Paint()
       ..color = Colors.blueGrey
       ..style = PaintingStyle.stroke
@@ -453,6 +454,7 @@ class _VennPainter extends CustomPainter {
 class _TreePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
     final branchPaint = Paint()
       ..color = Colors.blueGrey
       ..strokeWidth = 2.0;

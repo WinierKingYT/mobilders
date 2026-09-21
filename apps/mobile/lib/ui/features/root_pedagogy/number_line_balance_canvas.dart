@@ -206,14 +206,20 @@ class _NumberLineBalanceCanvasState extends State<NumberLineBalanceCanvas> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             ElevatedButton.icon(
-              onPressed: () => setState(() => _currentPos -= 1),
+              key: const Key('btn_step_left'),
+              onPressed: _currentPos > -6
+                  ? () => setState(() => _currentPos = (_currentPos - 1).clamp(-6, 6))
+                  : null,
               icon: const Icon(Icons.arrow_back, size: 14),
               label: const Text('1 Sola Yürü (-1)', style: TextStyle(fontSize: 11)),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent.withValues(alpha: 0.3)),
             ),
             const SizedBox(width: 12),
             ElevatedButton.icon(
-              onPressed: () => setState(() => _currentPos += 1),
+              key: const Key('btn_step_right'),
+              onPressed: _currentPos < 6
+                  ? () => setState(() => _currentPos = (_currentPos + 1).clamp(-6, 6))
+                  : null,
               icon: const Icon(Icons.arrow_forward, size: 14),
               label: const Text('1 Sağa Yürü (+1)', style: TextStyle(fontSize: 11)),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent.withValues(alpha: 0.3)),
@@ -240,7 +246,14 @@ class _NumberLineBalanceCanvasState extends State<NumberLineBalanceCanvas> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.remove_circle_outline, color: Colors.amberAccent, size: 18),
-                      onPressed: _fractionSlices > 2 ? () => setState(() => _fractionSlices--) : null,
+                      onPressed: _fractionSlices > 2
+                          ? () => setState(() {
+                                _fractionSlices--;
+                                if (_shadedSlices > _fractionSlices) {
+                                  _shadedSlices = _fractionSlices;
+                                }
+                              })
+                          : null,
                     ),
                     Text('$_fractionSlices', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     IconButton(
@@ -368,15 +381,33 @@ class _NumberLineBalanceCanvasState extends State<NumberLineBalanceCanvas> {
         ),
         const SizedBox(height: 14),
         // İki taraftan aynı ağırlığı çıkarma butonu
-        ElevatedButton(
-          onPressed: _leftWeight > 0 && _rightWeight >= 3
-              ? () => setState(() {
-                    _leftWeight -= 3;
-                    _rightWeight -= 3;
-                  })
-              : null,
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
-          child: const Text('Her İki Kefeden 3 Eksilt (-3)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: _leftWeight > 0 && _rightWeight >= 3
+                  ? () => setState(() {
+                        _leftWeight -= 3;
+                        _rightWeight -= 3;
+                      })
+                  : null,
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
+              child: const Text('Her İki Kefeden 3 Eksilt (-3)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+            ),
+            if (_leftWeight != 3 || _rightWeight != 11) ...[
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                key: const Key('btn_reset_balance'),
+                onPressed: () => setState(() {
+                  _leftWeight = 3;
+                  _rightWeight = 11;
+                }),
+                icon: const Icon(Icons.replay, size: 14, color: Colors.white70),
+                label: const Text('Sıfırla', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white24)),
+              ),
+            ],
+          ],
         ),
       ],
     );

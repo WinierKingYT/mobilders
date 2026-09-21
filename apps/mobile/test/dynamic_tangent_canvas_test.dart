@@ -56,4 +56,20 @@ void main() {
     // Now deltaM < 0.08, badge should switch to "Teğete Yakınsadı (Limit!)"
     expect(find.text("Teğete Yakınsadı (Limit!)"), findsOneWidget);
   });
+
+  testWidgets('DynamicTangentCanvas safely clamps out-of-range initialH without Slider assertion crash', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: DynamicTangentCanvas(initialX0: 10.0, initialH: 99.0),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text("Dinamik Türev & Teğet Simülatörü"), findsOneWidget);
+  });
 }
+

@@ -11,6 +11,7 @@ class AlKhwarizmiPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
     final center = Offset(size.width / 2, size.height / 2 - 10);
     const xSize = 130.0;
     final safeB = (bCoefficient.isNaN || bCoefficient.isInfinite) ? 6.0 : bCoefficient;
@@ -42,14 +43,14 @@ class AlKhwarizmiPainter extends CustomPainter {
     canvas.drawRRect(RRect.fromRectAndRadius(rightRect, const Radius.circular(6)), rectPaint);
     canvas.drawRRect(RRect.fromRectAndRadius(rightRect, const Radius.circular(6)), borderPaint);
 
-    _drawText(canvas, "${(bCoefficient/2).toStringAsFixed(1)}x", rightRect.center, 12, Colors.white);
+    _drawText(canvas, "${(safeB/2).toStringAsFixed(1)}x", rightRect.center, 12, Colors.white);
 
     // 3. Draw Bottom (b/2)*x Rectangle
     final bottomRect = Rect.fromLTWH(xSquareLeft, xSquareTop + xSize + 4, xSize, bHalf);
     canvas.drawRRect(RRect.fromRectAndRadius(bottomRect, const Radius.circular(6)), rectPaint);
     canvas.drawRRect(RRect.fromRectAndRadius(bottomRect, const Radius.circular(6)), borderPaint);
 
-    _drawText(canvas, "${(bCoefficient/2).toStringAsFixed(1)}x", bottomRect.center, 12, Colors.white);
+    _drawText(canvas, "${(safeB/2).toStringAsFixed(1)}x", bottomRect.center, 12, Colors.white);
 
     // 4. Draw Missing Corner (b/2)^2
     final cornerRect = Rect.fromLTWH(xSquareLeft + xSize + 4, xSquareTop + xSize + 4, bHalf, bHalf);
@@ -58,7 +59,7 @@ class AlKhwarizmiPainter extends CustomPainter {
         ..color = const Color(0xFFD97706) // Amber Completed
         ..style = PaintingStyle.fill;
       canvas.drawRRect(RRect.fromRectAndRadius(cornerRect, const Radius.circular(6)), cornerPaint);
-      _drawText(canvas, "+${((bCoefficient/2)*(bCoefficient/2)).toStringAsFixed(1)}", cornerRect.center, 12, Colors.white);
+      _drawText(canvas, "+${((safeB/2)*(safeB/2)).toStringAsFixed(1)}", cornerRect.center, 12, Colors.white);
     } else {
       // Dashed Outline for Missing Piece
       final dashedPaint = Paint()

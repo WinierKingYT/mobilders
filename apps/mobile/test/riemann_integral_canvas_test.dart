@@ -73,4 +73,22 @@ void main() {
     // Now with n=64 and midpoint/left, error is tiny -> badge switches to "Yakınsadı (Limit!)"
     expect(find.text("Yakınsadı (Limit!)"), findsOneWidget);
   });
+
+  testWidgets('RiemannIntegralCanvas clamps out-of-range initialN without crashing Slider', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: RiemannIntegralCanvas(
+              initialN: 999,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.text("Riemann İntegral & Alan Simülatörü"), findsOneWidget);
+  });
 }
+

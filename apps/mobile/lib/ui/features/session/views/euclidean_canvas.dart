@@ -218,6 +218,7 @@ class _EuclideanPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
     switch (preset) {
       case EuclideanShapePreset.isosceles:
         _paintIsosceles(canvas, size);

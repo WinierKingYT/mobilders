@@ -41,5 +41,63 @@ void main() {
     await tester.pump();
     expect(find.text('Sol Kefe: 2x + 0'), findsOneWidget);
     expect(find.text('Sağ Kefe: 8'), findsOneWidget);
+
+    // Verify reset button appears and restores initial balance state
+    final resetBtn = find.byKey(const Key('btn_reset_balance'));
+    expect(resetBtn, findsOneWidget);
+    await tester.tap(resetBtn);
+    await tester.pump();
+    expect(find.text('Sol Kefe: 2x + 3'), findsOneWidget);
+    expect(find.text('Sağ Kefe: 11'), findsOneWidget);
+  });
+
+  testWidgets('NumberLine stepping is clamped between -6 and +6', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: NumberLineBalanceCanvas(),
+        ),
+      ),
+    );
+
+    // Walk left 8 times
+    for (int i = 0; i < 8; i++) {
+      final leftBtn = find.byKey(const Key('btn_step_left'));
+      if (tester.widget<ElevatedButton>(leftBtn).onPressed != null) {
+        await tester.tap(leftBtn);
+        await tester.pump();
+      }
+    }
+    expect(find.text('Konum: -6'), findsOneWidget);
+    // Left button should be disabled at edge -6
+    final leftBtnAtEdge = find.byKey(const Key('btn_step_left'));
+    expect(tester.widget<ElevatedButton>(leftBtnAtEdge).onPressed, isNull);
+  });
+
+  testWidgets('Pasta kesir synchronizes shaded slices when total slices decremented', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: NumberLineBalanceCanvas(initialMode: RootCanvasMode.pieFraction),
+        ),
+      ),
+    );
+
+    // Initial: 1 / 4. Increase shaded slices to 4.
+    final addShadedBtn = find.byIcon(Icons.add_circle_outline).last;
+    for (int i = 0; i < 3; i++) {
+      await tester.tap(addShadedBtn);
+      await tester.pump();
+    }
+    expect(find.textContaining('Kesir Değeri = 4 / 4'), findsOneWidget);
+
+    // Now decrement fraction slices (from 4 to 3)
+    final removeSliceBtn = find.byIcon(Icons.remove_circle_outline).first;
+    await tester.tap(removeSliceBtn);
+    await tester.pump();
+
+    // Shaded slices should automatically be capped at 3, not remain at 4!
+    expect(find.textContaining('Kesir Değeri = 3 / 3'), findsOneWidget);
   });
 }
+

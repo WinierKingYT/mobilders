@@ -42,6 +42,7 @@ class RiemannIntegralPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
     final origin = Offset(size.width * 0.15, size.height * 0.78);
     final denom = b - a + 0.8;
     final scaleX = denom > 0 ? (size.width * 0.75) / denom : 1.0;
@@ -246,7 +247,7 @@ class _RiemannIntegralCanvasState extends State<RiemannIntegralCanvas> {
   @override
   void initState() {
     super.initState();
-    _n = widget.initialN;
+    _n = widget.initialN.clamp(2, 64);
     _method = widget.initialMethod;
     _funcType = widget.initialFunc;
   }
@@ -255,7 +256,7 @@ class _RiemannIntegralCanvasState extends State<RiemannIntegralCanvas> {
   void didUpdateWidget(covariant RiemannIntegralCanvas oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialN != widget.initialN) {
-      _n = widget.initialN;
+      _n = widget.initialN.clamp(2, 64);
     }
     if (oldWidget.initialMethod != widget.initialMethod) {
       _method = widget.initialMethod;
@@ -487,7 +488,7 @@ class _RiemannIntegralCanvasState extends State<RiemannIntegralCanvas> {
                 ),
                 const Spacer(),
                 Text(
-                  "Δx = ${((_b - _a) / _n).toStringAsFixed(3)}",
+                  "Δx = ${((_b - _a) / math.max(1, _n)).toStringAsFixed(3)}",
                   style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontFamily: "monospace"),
                 ),
               ],
@@ -500,14 +501,14 @@ class _RiemannIntegralCanvasState extends State<RiemannIntegralCanvas> {
                 overlayColor: const Color(0xFF38BDF8).withValues(alpha: 0.2),
               ),
               child: Slider(
-                value: _n.toDouble(),
+                value: _n.clamp(2, 64).toDouble(),
                 min: 2,
                 max: 64,
                 divisions: 31,
                 label: "n = $_n",
                 onChanged: (val) {
                   setState(() {
-                    _n = val.round();
+                    _n = val.round().clamp(2, 64);
                   });
                 },
               ),

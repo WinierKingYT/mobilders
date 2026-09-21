@@ -42,6 +42,7 @@ class DynamicTangentPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
     final origin = Offset(size.width * 0.45, size.height * 0.65);
     final scale = size.width / 7.0; // pixels per unit
 
@@ -120,10 +121,11 @@ class DynamicTangentPainter extends CustomPainter {
 
     // 6. Draw Secant Line through P and Q (m_sec = (y1 - y0)/h)
     final mSec = h.abs() < 1e-6 ? mTan : (y1 - y0) / (x1 - x0);
+    final safeMSec = mSec.isFinite ? mSec : mTan;
     final secXMin = x0 - 2.0;
     final secXMax = x1 + 2.0;
-    final secP1 = toScreen(secXMin, y0 + mSec * (secXMin - x0));
-    final secP2 = toScreen(secXMax, y0 + mSec * (secXMax - x0));
+    final secP1 = toScreen(secXMin, y0 + safeMSec * (secXMin - x0));
+    final secP2 = toScreen(secXMax, y0 + safeMSec * (secXMax - x0));
 
     final secantPaint = Paint()
       ..color = const Color(0xFFF59E0B)
@@ -222,18 +224,18 @@ class _DynamicTangentCanvasState extends State<DynamicTangentCanvas> {
   void initState() {
     super.initState();
     _curveType = CalculusCurveType.parabola;
-    _x0 = widget.initialX0;
-    _h = widget.initialH;
+    _x0 = widget.initialX0.isFinite ? widget.initialX0.clamp(-3.0, 3.0) : 1.0;
+    _h = widget.initialH.isFinite ? widget.initialH.clamp(0.02, 2.0) : 1.0;
   }
 
   @override
   void didUpdateWidget(covariant DynamicTangentCanvas oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialX0 != widget.initialX0) {
-      _x0 = widget.initialX0;
+      _x0 = widget.initialX0.isFinite ? widget.initialX0.clamp(-3.0, 3.0) : 1.0;
     }
     if (oldWidget.initialH != widget.initialH) {
-      _h = widget.initialH;
+      _h = widget.initialH.isFinite ? widget.initialH.clamp(0.02, 2.0) : 1.0;
     }
   }
 
@@ -507,11 +509,11 @@ class _DynamicTangentCanvasState extends State<DynamicTangentCanvas> {
               overlayColor: const Color(0xFF38BDF8).withValues(alpha: 0.2),
             ),
             child: Slider(
-              value: _h,
+              value: _h.clamp(0.02, 2.0),
               min: 0.02,
               max: 2.0,
               onChanged: (val) {
-                setState(() => _h = val);
+                setState(() => _h = val.clamp(0.02, 2.0));
               },
             ),
           ),
