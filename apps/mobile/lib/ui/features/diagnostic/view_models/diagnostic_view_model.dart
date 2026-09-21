@@ -16,6 +16,7 @@ class DiagnosticViewModel extends ChangeNotifier {
   final List<List<dynamic>> _administeredHistory = [];
   Map<String, double>? _seededMastery;
   List<String>? _zpdCandidates;
+  bool _isDisposed = false;
 
   DiagnosticViewModel({
     required EngineApiService apiService,
@@ -202,4 +203,20 @@ class DiagnosticViewModel extends ChangeNotifier {
       );
     }
   }
+
+  bool get isDisposed => _isDisposed;
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_isDisposed) {
+      super.notifyListeners();
+    }
+  }
 }
+

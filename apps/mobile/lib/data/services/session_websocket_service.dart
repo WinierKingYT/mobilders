@@ -12,6 +12,10 @@ class SessionWebSocketService {
   bool _isConnected = false;
   bool get isConnected => _isConnected;
 
+  bool _isDisposed = false;
+  bool get isDisposed => _isDisposed;
+
+  static const int maxQueuedEvents = 100;
   final List<Map<String, dynamic>> _offlineQueue = [];
   int get queuedEventsCount => _offlineQueue.length;
 
@@ -28,6 +32,7 @@ class SessionWebSocketService {
   }) : serverUrl = url ?? "${ApiConstants.baseUrl.replaceFirst('http', 'ws')}/ws/v1/session";
 
   void connect() {
+    if (_isDisposed) return;
     if (_isConnected || _channel != null) {
       disconnect();
     }
@@ -37,6 +42,7 @@ class SessionWebSocketService {
 
       _subscription = _channel?.stream.listen(
         (message) {
+          if (_isDisposed) return;
           try {
             final Map<String, dynamic> data = jsonDecode(message as String);
             if (data["type"] == "SESSION_READY") {
@@ -44,11 +50,13 @@ class SessionWebSocketService {
               _flushOfflineQueue();
             } else if (data["type"] == "AFFECTIVE_ALERT") {
               final payload = data["payload"];
-              if (payload is Map<String, dynamic>) {
+              if (payload is Map<String, dynamic> && !_affectiveAlertController.isClosed) {
                 _affectiveAlertController.add(payload);
               }
             }
-            _messageController.add(data);
+            if (!_messageController.isClosed) {
+              _messageController.add(data);
+            }
           } catch (e) {
             debugPrint("WS parse error: $e");
           }
@@ -75,7 +83,7 @@ class SessionWebSocketService {
   }
 
   void _flushOfflineQueue() {
-    if (!_isConnected || _channel == null) return;
+    if (!_isConnected || _channel == null || _isDisposed) return;
     while (_offlineQueue.isNotEmpty) {
       final event = _offlineQueue.removeAt(0);
       try {
@@ -89,17 +97,24 @@ class SessionWebSocketService {
   }
 
   void sendEvent(Map<String, dynamic> event) {
+    if (_isDisposed) return;
     if (_isConnected && _channel != null) {
       try {
         _channel!.sink.add(jsonEncode(event));
       } catch (e) {
         _isConnected = false;
-        _offlineQueue.add(event);
+        _enqueueOfflineEvent(event);
       }
     } else {
-      // Buffer in offline queue
-      _offlineQueue.add(event);
+      _enqueueOfflineEvent(event);
     }
+  }
+
+  void _enqueueOfflineEvent(Map<String, dynamic> event) {
+    if (_offlineQueue.length >= maxQueuedEvents) {
+      _offlineQueue.removeAt(0);
+    }
+    _offlineQueue.add(event);
   }
 
   void sendStepSubmit({
@@ -160,6 +175,7 @@ class SessionWebSocketService {
   }
 
   void dispose() {
+    _isDisposed = true;
     disconnect();
     if (!_messageController.isClosed) {
       _messageController.close();

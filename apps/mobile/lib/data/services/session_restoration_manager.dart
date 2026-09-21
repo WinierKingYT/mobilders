@@ -61,6 +61,9 @@ class RestoredSessionState {
       }
     }
 
+    final rawPl = (json['currentPl'] as num?)?.toDouble() ?? 0.20;
+    final safePl = (rawPl.isFinite && !rawPl.isNaN && rawPl >= 0.0 && rawPl <= 1.0) ? rawPl : 0.20;
+
     return RestoredSessionState(
       sessionId: json['sessionId'] as String? ?? '',
       nodeId: json['nodeId'] as String? ?? 'N15',
@@ -68,7 +71,7 @@ class RestoredSessionState {
       draftText: json['draftText'] as String? ?? '',
       inputMode: mode,
       serializedSteps: parsedSteps,
-      currentPl: (json['currentPl'] as num?)?.toDouble() ?? 0.20,
+      currentPl: safePl,
       lastUpdated: json['lastUpdated'] != null
           ? DateTime.tryParse(json['lastUpdated'] as String) ?? DateTime.now()
           : DateTime.now(),
@@ -327,6 +330,10 @@ class SessionRestorationManager with WidgetsBindingObserver {
       'elapsed_ms': s.elapsedMs,
     }).toList();
 
+    final safePl = (currentPl.isFinite && !currentPl.isNaN && currentPl >= 0.0 && currentPl <= 1.0)
+        ? currentPl
+        : 0.20;
+
     final state = RestoredSessionState(
       sessionId: sessionId,
       nodeId: nodeId,
@@ -334,7 +341,7 @@ class SessionRestorationManager with WidgetsBindingObserver {
       draftText: draftText,
       inputMode: inputMode,
       serializedSteps: serializedSteps,
-      currentPl: currentPl,
+      currentPl: safePl,
       lastUpdated: DateTime.now(),
     );
 

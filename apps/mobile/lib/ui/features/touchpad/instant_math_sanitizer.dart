@@ -26,6 +26,7 @@ class MathSanityReport {
   final int unclosedOpeningCount;
   final int consecutiveOperatorCount;
   final bool hasDuplicateDecimals;
+  final bool hasDivisionByZero;
   final int executionTimeMicros;
   final String? errorSummary;
 
@@ -35,6 +36,7 @@ class MathSanityReport {
     required this.unclosedOpeningCount,
     required this.consecutiveOperatorCount,
     required this.hasDuplicateDecimals,
+    this.hasDivisionByZero = false,
     required this.executionTimeMicros,
     this.errorSummary,
   });
@@ -317,16 +319,22 @@ class InstantMathSanitizer {
       }
     }
 
+    // Check division by zero: e.g. / 0 or ÷ 0 or / (0)
+    final hasDivisionByZero = RegExp(r'[/÷](?:\s*\(?\s*0+(?:\.0+)?\s*\)?)').hasMatch(cleaned);
+
     stopwatch.stop();
 
     final isValid = unmatchedClosing == 0 &&
         unclosedOpening == 0 &&
         consecutiveOps == 0 &&
-        !duplicateDecimals;
+        !duplicateDecimals &&
+        !hasDivisionByZero;
 
     String? summary;
     if (!isValid) {
-      if (unmatchedClosing > 0) {
+      if (hasDivisionByZero) {
+        summary = 'Sıfıra bölme tanımsızdır.';
+      } else if (unmatchedClosing > 0) {
         summary = '$unmatchedClosing adet kapatılmamış/hatalı parantez var.';
       } else if (unclosedOpening > 0) {
         summary = '$unclosedOpening adet açık parantez kapatılmadı.';
@@ -343,6 +351,7 @@ class InstantMathSanitizer {
       unclosedOpeningCount: unclosedOpening,
       consecutiveOperatorCount: consecutiveOps,
       hasDuplicateDecimals: duplicateDecimals,
+      hasDivisionByZero: hasDivisionByZero,
       executionTimeMicros: stopwatch.elapsedMicroseconds,
       errorSummary: summary,
     );
