@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 class ExamChoice {
@@ -33,6 +36,9 @@ class DynamicExamView extends StatefulWidget {
   final List<ExamQuestion> questions;
   final int timeMinutes;
   final ValueChanged<Map<int, int>>? onExamCompleted;
+  final ValueChanged<Map<int, int>>? onAnswerSaved;
+  final String? persistenceFilePath;
+  final DateTime? examStartTime;
 
   const DynamicExamView({
     super.key,
@@ -40,18 +46,143 @@ class DynamicExamView extends StatefulWidget {
     required this.questions,
     this.timeMinutes = 20,
     this.onExamCompleted,
+    this.onAnswerSaved,
+    this.persistenceFilePath,
+    this.examStartTime,
   });
 
   @override
   State<DynamicExamView> createState() => _DynamicExamViewState();
 }
 
-class _DynamicExamViewState extends State<DynamicExamView> {
+class _DynamicExamViewState extends State<DynamicExamView> with WidgetsBindingObserver {
   int _currentIndex = 0;
   final Map<int, int> _answers = {}; // questionIndex -> choiceIndex
   bool _isFinished = false;
 
+  late final DateTime _startTime;
+  Timer? _timer;
+  int _remainingSeconds = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _startTime = widget.examStartTime ?? DateTime.now();
+    _remainingSeconds = widget.timeMinutes * 60;
+    _loadPersistedAnswers();
+    _syncTimerWithWallClock();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _syncTimerWithWallClock());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _syncTimerWithWallClock();
+    }
+  }
+
+  void _syncTimerWithWallClock() {
+    if (_isFinished) return;
+    final elapsedSeconds = DateTime.now().difference(_startTime).inSeconds;
+    final totalAllowedSeconds = widget.timeMinutes * 60;
+    final remaining = totalAllowedSeconds - elapsedSeconds;
+    if (remaining <= 0) {
+      if (_remainingSeconds != 0 && mounted) {
+        setState(() {
+          _remainingSeconds = 0;
+        });
+      }
+      _finishExam();
+    } else {
+      if (_remainingSeconds != remaining && mounted) {
+        setState(() {
+          _remainingSeconds = remaining;
+        });
+      }
+    }
+  }
+
+  String get _formattedTimeRemaining {
+    final minutes = (_remainingSeconds ~/ 60).toString().padLeft(2, '0');
+    final seconds = (_remainingSeconds % 60).toString().padLeft(2, '0');
+    return "$minutes:$seconds";
+  }
+
+  void _loadPersistedAnswers() {
+    if (widget.persistenceFilePath == null) return;
+    try {
+      final file = File(widget.persistenceFilePath!);
+      String content = '';
+      if (file.existsSync()) {
+        content = file.readAsStringSync();
+      } else {
+        final tempFile = File('${widget.persistenceFilePath!}.tmp');
+        if (tempFile.existsSync()) {
+          content = tempFile.readAsStringSync();
+        }
+      }
+      if (content.isNotEmpty) {
+        final decoded = jsonDecode(content);
+        if (decoded is Map) {
+          decoded.forEach((k, v) {
+            final qIdx = int.tryParse(k.toString());
+            final cIdx = v is int ? v : int.tryParse(v.toString());
+            if (qIdx != null && cIdx != null) {
+              _answers[qIdx] = cIdx;
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("DynamicExamView load persisted answers error: $e");
+    }
+  }
+
+  void _selectChoice(int choiceIdx) {
+    setState(() {
+      _answers[_currentIndex] = choiceIdx;
+    });
+    widget.onAnswerSaved?.call(Map.unmodifiable(_answers));
+
+    if (widget.persistenceFilePath != null) {
+      try {
+        final file = File(widget.persistenceFilePath!);
+        file.parent.createSync(recursive: true);
+        final tempFile = File('${widget.persistenceFilePath!}.tmp');
+        final encoded = jsonEncode(_answers.map((k, v) => MapEntry(k.toString(), v)));
+        tempFile.writeAsStringSync(encoded, flush: true);
+        if (tempFile.existsSync()) {
+          try {
+            if (file.existsSync()) {
+              file.deleteSync();
+            }
+            tempFile.renameSync(file.path);
+          } catch (_) {
+            try {
+              file.writeAsStringSync(encoded, flush: true);
+              if (tempFile.existsSync()) {
+                tempFile.deleteSync();
+              }
+            } catch (_) {}
+          }
+        }
+      } catch (e) {
+        debugPrint("DynamicExamView auto-save error: $e");
+      }
+    }
+  }
+
   void _finishExam() {
+    if (_isFinished) return;
+    _timer?.cancel();
     setState(() {
       _isFinished = true;
     });
@@ -102,7 +233,7 @@ class _DynamicExamViewState extends State<DynamicExamView> {
                 const Icon(Icons.timer_outlined, size: 18, color: Colors.amberAccent),
                 const SizedBox(width: 4),
                 Text(
-                  "${widget.timeMinutes}:00",
+                  _formattedTimeRemaining,
                   key: const Key('exam_timer'),
                   style: const TextStyle(
                     color: Colors.amberAccent,
@@ -196,11 +327,7 @@ class _DynamicExamViewState extends State<DynamicExamView> {
 
                     return GestureDetector(
                       key: Key('choice_$choiceIdx'),
-                      onTap: () {
-                        setState(() {
-                          _answers[_currentIndex] = choiceIdx;
-                        });
-                      },
+                      onTap: () => _selectChoice(choiceIdx),
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 10.0),
                         padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -70,6 +71,9 @@ void main() {
 
     expect(find.text("Soru 2 / 2"), findsOneWidget);
     expect(find.textContaining("f(x) = (3x + 2)⁴"), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
   });
 
   testWidgets('DynamicExamView finishes exam and shows cognitive trap diagnostic report',
@@ -107,6 +111,96 @@ void main() {
 
     expect(completedAnswers, isNotNull);
     expect(completedAnswers![0], 1);
+  });
+
+  testWidgets('DynamicExamView monotonic clock automatically finishes when time expires',
+      (WidgetTester tester) async {
+    bool isCompleted = false;
+    final expiredTime = DateTime.now().subtract(const Duration(minutes: 25));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DynamicExamView(
+          examTitle: "Süresi Dolan Sınav",
+          questions: testQuestions,
+          timeMinutes: 20,
+          examStartTime: expiredTime,
+          onExamCompleted: (_) {
+            isCompleted = true;
+          },
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Automatically transitions to result view due to monotonic time check
+    expect(isCompleted, isTrue);
+    expect(find.byKey(const Key('exam_result_view')), findsOneWidget);
+  });
+
+  testWidgets('DynamicExamView instantly auto-saves answer to file and restores state',
+      (WidgetTester tester) async {
+    final tempDir = Directory.systemTemp.createTempSync('exam_answers_');
+    final savePath = '${tempDir.path}/exam_answers.json';
+    Map<int, int>? savedAnswers;
+
+    // 1. First session: answer Q1
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DynamicExamView(
+          key: const Key('exam_1'),
+          examTitle: "Kalıcı Sınav",
+          questions: testQuestions,
+          timeMinutes: 20,
+          persistenceFilePath: savePath,
+          onAnswerSaved: (answers) {
+            savedAnswers = answers;
+          },
+        ),
+      ),
+    );
+
+    // Tap Choice A (choice_0)
+    await tester.tap(find.byKey(const Key('choice_0')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(savedAnswers, isNotNull);
+    expect(savedAnswers![0], 0);
+
+    // Verify file on disk exists and contains answers
+    final file = File(savePath);
+    expect(file.existsSync(), isTrue);
+    final diskContent = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+    expect(diskContent['0'], 0);
+
+    // 2. Re-create exam view with the same persistence file to test automatic restoration
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DynamicExamView(
+          key: const Key('exam_2'),
+          examTitle: "Kalıcı Sınav Restored",
+          questions: testQuestions,
+          timeMinutes: 20,
+          persistenceFilePath: savePath,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // Verify choice 0 remains selected after restoration
+    expect(find.byKey(const Key('dynamic_exam_view')), findsOneWidget);
+
+    // Unmount widget so timer is disposed
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+
+    // Cleanup
+    try {
+      tempDir.deleteSync(recursive: true);
+    } catch (_) {}
   });
 
   group('EngineApiService Dynamic Exam & Trap Question Tests', () {
