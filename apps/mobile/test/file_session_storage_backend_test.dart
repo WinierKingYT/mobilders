@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:personal_learning_engine/data/services/offline_sync_queue.dart';
 import 'package:personal_learning_engine/data/services/session_restoration_manager.dart';
 import 'package:personal_learning_engine/domain/models/solution_step.dart';
 import 'package:personal_learning_engine/ui/features/touchpad/math_touchpad.dart';
@@ -17,8 +18,12 @@ void main() {
     });
 
     tearDown(() async {
-      if (await tempDir.exists()) {
-        await tempDir.delete(recursive: true);
+      try {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      } catch (_) {
+        // Windows file locking tolerance for temporary test directories
       }
     });
 
@@ -204,6 +209,76 @@ void main() {
 
       // Primary file should have been cleared
       expect(await primaryFile.exists(), isFalse);
+    });
+
+    test('restoreDraftWithParity succeeds when equation matches and discards when equation differs', () async {
+      final manager = SessionRestorationManager(storage: storage);
+
+      await manager.saveDraft(
+        sessionId: 'sess_parity_01',
+        nodeId: 'N_PARITY',
+        targetEquation: '2x + 4 = 10',
+        draftText: '2x = 6',
+        inputMode: InputMode.touchpad,
+        steps: const [],
+        currentPl: 0.30,
+      );
+
+      // 1. Matches: Should restore successfully
+      final restored = await manager.restoreDraftWithParity(currentTargetEquation: '2x + 4 = 10');
+      expect(restored, isNotNull);
+      expect(restored!.draftText, '2x = 6');
+
+      // 2. Mismatch: User opened a different question ('x^2 - 9 = 0')
+      // Parity check must detect mismatch, discard stale draft, and return null
+      final mismatched = await manager.restoreDraftWithParity(currentTargetEquation: 'x^2 - 9 = 0');
+      expect(mismatched, isNull);
+
+      // Draft has been cleared from storage
+      expect(await manager.restoreDraft(), isNull);
+    });
+
+    test('OfflineSyncQueue filters and purges stale equation events for parity', () async {
+      final queueFile = File('${tempDir.path}/queue.json');
+      final queue = OfflineSyncQueue(storageFilePath: queueFile.path);
+
+      final event1 = UnsyncedStepEvent(
+        clientMsgId: 'm1',
+        sessionId: 's1',
+        nodeId: 'N1',
+        stepNumber: 1,
+        userExpression: '2x = 6',
+        targetEquation: '2x + 4 = 10',
+        clientTimestamp: DateTime.now(),
+      );
+
+      final event2 = UnsyncedStepEvent(
+        clientMsgId: 'm2',
+        sessionId: 's1',
+        nodeId: 'N2',
+        stepNumber: 1,
+        userExpression: 'x = 3',
+        targetEquation: 'x^2 = 9',
+        clientTimestamp: DateTime.now(),
+      );
+
+      queue.enqueueStep(event1);
+      queue.enqueueStep(event2);
+
+      // Parity filter
+      final target1Events = queue.getPendingEventsForEquation('2x + 4 = 10');
+      expect(target1Events.length, 1);
+      expect(target1Events.first.userExpression, '2x = 6');
+
+      final target2Events = queue.getPendingEventsForEquation('x^2 = 9');
+      expect(target2Events.length, 1);
+      expect(target2Events.first.userExpression, 'x = 3');
+
+      // Purge non-matching events when active problem is '2x + 4 = 10'
+      final purged = await queue.purgeStaleEquationEvents('2x + 4 = 10');
+      expect(purged, 1);
+      expect(queue.pendingCount, 1);
+      expect(queue.pendingEvents.first.targetEquation, '2x + 4 = 10');
     });
   });
 }

@@ -286,6 +286,26 @@ class OfflineSyncQueue extends ChangeNotifier {
     return result.syncedCount;
   }
 
+  /// Returns pending unsynced steps that match the given target equation (Equation Parity).
+  List<UnsyncedStepEvent> getPendingEventsForEquation(String targetEquation) {
+    final clean = targetEquation.replaceAll(' ', '').trim();
+    return _events.where((e) => e.targetEquation.replaceAll(' ', '').trim() == clean).toList();
+  }
+
+  /// Removes any pending steps that do not match the current target equation to preserve parity.
+  Future<int> purgeStaleEquationEvents(String currentTargetEquation) async {
+    final clean = currentTargetEquation.replaceAll(' ', '').trim();
+    if (clean.isEmpty) return 0;
+    final initialCount = _events.length;
+    _events.removeWhere((e) => e.targetEquation.replaceAll(' ', '').trim() != clean);
+    final removed = initialCount - _events.length;
+    if (removed > 0) {
+      await _persistToDisk();
+      notifyListeners();
+    }
+    return removed;
+  }
+
   Future<void> clearQueue() async {
     _events.clear();
     _focusEvents.clear();

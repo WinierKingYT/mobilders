@@ -395,6 +395,31 @@ class SessionRestorationManager with WidgetsBindingObserver {
     }
   }
 
+  /// Restores the draft ONLY IF it matches the expected targetEquation (Equation Parity Check).
+  /// If targetEquation does not match, the stale draft is discarded to prevent loading old problem states.
+  Future<RestoredSessionState?> restoreDraftWithParity({
+    required String currentTargetEquation,
+    Duration maxAge = defaultExpiry,
+  }) async {
+    final state = await restoreDraft(maxAge: maxAge);
+    if (state == null) return null;
+
+    final normalizedCurrent = _normalizeEquation(currentTargetEquation);
+    final normalizedDraft = _normalizeEquation(state.targetEquation);
+
+    if (normalizedCurrent.isNotEmpty && normalizedDraft != normalizedCurrent) {
+      debugPrint("SessionRestorationManager: Equation parity mismatch ('$normalizedDraft' != '$normalizedCurrent'). Discarding stale draft.");
+      await clearDraft();
+      return null;
+    }
+
+    return state;
+  }
+
+  static String _normalizeEquation(String eq) {
+    return eq.replaceAll(' ', '').trim();
+  }
+
   /// Clears persisted draft upon successful problem completion or explicit reset
   Future<void> clearDraft() async {
     _cachedState = null;
