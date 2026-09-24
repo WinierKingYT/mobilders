@@ -8,6 +8,7 @@ import 'dynamic_tangent_canvas.dart';
 import 'riemann_integral_canvas.dart';
 import '../view_models/focus_session_view_model.dart';
 import '../widgets/socratic_hint_dialog.dart';
+import 'components/reflection_phase_view.dart';
 
 /// Full interactive mobile screen for the Focus Kernel multi-topic cognitive session.
 class FocusSessionScreen extends StatefulWidget {
@@ -40,6 +41,7 @@ class _FocusSessionScreenState extends State<FocusSessionScreen> {
   late final TextEditingController _inputController;
   late final FocusNode _inputFocusNode;
   bool _hideTimer = false;
+  String? _selectedReflectionStep;
 
   @override
   void initState() {
@@ -946,79 +948,140 @@ class _FocusSessionScreenState extends State<FocusSessionScreen> {
         example = '';
     }
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.zenSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFF38BDF8), size: 18),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            instruction,
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 13, height: 1.4),
-          ),
-          const SizedBox(height: 8),
+    final int currentOrder = _stageOrder(vm.currentStage);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Tamamlanan adımların kompakt özet kartı (Bilişsel Yük Parçalama / Chunking)
+        if (currentOrder > 1) ...[
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            key: const Key('completed_stages_chunk_summary'),
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(6),
+              color: const Color(0xFF0F172A),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
             ),
-            child: Text(
-              example,
-              style: const TextStyle(
-                color: Color(0xFF38BDF8),
-                fontSize: 12,
-                fontFamily: 'monospace',
-              ),
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle_outline, color: Color(0xFF10B981), size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Tamamlanan Adımlar (Parçalanmış Bellek): ${currentOrder - 1} adım başarıyla kilitlendi',
+                    style: const TextStyle(
+                      color: Color(0xFFA7F3D0),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton.icon(
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  visualDensity: VisualDensity.compact,
-                ),
-                icon: const Icon(Icons.toys_outlined, size: 14, color: Colors.amberAccent),
-                label: const Text('Mikro-Kum Havuzu', style: TextStyle(color: Colors.amberAccent, fontSize: 11)),
-                onPressed: () => _openMicroSandbox(context, vm),
-              ),
-              const SizedBox(width: 8),
-              TextButton.icon(
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  visualDensity: VisualDensity.compact,
-                ),
-                icon: const Icon(Icons.lightbulb_outline_rounded, size: 14, color: Color(0xFF38BDF8)),
-                label: const Text('Sokratik İpucu', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11)),
-                onPressed: () => _openSocraticHint(context, vm),
-              ),
-            ],
           ),
         ],
-      ),
+
+        // Aktif Adım Kartı (Tam Opaklıkta Bilişsel Spot)
+        Container(
+          key: const Key('active_stage_spotlight_card'),
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: AppColors.zenSurface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.6), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF38BDF8).withValues(alpha: 0.1),
+                blurRadius: 16,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'AKTİF ADIM',
+                      style: TextStyle(
+                        color: Color(0xFF38BDF8),
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                instruction,
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  example,
+                  style: const TextStyle(
+                    color: Color(0xFF38BDF8),
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    icon: const Icon(Icons.toys_outlined, size: 14, color: Colors.amberAccent),
+                    label: const Text('Mikro-Kum Havuzu', style: TextStyle(color: Colors.amberAccent, fontSize: 11)),
+                    onPressed: () => _openMicroSandbox(context, vm),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    icon: const Icon(Icons.lightbulb_outline_rounded, size: 14, color: Color(0xFF38BDF8)),
+                    label: const Text('Sokratik İpucu', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11)),
+                    onPressed: () => _openSocraticHint(context, vm),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1273,7 +1336,120 @@ class _FocusSessionScreenState extends State<FocusSessionScreen> {
             style: TextStyle(color: Color(0xFFA7F3D0), fontSize: 13),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+
+          // Yansıtma Aşaması (Reflection Phase Card)
+          Container(
+            key: const Key('reflection_critical_step_card'),
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.psychology, color: Color(0xFFF59E0B), size: 18),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Bu soruda hangi kritik adımı attın?',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    'Ayrıştırma / Parantez',
+                    'Kök İzolasyonu',
+                    'Doğrulama ve Sağlama',
+                  ].map((option) {
+                    final isSelected = _selectedReflectionStep == option;
+                    return InkWell(
+                      key: Key('reflection_option_${option.replaceAll(' ', '_')}'),
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () {
+                        HapticFeedbackService().selectionClick();
+                        setState(() => _selectedReflectionStep = option);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFFF59E0B) : const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSelected ? const Color(0xFFF59E0B) : const Color(0xFF334155),
+                          ),
+                        ),
+                        child: Text(
+                          option,
+                          style: TextStyle(
+                            color: isSelected ? Colors.black : Colors.white70,
+                            fontSize: 11,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                if (_selectedReflectionStep != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'Harika metabilişsel farkındalık! "$_selectedReflectionStep" adımını zihnine başarıyla kilitledin.',
+                    key: const Key('reflection_feedback_text'),
+                    style: const TextStyle(
+                      color: Color(0xFFFBBF24),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              key: const Key('btn_open_reflection_phase'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFF59E0B),
+                side: const BorderSide(color: Color(0xFFF59E0B)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                HapticFeedbackService().selectionClick();
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: const Color(0xFF0F172A),
+                  builder: (ctx) => Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: ReflectionPhaseView(
+                      onCompleted: () => Navigator.of(ctx).pop(),
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.psychology_rounded, size: 18),
+              label: const Text('Faz 4 Metabilişsel Yansıtma Modunu Aç'),
+            ),
+          ),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(

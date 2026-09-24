@@ -122,6 +122,10 @@ void main() {
       expect(find.text('Aşama 2: Çarpan Denklemlerine Ayırın'), findsOneWidget);
       expect(find.text('Örnek: x+2=0 or x+3=0'), findsOneWidget);
       expect(find.text('Seq #2'), findsOneWidget);
+
+      // Verify chunking summary of completed steps & active step spotlight
+      expect(find.byKey(const Key('completed_stages_chunk_summary')), findsOneWidget);
+      expect(find.byKey(const Key('active_stage_spotlight_card')), findsOneWidget);
     });
 
     testWidgets('Probing phase displays diagnostic probe card and choice buttons', (tester) async {
@@ -165,7 +169,7 @@ void main() {
       expect(find.text('Yalnızca çarpımın işaretini tuttururum'), findsOneWidget);
     });
 
-    testWidgets('Completed phase displays completion victory card', (tester) async {
+    testWidgets('Completed phase displays completion victory card and interactive reflection prompt', (tester) async {
       final mockClient = MockClient((request) async {
         return http.Response(
           jsonEncode({
@@ -197,6 +201,20 @@ void main() {
       expect(find.text('Odak Seansı Başarıyla Tamamlandı!'), findsOneWidget);
       expect(find.text('TAMAMLANDI'), findsOneWidget);
       expect(find.text('Yeni CT-QF1 Seansı Başlat'), findsOneWidget);
+
+      // Verify Metacognitive Reflection Card & Options
+      expect(find.byKey(const Key('reflection_critical_step_card')), findsOneWidget);
+      expect(find.text('Bu soruda hangi kritik adımı attın?'), findsOneWidget);
+      expect(find.byKey(const Key('btn_open_reflection_phase')), findsOneWidget);
+
+      // Tap on reflection option
+      final optionFinder = find.byKey(const Key('reflection_option_Ayrıştırma_/_Parantez'));
+      expect(optionFinder, findsOneWidget);
+      await tester.tap(optionFinder);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('reflection_feedback_text')), findsOneWidget);
+      expect(find.textContaining('Harika metabilişsel farkındalık!'), findsOneWidget);
     });
   });
 }
