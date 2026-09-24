@@ -303,6 +303,51 @@ class _SessionScreenState extends State<SessionScreen> {
           ],
         ),
         actions: [
+          if (viewModel.streak > 0 || viewModel.isShieldActive)
+            Center(
+              child: Container(
+                key: const Key('session_streak_shield_badge'),
+                margin: const EdgeInsets.only(right: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: viewModel.isShieldActive
+                      ? const Color(0xFFF59E0B).withValues(alpha: 0.18)
+                      : const Color(0xFF10B981).withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: viewModel.isShieldActive
+                        ? const Color(0xFFF59E0B)
+                        : const Color(0xFF10B981),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      viewModel.isShieldActive
+                          ? Icons.shield_rounded
+                          : Icons.local_fire_department_rounded,
+                      color: viewModel.isShieldActive
+                          ? const Color(0xFFF59E0B)
+                          : const Color(0xFF10B981),
+                      size: 15,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${viewModel.streak}',
+                      style: TextStyle(
+                        color: viewModel.isShieldActive
+                            ? const Color(0xFFF59E0B)
+                            : const Color(0xFF10B981),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           IconButton(
             icon: Icon(
               Icons.center_focus_strong,

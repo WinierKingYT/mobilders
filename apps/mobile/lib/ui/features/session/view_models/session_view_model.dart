@@ -22,12 +22,14 @@ class SessionViewModel extends ChangeNotifier {
   InputMode _inputMode = InputMode.touchpad;
   DateTime _stepStartTime = DateTime.now();
 
-  // Accessibility & UX States
+  // Accessibility, Gamification & UX States
   bool _isTunnelFocusMode = false;
   bool _isDyscalculiaHelper = false;
   bool _isZenMode = false;
   String? _hesitationWhisper;
   Timer? _hesitationTimer;
+  int _streak = 0;
+  bool _isShieldActive = false;
 
   SessionViewModel({
     required EngineApiService apiService,
@@ -60,12 +62,15 @@ class SessionViewModel extends ChangeNotifier {
   bool get isZenMode => _isZenMode;
   String? get hesitationWhisper => _hesitationWhisper;
   int get pendingOfflineCount => _syncQueue.pendingCount;
+  int get streak => _streak;
+  bool get isShieldActive => _isShieldActive;
 
   void reinitializeSession({
     required String sessionId,
     required String targetEquation,
     required String nodeId,
     double initialPl = 0.20,
+    bool preserveStreak = false,
   }) {
     _sessionId = sessionId;
     _targetEquation = targetEquation;
@@ -76,6 +81,10 @@ class SessionViewModel extends ChangeNotifier {
     _hesitationTimer?.cancel();
     _hesitationWhisper = null;
     _stepStartTime = DateTime.now();
+    if (!preserveStreak) {
+      _streak = 0;
+      _isShieldActive = false;
+    }
     notifyListeners();
   }
 
@@ -83,12 +92,14 @@ class SessionViewModel extends ChangeNotifier {
     required String newTargetEquation,
     String? newNodeId,
     String? newSessionId,
+    bool preserveStreak = true,
   }) {
     final now = DateTime.now().millisecondsSinceEpoch;
     reinitializeSession(
       sessionId: newSessionId ?? 'sess_twin_$now',
       targetEquation: newTargetEquation,
       nodeId: newNodeId ?? _nodeId,
+      preserveStreak: preserveStreak,
     );
   }
 
@@ -243,6 +254,10 @@ class SessionViewModel extends ChangeNotifier {
 
       if (verifiedStep.isValid) {
         HapticFeedbackService().stepSuccess();
+        if (_isShieldActive) {
+          _isShieldActive = false;
+        }
+        _streak++;
         if (verifiedStep.psychometrics != null) {
           _currentPl = verifiedStep.psychometrics!.bktPosteriorPl;
         }
@@ -251,6 +266,11 @@ class SessionViewModel extends ChangeNotifier {
         }
       } else {
         HapticFeedbackService().stepError();
+        if (_streak > 0 && !_isShieldActive) {
+          _isShieldActive = true;
+        } else if (!_isShieldActive) {
+          _streak = 0;
+        }
       }
 
       // Check if there are any pending offline steps to sync in the background

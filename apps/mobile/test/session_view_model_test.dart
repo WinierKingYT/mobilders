@@ -278,5 +278,32 @@ void main() {
       expect(vm.targetEquation, 'initial-eq');
       expect(vm.steps, isEmpty);
     });
+
+    test('Streak increments on valid step and activates Streak Shield on mistake without reset', () async {
+      final fakeApi = FakeEngineApiService();
+      final vm = SessionViewModel(
+        apiService: fakeApi,
+        sessionId: 'streak-test-sess',
+        targetEquation: 'x^2 - 5x + 6 = 0',
+      );
+
+      expect(vm.streak, 0);
+      expect(vm.isShieldActive, isFalse);
+
+      // Step 1: Valid
+      await vm.submitStep('(x - 2)(x - 3) = 0');
+      expect(vm.streak, 1);
+      expect(vm.isShieldActive, isFalse);
+
+      // Step 2: Invalid step -> triggers Streak Shield instead of zeroing streak
+      await vm.submitStep('invalid_attempt');
+      expect(vm.streak, 1);
+      expect(vm.isShieldActive, isTrue);
+
+      // Step 3: Valid recovery step -> Shield consumed, streak increments to 2
+      await vm.submitStep('x = 2');
+      expect(vm.streak, 2);
+      expect(vm.isShieldActive, isFalse);
+    });
   });
 }
