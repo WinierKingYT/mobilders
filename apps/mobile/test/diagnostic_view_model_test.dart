@@ -105,6 +105,44 @@ void main() {
       expect(viewModel.currentItem, isNull);
       expect(viewModel.zpdCandidates, ['N15']);
       expect(viewModel.calibrationProgress, 1.0);
+      expect(viewModel.overallMasteryScore, greaterThan(0.0));
+    });
+
+    test('computeWeightedMastery returns 0.0 for empty profile', () {
+      final score = DiagnosticViewModel.computeWeightedMastery(
+        nodeMasteries: {},
+      );
+      expect(score, 0.0);
+    });
+
+    test('computeWeightedMastery filters NaN and Infinity values safely', () {
+      final score = DiagnosticViewModel.computeWeightedMastery(
+        nodeMasteries: {
+          'N01': double.nan,
+          'N02': double.infinity,
+          'N03': 0.80,
+        },
+      );
+      expect(score, 0.80);
+    });
+
+    test('computeWeightedMastery correctly incorporates resolved twins weighting', () {
+      // Without twins: average of 0.40 and 0.80 is 0.60
+      final baseline = DiagnosticViewModel.computeWeightedMastery(
+        nodeMasteries: {'N01': 0.40, 'N02': 0.80},
+      );
+      expect(baseline, closeTo(0.60, 0.001));
+
+      // With twins on N02: weight of N02 increases, raising overall mastery
+      final boosted = DiagnosticViewModel.computeWeightedMastery(
+        nodeMasteries: {'N01': 0.40, 'N02': 0.80},
+        resolvedTwinsCount: {'N02': 4},
+      );
+      expect(boosted, greaterThan(baseline));
+    });
+
+    test('overallMasteryScore returns 0.0 before test completion', () {
+      expect(viewModel.overallMasteryScore, 0.0);
     });
   });
 }

@@ -6,6 +6,7 @@ import '../../vault/mistake_autopsy_view.dart';
 import '../../analytics/views/cognitive_health_atlas_screen.dart';
 import '../../session/view_models/session_view_model.dart';
 import '../../touchpad/math_touchpad.dart';
+import '../../diagnostic/view_models/diagnostic_view_model.dart';
 
 class CognitiveProfileHubScreen extends StatefulWidget {
   const CognitiveProfileHubScreen({super.key});
@@ -64,29 +65,126 @@ class _CognitiveProfileHubScreenState extends State<CognitiveProfileHubScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          // Tab 1: Mistake Vault
-          MistakeAutopsyView(
-            key: const Key('profile_mistake_vault_view'),
-            mistakes: MistakeVaultService.instance.mistakes,
-            onStartBossBattle: () {
-              HapticFeedbackService().stepSuccess();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Boss Battle: Zayıf konseptler üzerinde kişiselleştirilmiş mücadele başlıyor!'),
-                  backgroundColor: Color(0xFFF43F5E),
+          _buildProfileSummaryHeader(context),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // Tab 1: Mistake Vault
+                MistakeAutopsyView(
+                  key: const Key('profile_mistake_vault_view'),
+                  mistakes: MistakeVaultService.instance.mistakes,
+                  onStartBossBattle: () {
+                    HapticFeedbackService().stepSuccess();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Boss Battle: Zayıf konseptler üzerinde kişiselleştirilmiş mücadele başlıyor!'),
+                        backgroundColor: Color(0xFFF43F5E),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
+
+                // Tab 2: Cognitive Health Analytics (ECE, Paas, Retention)
+                const CognitiveHealthAtlasScreen(),
+
+                // Tab 3: Settings & Neurodiversity Adjustments
+                _buildSettingsTab(context),
+              ],
+            ),
           ),
+        ],
+      ),
+    );
+  }
 
-          // Tab 2: Cognitive Health Analytics (ECE, Paas, Retention)
-          const CognitiveHealthAtlasScreen(),
+  Widget _buildProfileSummaryHeader(BuildContext context) {
+    DiagnosticViewModel? diagVm;
+    try {
+      diagVm = Provider.of<DiagnosticViewModel>(context);
+    } catch (_) {}
 
-          // Tab 3: Settings & Neurodiversity Adjustments
-          _buildSettingsTab(context),
+    final bool hasProfileData = diagVm != null &&
+        diagVm.seededMastery != null &&
+        diagVm.seededMastery!.isNotEmpty;
+
+    final double overallScore = hasProfileData ? diagVm.overallMasteryScore : 0.0;
+    final int nodeCount = hasProfileData ? diagVm.seededMastery!.length : 0;
+
+    return Container(
+      key: const Key('profile_summary_header'),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: hasProfileData ? const Color(0xFF38BDF8).withValues(alpha: 0.3) : const Color(0xFF334155),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: hasProfileData
+                  ? const Color(0xFF38BDF8).withValues(alpha: 0.15)
+                  : const Color(0xFF64748B).withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              hasProfileData ? Icons.verified_user_rounded : Icons.person_outline_rounded,
+              color: hasProfileData ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  hasProfileData
+                      ? 'Bilişsel Ustalık Skoru: %${(overallScore * 100).toStringAsFixed(1)}'
+                      : 'Bilişsel Profil: Başlangıç Seviyesi',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  hasProfileData
+                      ? '$nodeCount bilişsel düğüm kalibre edildi & izleniyor'
+                      : 'Henüz teşhis tamamlanmadı. İlk seansla kalibre edilecek.',
+                  style: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (hasProfileData)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'Aktif',
+                style: TextStyle(
+                  color: Color(0xFF10B981),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                ),
+              ),
+            ),
         ],
       ),
     );

@@ -39,8 +39,53 @@ class DiagnosticViewModel extends ChangeNotifier {
   // Precision progress from 0.0 to 1.0 (Target SE <= 0.35 starting from 1.0)
   double get calibrationProgress {
     if (_isComplete) return 1.0;
-    final progress = (1.0 - _standardError) / (1.0 - 0.35);
+    if (_standardError.isNaN || _standardError.isInfinite) return 0.05;
+    const denom = 1.0 - 0.35;
+    final progress = (1.0 - _standardError) / denom;
+    if (progress.isNaN || progress.isInfinite) return 0.05;
     return progress.clamp(0.05, 0.95);
+  }
+
+  /// Computes the weighted average mastery across cognitive nodes, taking into account
+  /// resolved twin question repetitions to weigh established competencies higher.
+  /// Safely handles empty maps, null values, NaNs, and infinite values.
+  static double computeWeightedMastery({
+    required Map<String, double> nodeMasteries,
+    Map<String, int>? resolvedTwinsCount,
+  }) {
+    if (nodeMasteries.isEmpty) return 0.0;
+
+    double totalWeight = 0.0;
+    double weightedSum = 0.0;
+
+    nodeMasteries.forEach((nodeId, rawMastery) {
+      if (rawMastery.isNaN || rawMastery.isInfinite) return;
+      final clampedMastery = rawMastery.clamp(0.0, 1.0);
+
+      // Base weight is 1.0. Each resolved twin question adds 0.25 (up to max +2.0)
+      final twins = resolvedTwinsCount != null && resolvedTwinsCount.containsKey(nodeId)
+          ? (resolvedTwinsCount[nodeId] ?? 0)
+          : 0;
+      final safeTwins = twins > 0 ? twins.clamp(0, 8) : 0;
+      final weight = 1.0 + (safeTwins * 0.25);
+
+      weightedSum += clampedMastery * weight;
+      totalWeight += weight;
+    });
+
+    if (totalWeight <= 0.0 || totalWeight.isNaN || totalWeight.isInfinite) {
+      return 0.0;
+    }
+
+    final score = weightedSum / totalWeight;
+    if (score.isNaN || score.isInfinite) return 0.0;
+    return score.clamp(0.0, 1.0);
+  }
+
+  /// Overall mastery score calculated from seeded mastery and twin completions
+  double get overallMasteryScore {
+    if (_seededMastery == null || _seededMastery!.isEmpty) return 0.0;
+    return computeWeightedMastery(nodeMasteries: _seededMastery!);
   }
 
   static const List<DiagnosticItem> _offlineBank = [
