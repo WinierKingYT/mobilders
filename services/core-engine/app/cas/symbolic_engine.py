@@ -26,6 +26,7 @@ class SymbolicEquivalenceEngine:
     """
 
     MAX_CACHE_SIZE = 2048
+    MAX_POLYNOMIAL_DEGREE = 12
     ALLOWED_VARIABLES = {
         "x", "y", "z", "a", "b", "c", "k", "n", "m", "r", "p", "q", "d", "Delta", "P", "Q", "R",
         "theta", "alpha", "beta", "pi", "e",
@@ -183,6 +184,16 @@ class SymbolicEquivalenceEngine:
         if not isinstance(node, allowed_types):
             raise SecurityViolationError(f"Yasaklı AST düğümü tespit edildi: {type(node).__name__}")
 
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Pow):
+            exp_val = None
+            if isinstance(node.right, ast.Constant) and isinstance(node.right.value, (int, float)):
+                exp_val = abs(node.right.value)
+            elif isinstance(node.right, ast.UnaryOp) and isinstance(node.right.op, (ast.USub, ast.UAdd)):
+                if isinstance(node.right.operand, ast.Constant) and isinstance(node.right.operand.value, (int, float)):
+                    exp_val = abs(node.right.operand.value)
+            if exp_val is not None and exp_val > self.MAX_POLYNOMIAL_DEGREE:
+                raise SecurityViolationError(f"Aşırı derece/üs tespit edildi: {exp_val} (> {self.MAX_POLYNOMIAL_DEGREE})")
+
         if isinstance(node, ast.Name):
             if node.id not in self.ALLOWED_VARIABLES and node.id not in self.ALLOWED_FUNCTIONS:
                 raise SecurityViolationError(f"Tanımsız veya yetkisiz değişken/fonksiyon: '{node.id}'")
@@ -211,20 +222,74 @@ class SymbolicEquivalenceEngine:
             rhs_str = parts[1].strip()
             if not lhs_str or not rhs_str:
                 raise ValueError("Eşitliğin her iki tarafında da geçerli bir matematiksel ifade bulunmalıdır.")
-            lhs = sp.sympify(lhs_str, locals=self.symbols)
-            rhs = sp.sympify(rhs_str, locals=self.symbols)
-            return sp.simplify(lhs - rhs)
+            try:
+                lhs = sp.sympify(lhs_str, locals=self.symbols)
+                rhs = sp.sympify(rhs_str, locals=self.symbols)
+            except ZeroDivisionError:
+                raise ValueError("Tanımsız rasyonel ifade (sıfıra bölme hatası)")
+
+            if lhs in (sp.zoo, sp.nan) or rhs in (sp.zoo, sp.nan) or lhs.has(sp.zoo, sp.nan) or rhs.has(sp.zoo, sp.nan):
+                raise ValueError("Tanımsız rasyonel ifade (zoo / nan tespit edildi)")
+
+            res = sp.simplify(lhs - rhs)
+            if res in (sp.zoo, sp.nan) or res.has(sp.zoo, sp.nan):
+                raise ValueError("Tanımsız rasyonel ifade (zoo / nan tespit edildi)")
+
+            try:
+                for var in (res.free_symbols or []):
+                    if res.is_polynomial(var):
+                        deg = sp.degree(res, var)
+                        if deg is not None and deg > self.MAX_POLYNOMIAL_DEGREE:
+                            raise SecurityViolationError(f"Aşırı polinom derecesi tespit edildi: {deg} (> {self.MAX_POLYNOMIAL_DEGREE})")
+            except Exception as e:
+                if isinstance(e, SecurityViolationError):
+                    raise
+            return res
         else:
-            return sp.sympify(expr_str, locals=self.symbols)
+            try:
+                res = sp.sympify(expr_str, locals=self.symbols)
+            except ZeroDivisionError:
+                raise ValueError("Tanımsız rasyonel ifade (sıfıra bölme hatası)")
+
+            if res in (sp.zoo, sp.nan) or res.has(sp.zoo, sp.nan):
+                raise ValueError("Tanımsız rasyonel ifade (zoo / nan tespit edildi)")
+
+            try:
+                for var in (res.free_symbols or []):
+                    if res.is_polynomial(var):
+                        deg = sp.degree(res, var)
+                        if deg is not None and deg > self.MAX_POLYNOMIAL_DEGREE:
+                            raise SecurityViolationError(f"Aşırı polinom derecesi tespit edildi: {deg} (> {self.MAX_POLYNOMIAL_DEGREE})")
+            except Exception as e:
+                if isinstance(e, SecurityViolationError):
+                    raise
+            return res
 
     def _compute_equivalence(
         self, user_expr_str: str, target_expr_str: str
     ) -> Tuple[bool, Optional[str]]:
-        user_expr = self.parse_to_sympy(user_expr_str)
-        target_expr = self.parse_to_sympy(target_expr_str)
+        try:
+            user_expr = self.parse_to_sympy(user_expr_str)
+            target_expr = self.parse_to_sympy(target_expr_str)
+        except ValueError as ve:
+            if "tanımsız" in str(ve).lower() or "sıfıra bölme" in str(ve).lower():
+                return False, "Tanımsız rasyonel ifade"
+            raise
+
+        if user_expr in (sp.zoo, sp.nan) or target_expr in (sp.zoo, sp.nan):
+            return False, "Tanımsız rasyonel ifade"
+        if user_expr.has(sp.zoo, sp.nan) or target_expr.has(sp.zoo, sp.nan):
+            return False, "Tanımsız rasyonel ifade"
 
         # 1. Doğrudan fark testi: user_expr - target_expr == 0 ?
-        diff = sp.simplify(user_expr - target_expr)
+        try:
+            diff = sp.simplify(user_expr - target_expr)
+        except (ZeroDivisionError, Exception):
+            return False, "Tanımsız rasyonel ifade"
+
+        if diff in (sp.zoo, sp.nan) or diff.has(sp.zoo, sp.nan):
+            return False, "Tanımsız rasyonel ifade"
+
         if diff == 0 or getattr(diff, "is_zero", False):
             return True, "0"
 
@@ -233,6 +298,8 @@ class SymbolicEquivalenceEngine:
         if ("=" in user_expr_str or "=" in target_expr_str) and target_expr != 0 and user_expr != 0:
             try:
                 ratio = sp.simplify(user_expr / target_expr)
+                if ratio in (sp.zoo, sp.nan) or ratio.has(sp.zoo, sp.nan):
+                    return False, "Tanımsız rasyonel ifade"
                 if ratio.is_number and ratio != 0:
                     return True, "0"
             except Exception:

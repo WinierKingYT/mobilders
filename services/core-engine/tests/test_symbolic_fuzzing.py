@@ -156,3 +156,23 @@ class TestSymbolicEquivalenceEngineFuzzing:
         deep = "1 + (2 + (3 + (4 + (5 + (6 + (7 + (8 + (9 + (10 + (11 + x))))))))))"
         with pytest.raises(SecurityViolationError):
             engine.sanitize_and_validate_ast(deep)
+
+    def test_extreme_power_degree_cap(self):
+        from app.cas.symbolic_engine import SymbolicEquivalenceEngine, SecurityViolationError
+        engine = SymbolicEquivalenceEngine()
+        with pytest.raises(SecurityViolationError):
+            engine.sanitize_and_validate_ast("x^100 + 1")
+        with pytest.raises(SecurityViolationError):
+            engine.parse_to_sympy("x**15 = 0")
+
+    def test_division_by_zero_complex_zoo_graceful_handling(self):
+        from app.cas.symbolic_engine import SymbolicEquivalenceEngine
+        engine = SymbolicEquivalenceEngine()
+        is_equiv, _, diff = engine.verify_equivalence("1 / 0 = 5", "x = 5")
+        assert is_equiv is False
+        assert "Tanımsız" in diff
+
+        is_equiv2, _, diff2 = engine.verify_equivalence("x / (x - x) = 1", "x = 1")
+        assert is_equiv2 is False
+        assert "Tanımsız" in diff2
+
