@@ -437,6 +437,73 @@ void main() {
 
       expect(MistakeVaultService.instance.mistakes.first.status, equals('cured'));
     });
+
+    testWidgets('MistakeAutopsyView Stage 3 one-touch twin launches practice and transitions to in_remediation',
+        (WidgetTester tester) async {
+      String? launchedEquation;
+      MistakeAutopsyItem? launchedItem;
+
+      final mockClient = MockClient((request) async {
+        if (request.url.path == '/api/v1/twin/generate') {
+          return http.Response(
+            jsonEncode({
+              'twin_id': 'twin_quick_01',
+              'target_equation': '3x - 5 = 10',
+              'canonical_roots': [5.0],
+              'targeted_bug_id': 'BUG-LIN-01',
+              'targeted_bug_title': 'Katsayı İşareti Transfer Hatası',
+              'pedagogical_focus': 'Denklemde terimleri karşıya atarken işaret dönüşümü.',
+              'hint': 'Her iki tarafa 5 ekle.',
+            }),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }
+        return http.Response('Not Found', 404);
+      });
+      final mockApi = EngineApiService(client: mockClient);
+
+      const linItem = MistakeAutopsyItem(
+        id: "m_lin",
+        bugId: "BUG-LIN-01",
+        nodeId: "N10",
+        problem: "3x + 5 = 20",
+        offendingStep: "3x = 25",
+        correctPrinciple: "3x = 20 - 5 = 15",
+        status: "open",
+        stabilityDays: 0.5,
+        isDue: true,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MistakeAutopsyView(
+            mistakes: const [linItem],
+            apiService: mockApi,
+            onLaunchTwinPractice: (item, eq) async {
+              launchedItem = item;
+              launchedEquation = eq;
+            },
+          ),
+        ),
+      );
+
+      // Start self-correction
+      await tester.tap(find.byKey(const Key('btn_start_self_correction_m_lin')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('btn_stage_1_confirm')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('btn_stage_2_confirm')));
+      await tester.pumpAndSettle();
+
+      // Verify one-touch twin button exists and tap it
+      expect(find.byKey(const Key('btn_stage_3_one_touch_twin')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('btn_stage_3_one_touch_twin')));
+      await tester.pumpAndSettle();
+
+      expect(launchedItem?.id, equals('m_lin'));
+      expect(launchedEquation, equals('3x - 5 = 10'));
+    });
   });
 }
 

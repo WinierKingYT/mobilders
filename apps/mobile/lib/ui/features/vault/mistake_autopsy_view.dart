@@ -590,6 +590,7 @@ class _MistakeAutopsyViewState extends State<MistakeAutopsyView> {
                     foregroundColor: Colors.black,
                   ),
                   onPressed: () async {
+                    MistakeVaultService.instance.updateMistakeStatus(item.id, 'in_remediation');
                     await widget.onLaunchTwinPractice!(item, _generatedTwin!.targetEquation);
                   },
                 ),
@@ -601,6 +602,42 @@ class _MistakeAutopsyViewState extends State<MistakeAutopsyView> {
               spacing: 8.0,
               runSpacing: 8.0,
               children: [
+                if (widget.onLaunchTwinPractice != null && _generatedTwin == null)
+                  ElevatedButton.icon(
+                    key: const Key('btn_stage_3_one_touch_twin'),
+                    icon: const Icon(Icons.flash_on, size: 16),
+                    label: const Text("⚡ Tek Dokunuşla İkiz Soru Çöz", style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.cyanAccent,
+                      foregroundColor: Colors.black,
+                    ),
+                    onPressed: _isGeneratingTwin
+                        ? null
+                        : () async {
+                            setState(() => _isGeneratingTwin = true);
+                            try {
+                              final api = widget.apiService ?? EngineApiService();
+                              final twin = await api.generateTwinQuestion(
+                                bugId: item.bugId,
+                                originalEquation: item.problem,
+                              );
+                              if (mounted) {
+                                setState(() {
+                                  _isGeneratingTwin = false;
+                                  _generatedTwin = twin;
+                                });
+                              }
+                              MistakeVaultService.instance.updateMistakeStatus(item.id, 'in_remediation');
+                              if (widget.onLaunchTwinPractice != null) {
+                                await widget.onLaunchTwinPractice!(item, twin.targetEquation);
+                              }
+                            } catch (_) {
+                              if (mounted) {
+                                setState(() => _isGeneratingTwin = false);
+                              }
+                            }
+                          },
+                  ),
                 OutlinedButton.icon(
                   key: const Key('btn_stage_3_launch_twin'),
                   icon: const Icon(Icons.autorenew, size: 16),
@@ -646,6 +683,13 @@ class _MistakeAutopsyViewState extends State<MistakeAutopsyView> {
                     } else {
                       MistakeVaultService.instance.updateMistakeStatus(item.id, 'cured');
                     }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Tebrikler! ${item.bugId} yanılgısı kasada giderildi (Mastered)."),
+                        backgroundColor: const Color(0xFF10B981),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
                     _resetSelfCorrection();
                   },
                 ),

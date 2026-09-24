@@ -58,6 +58,18 @@ class SyntheticTwinGenerator:
             "title": "Eksi İşareti Dağıtım Yanılgısı",
             "focus": "Parantez önündeki eksi işaretini parantez içindeki tüm terimlere dağıt.",
         },
+        "BUG-LIN-01": {
+            "title": "Katsayı İşareti Transfer Hatası",
+            "focus": "Denklemde terimleri karşıya atarken işaret dönüşümünü doğru uygula.",
+        },
+        "BUG-FOUND-01": {
+            "title": "İşlem Önceliği Yanılgısı",
+            "focus": "Çarpma ve bölme işlemlerini toplama ve çıkarmadan önce tamamla.",
+        },
+        "BUG-EUC-04": {
+            "title": "Öklid Yükseklik Bağıntısı Yanılgısı",
+            "focus": "Dik üçgende hipotenüse ait yükseklik bağıntısı: h² = p * k.",
+        },
     }
 
     @staticmethod
@@ -87,6 +99,8 @@ class SyntheticTwinGenerator:
             return cls._generate_bug_quad_05(difficulty_level, original_equation)
         elif "SIGN" in b:
             return cls._generate_sign_flip(difficulty_level, original_equation)
+        elif "LIN" in b or "FOUND" in b or "EUC" in b:
+            return cls._generate_generic_linear(b, difficulty_level, original_equation)
         else:
             return cls._generate_generic_quadratic(b, difficulty_level, original_equation)
 
@@ -333,6 +347,49 @@ class SyntheticTwinGenerator:
         if len(parts) == 1:
             return "x² = 0"
         return " ".join(parts) + " = 0"
+
+    @classmethod
+    def _generate_generic_linear(
+        cls,
+        bug_id: str,
+        difficulty: int,
+        original_equation: Optional[str] = None,
+    ) -> TwinQuestionResponse:
+        presets = [
+            {
+                "eq": "3x - 5 = 10",
+                "roots": [5.0],
+                "hint": "Her iki tarafa 5 ekle: 3x = 15 => x = 5.",
+            },
+            {
+                "eq": "2x + 7 = 15",
+                "roots": [4.0],
+                "hint": "Her iki taraftan 7 çıkar: 2x = 8 => x = 4.",
+            },
+            {
+                "eq": "4x - 6 = 14",
+                "roots": [5.0],
+                "hint": "Her iki tarafa 6 ekle: 4x = 20 => x = 5.",
+            },
+            {
+                "eq": "5x + 3 = 28",
+                "roots": [5.0],
+                "hint": "Her iki taraftan 3 çıkar: 5x = 25 => x = 5.",
+            },
+        ]
+        choice = cls._pick_preset(presets, original_equation)
+        meta = cls.BUG_METADATA.get(bug_id, {})
+        title = meta.get("title", f"Kavramsal Pekiştirme ({bug_id})")
+        focus = meta.get("focus", "Adım adım terimleri karşıya geçirip sadeleştirerek çöz.")
+        return TwinQuestionResponse(
+            target_equation=choice["eq"],
+            canonical_roots=choice["roots"],
+            targeted_bug_id=bug_id,
+            targeted_bug_title=title,
+            pedagogical_focus=focus,
+            hint=choice["hint"],
+            difficulty_level=difficulty,
+        )
 
     @classmethod
     def _generate_generic_quadratic(
