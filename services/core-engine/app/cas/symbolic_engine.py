@@ -94,6 +94,7 @@ class SymbolicEquivalenceEngine:
         try:
             _ = self.parse_to_sympy("x + 1 = 2")
             _ = sp.simplify(self.symbols["x"] - self.symbols["x"])
+            _ = sp.trigsimp(sp.tan(self.symbols["x"]) * sp.Abs(self.symbols["x"]))
         except Exception:
             pass
 

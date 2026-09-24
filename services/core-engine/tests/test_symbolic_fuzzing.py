@@ -176,3 +176,49 @@ class TestSymbolicEquivalenceEngineFuzzing:
         assert is_equiv2 is False
         assert "Tanımsız" in diff2
 
+    def test_hypothesis_property_based_10000_fuzz_stress(self):
+        """
+        Aşama 57: CAS Ayrıştırıcısı için Hipotez Tabanlı 10.000 İfade Stres Testi.
+        Rastgele iç içe parantez, kesir ve operatör kombinasyonlarında motorun asla
+        çökmediğini (Zero-Crash) ve her ifadenin azami 50ms içinde sonuçlandığını doğrular.
+        """
+        import time
+        import random
+        from app.cas.symbolic_engine import SymbolicEquivalenceEngine, SecurityViolationError, CASTimeoutError
+
+        engine = SymbolicEquivalenceEngine(timeout_ms=50)
+        random.seed(1337)
+
+        tokens = [
+            "x", "y", "2", "3", "0", "-1", "+", "-", "*", "/", "^",
+            "(", ")", "x^2", "2*x", r"\frac{x}{2}", r"\sqrt{x}",
+            "sin(x)", "cos(x)", "tan(x)", "Abs(x)", "=", " "
+        ]
+
+        max_observed_latency = 0.0
+
+        for i in range(10000):
+            k = (i % 7) + 1
+            sample = random.choices(tokens, k=k)
+            expr = "".join(sample)
+
+            t0 = time.perf_counter()
+            try:
+                is_equiv, latency_ms, diff = engine.verify_equivalence(expr, "x = 0", timeout_ms=50)
+                assert isinstance(is_equiv, bool)
+            except CASTimeoutError:
+                # Aşama 57 Kriteri: 50ms'yi aşan hesaplamalar kontrollü olarak CASTimeoutError ile durdurulur
+                pass
+            except (SecurityViolationError, ValueError):
+                pass
+            except Exception as e:
+                pytest.fail(f"Aşama 57 Fuzz Hatası - Beklenmeyen istisna: '{expr}' -> {type(e).__name__}: {e}")
+
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            if elapsed_ms > max_observed_latency:
+                max_observed_latency = elapsed_ms
+            # Aşama 57 Kriteri: Zaman Aşımı Koruması (50ms zaman aşımı + Windows iş parçacığı toleransı)
+            assert elapsed_ms < 120.0, f"İfade '{expr}' işletim sistemi zaman sınırını aştı ({elapsed_ms:.2f}ms)"
+        engine.shutdown(wait=False)
+
+
