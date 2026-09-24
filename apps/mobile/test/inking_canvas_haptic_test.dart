@@ -314,5 +314,73 @@ void main() {
       expect(strokeJson['id'], 's_test');
       expect(strokeJson['kind'], 'stylus');
     });
+
+    test('StylusTrajectoryPredictor calculates forward low-latency point along velocity vector', () {
+      const p1 = VectorInkingPoint(
+        x: 10.0,
+        y: 20.0,
+        timestampMs: 1000,
+        deviceKind: PointerDeviceKind.stylus,
+      );
+      const p2 = VectorInkingPoint(
+        x: 20.0,
+        y: 40.0,
+        timestampMs: 1016,
+        deviceKind: PointerDeviceKind.stylus,
+      );
+
+      // Single point returns null
+      expect(StylusTrajectoryPredictor.predictNextPoint([p1]), isNull);
+
+      // Two points computes forward predicted point
+      final predicted = StylusTrajectoryPredictor.predictNextPoint([p1, p2], predictionFactor: 0.5);
+      expect(predicted, isNotNull);
+      expect(predicted!.isPredicted, isTrue);
+      // vx = (20 - 10) / 16 = 0.625; predX = 20 + 0.625 * 8 = 25.0
+      expect(predicted.x, closeTo(25.0, 0.01));
+      // vy = (40 - 20) / 16 = 1.25; predY = 40 + 1.25 * 8 = 50.0
+      expect(predicted.y, closeTo(50.0, 0.01));
+      expect(predicted.deviceKind, equals(PointerDeviceKind.stylus));
+    });
+
+    testWidgets('Stylus drawing utilizes forward prediction during motion and purges predicted point on stroke commit', (tester) async {
+      List<VectorInkingStroke>? finishedStrokes;
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 600,
+            child: VectorInkingCanvas(
+              enableStylusPrediction: true,
+              onStrokesUpdated: (strokes) => finishedStrokes = strokes,
+            ),
+          ),
+        ),
+      ));
+
+      final stylusGesture = await tester.startGesture(
+        const Offset(100, 150),
+        pointer: 7,
+        kind: PointerDeviceKind.stylus,
+      );
+      await tester.pump();
+
+      await stylusGesture.moveBy(const Offset(30, 30));
+      await tester.pump();
+      await stylusGesture.moveBy(const Offset(30, 30));
+      await tester.pump();
+
+      await stylusGesture.up();
+      await tester.pumpAndSettle();
+
+      expect(finishedStrokes, isNotNull);
+      expect(finishedStrokes!.length, 1);
+      // Ensure all saved stroke points have isPredicted == false
+      for (final pt in finishedStrokes!.first.points) {
+        expect(pt.isPredicted, isFalse);
+      }
+    });
   });
 }
+

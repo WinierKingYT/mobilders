@@ -11,6 +11,7 @@ class VectorInkingPoint {
   final double pressure;
   final double tilt;
   final PointerDeviceKind deviceKind;
+  final bool isPredicted;
 
   const VectorInkingPoint({
     required this.x,
@@ -19,6 +20,7 @@ class VectorInkingPoint {
     this.pressure = 1.0,
     this.tilt = 0.0,
     this.deviceKind = PointerDeviceKind.touch,
+    this.isPredicted = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -28,7 +30,41 @@ class VectorInkingPoint {
     'p': pressure,
     'tilt': tilt,
     'kind': deviceKind.name,
+    'pred': isPredicted,
   };
+}
+
+/// Low-latency (<8ms) S-Pen forward trajectory prediction for Samsung Galaxy S22 120Hz display (Stage 67)
+class StylusTrajectoryPredictor {
+  static VectorInkingPoint? predictNextPoint(
+    List<VectorInkingPoint> points, {
+    double predictionFactor = 0.5,
+  }) {
+    // Only predict if we have at least 2 non-predicted points
+    final realPoints = points.where((p) => !p.isPredicted).toList();
+    if (realPoints.length < 2) return null;
+
+    final pLast = realPoints.last;
+    final pPrev = realPoints[realPoints.length - 2];
+
+    final dt = (pLast.timestampMs - pPrev.timestampMs).clamp(1, 50);
+    final vx = (pLast.x - pPrev.x) / dt;
+    final vy = (pLast.y - pPrev.y) / dt;
+
+    // Instantaneous forward prediction distance (e.g. 8.33ms at 120Hz)
+    final predX = pLast.x + vx * (dt * predictionFactor);
+    final predY = pLast.y + vy * (dt * predictionFactor);
+
+    return VectorInkingPoint(
+      x: predX,
+      y: predY,
+      timestampMs: pLast.timestampMs + 8,
+      pressure: pLast.pressure,
+      tilt: pLast.tilt,
+      deviceKind: pLast.deviceKind,
+      isPredicted: true,
+    );
+  }
 }
 
 /// Continuous vector stroke with high-precision timestamped trajectory points.
@@ -192,6 +228,7 @@ class VectorInkingCanvas extends StatefulWidget {
   final VoidCallback? onDismiss;
   final bool enablePalmRejection;
   final bool stylusOnlyMode;
+  final bool enableStylusPrediction;
 
   const VectorInkingCanvas({
     super.key,
@@ -200,6 +237,7 @@ class VectorInkingCanvas extends StatefulWidget {
     this.onDismiss,
     this.enablePalmRejection = true,
     this.stylusOnlyMode = false,
+    this.enableStylusPrediction = true,
   });
 
   @override
@@ -321,7 +359,17 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
     );
 
     setState(() {
+      _activeStroke!.points.removeWhere((p) => p.isPredicted);
       _activeStroke!.points.add(point);
+
+      if (widget.enableStylusPrediction &&
+          (event.kind == PointerDeviceKind.stylus ||
+           event.kind == PointerDeviceKind.invertedStylus)) {
+        final predicted = StylusTrajectoryPredictor.predictNextPoint(_activeStroke!.points);
+        if (predicted != null) {
+          _activeStroke!.points.add(predicted);
+        }
+      }
     });
   }
 
@@ -333,7 +381,8 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
       _lastStylusActivity = DateTime.now();
     }
 
-    final simplifiedPoints = VectorInkingStrokeSimplifier.simplify(_activeStroke!.points);
+    final realPoints = _activeStroke!.points.where((p) => !p.isPredicted).toList();
+    final simplifiedPoints = VectorInkingStrokeSimplifier.simplify(realPoints);
     final finalStroke = VectorInkingStroke(
       id: _activeStroke!.id,
       points: simplifiedPoints,
