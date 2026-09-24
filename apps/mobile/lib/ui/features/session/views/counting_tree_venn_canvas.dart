@@ -37,6 +37,97 @@ class CountingTreeVennCanvas extends StatefulWidget {
 class _CountingTreeVennCanvasState extends State<CountingTreeVennCanvas> {
   late ProbabilityCanvasMode _mode;
   VennRegionHighlight _vennHighlight = VennRegionHighlight.intersection;
+  int? _selectedTreePathIndex;
+
+  String get _vennRegionLabel {
+    switch (_vennHighlight) {
+      case VennRegionHighlight.intersection:
+        return "A ∩ B (Genişletilmiş Dokunma Alanı)";
+      case VennRegionHighlight.onlyA:
+        return "A \\ B (Yalnızca A)";
+      case VennRegionHighlight.onlyB:
+        return "B \\ A (Yalnızca B)";
+      case VennRegionHighlight.union:
+        return "A ∪ B (Birleşim)";
+      case VennRegionHighlight.all:
+        return "Tüm Evrensel Küme";
+      case VennRegionHighlight.complement:
+        return "Tümleyen (A ∪ B)'";
+    }
+  }
+
+  void _handleVennTouch(Offset touch, Size size) {
+    final radius = size.height * 0.38;
+    final centerA = Offset(size.width * 0.38, size.height * 0.5);
+    final centerB = Offset(size.width * 0.62, size.height * 0.5);
+    final centerIntersect = Offset(size.width * 0.5, size.height * 0.5);
+
+    final distA = (touch - centerA).distance;
+    final distB = (touch - centerB).distance;
+    final distCenter = (touch - centerIntersect).distance;
+
+    // Expanded Hit-Test Zone for Intersection:
+    // Regular geometric intersection is (distA <= radius && distB <= radius).
+    // We expand this region with a 24dp magnetic padding / tolerance band
+    // around the central axis so user fingers don't accidentally miss the intersection!
+    final bool isGeometricIntersection = distA <= radius && distB <= radius;
+    final bool isNearIntersectionAxis = (touch.dx - centerIntersect.dx).abs() <= 24.0 &&
+        (touch.dy - centerIntersect.dy).abs() <= radius * 0.90;
+    final bool isExpandedIntersection = isGeometricIntersection ||
+        (distCenter <= 28.0) ||
+        (isNearIntersectionAxis && (distA <= radius + 14.0 || distB <= radius + 14.0));
+
+    setState(() {
+      if (isExpandedIntersection) {
+        _vennHighlight = VennRegionHighlight.intersection;
+      } else if (distA <= radius && distB > radius) {
+        _vennHighlight = VennRegionHighlight.onlyA;
+      } else if (distB <= radius && distA > radius) {
+        _vennHighlight = VennRegionHighlight.onlyB;
+      } else {
+        _vennHighlight = VennRegionHighlight.union;
+      }
+    });
+  }
+
+  void _handleTreeTouch(Offset touch, Size size) {
+    final stage2X = math.max(180.0, size.width * 0.82);
+    final topPad = size.height * 0.10;
+    final step = (size.height - (topPad * 2)) / 3.0;
+
+    final leaves = [
+      Offset(stage2X, topPad + step * 0),
+      Offset(stage2X, topPad + step * 1),
+      Offset(stage2X, topPad + step * 2),
+      Offset(stage2X, topPad + step * 3),
+    ];
+
+    int? nearestIndex;
+    double minDistance = double.infinity;
+
+    for (int i = 0; i < leaves.length; i++) {
+      final dist = (touch - leaves[i]).distance;
+      if (dist <= 36.0 && dist < minDistance) {
+        minDistance = dist;
+        nearestIndex = i;
+      }
+    }
+
+    if (nearestIndex == null) {
+      final stage1X = math.max(80.0, size.width * 0.42);
+      final b1 = Offset(stage1X, size.height * 0.28);
+      final b2 = Offset(stage1X, size.height * 0.72);
+      if ((touch - b1).distance <= 36.0) {
+        nearestIndex = 0;
+      } else if ((touch - b2).distance <= 36.0) {
+        nearestIndex = 2;
+      }
+    }
+
+    setState(() {
+      _selectedTreePathIndex = nearestIndex;
+    });
+  }
 
   // Monte Carlo State
   int _monteCarloTrials = 10000;
@@ -197,7 +288,7 @@ class _CountingTreeVennCanvasState extends State<CountingTreeVennCanvas> {
         ),
         const SizedBox(height: 8.0),
 
-        // Venn Canvas
+        // Interactive Venn Canvas with 24dp hit expansion
         Container(
           height: 180,
           decoration: BoxDecoration(
@@ -205,18 +296,56 @@ class _CountingTreeVennCanvasState extends State<CountingTreeVennCanvas> {
             borderRadius: BorderRadius.circular(12.0),
             border: Border.all(color: Colors.grey.shade300),
           ),
-          child: RepaintBoundary(
-            child: CustomPaint(
-              painter: _VennPainter(
-                highlight: _vennHighlight,
-                probA: widget.probA,
-                probB: widget.probB,
-                probIntersection: widget.probIntersection,
-              ),
-            ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final size = Size(constraints.maxWidth, 180.0);
+              return GestureDetector(
+                key: const Key("venn_gesture_detector"),
+                behavior: HitTestBehavior.opaque,
+                onTapDown: (details) => _handleVennTouch(details.localPosition, size),
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    key: const Key("venn_canvas"),
+                    size: size,
+                    painter: _VennPainter(
+                      highlight: _vennHighlight,
+                      probA: widget.probA,
+                      probB: widget.probB,
+                      probIntersection: widget.probIntersection,
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
-        const SizedBox(height: 10.0),
+        const SizedBox(height: 8.0),
+
+        // Selected Venn Region Badge
+        Container(
+          key: const Key('venn_selected_region_badge'),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.purple.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.purple.shade300),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.touch_app, size: 14, color: Colors.purple),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  "Seçilen Bölge: $_vennRegionLabel",
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.purple),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8.0),
 
         // Formula Card
         Container(
@@ -246,6 +375,13 @@ class _CountingTreeVennCanvasState extends State<CountingTreeVennCanvas> {
   }
 
   Widget _buildTreeSection() {
+    final pathLabels = [
+      "P(Yazı, Yazı) = 1/4",
+      "P(Yazı, Tura) = 1/4",
+      "P(Tura, Yazı) = 1/4",
+      "P(Tura, Tura) = 1/4",
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -256,13 +392,52 @@ class _CountingTreeVennCanvasState extends State<CountingTreeVennCanvas> {
             borderRadius: BorderRadius.circular(12.0),
             border: Border.all(color: Colors.grey.shade300),
           ),
-          child: RepaintBoundary(
-            child: CustomPaint(
-              painter: _TreePainter(),
-            ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final size = Size(constraints.maxWidth, 190.0);
+              return GestureDetector(
+                key: const Key("tree_gesture_detector"),
+                behavior: HitTestBehavior.opaque,
+                onTapDown: (details) => _handleTreeTouch(details.localPosition, size),
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    key: const Key("tree_canvas"),
+                    size: size,
+                    painter: _TreePainter(
+                      selectedPathIndex: _selectedTreePathIndex,
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
         const SizedBox(height: 8.0),
+        if (_selectedTreePathIndex != null)
+          Container(
+            key: const Key('tree_selected_path_badge'),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            margin: const EdgeInsets.only(bottom: 6),
+            decoration: BoxDecoration(
+              color: Colors.teal.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.teal.shade300),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.alt_route, size: 14, color: Colors.teal),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    "Seçilen Yol: ${pathLabels[_selectedTreePathIndex!]}",
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.teal),
+                  ),
+                ),
+              ],
+            ),
+          ),
         const Text(
           "Çarpma Kuralı: Bir dal boyunca olasılıklar art arda çarpılır.",
           style: TextStyle(fontSize: 12.0, fontStyle: FontStyle.italic),
@@ -452,39 +627,65 @@ class _VennPainter extends CustomPainter {
 }
 
 class _TreePainter extends CustomPainter {
+  final int? selectedPathIndex;
+
+  _TreePainter({this.selectedPathIndex});
+
   @override
   void paint(Canvas canvas, Size size) {
     if (size.width <= 0 || size.height <= 0) return;
+
     final branchPaint = Paint()
       ..color = Colors.blueGrey
       ..strokeWidth = 2.0;
 
-    final root = Offset(20, size.height * 0.5);
-    final b1 = Offset(size.width * 0.45, size.height * 0.25);
-    final b2 = Offset(size.width * 0.45, size.height * 0.75);
+    final activePaint = Paint()
+      ..color = Colors.teal
+      ..strokeWidth = 3.5;
 
-    // Stage 1 branches
-    canvas.drawLine(root, b1, branchPaint);
-    canvas.drawLine(root, b2, branchPaint);
+    final root = Offset(16.0, size.height * 0.5);
+    final stage1X = math.max(80.0, size.width * 0.42);
+    final stage2X = math.max(180.0, size.width * 0.82);
 
-    // Stage 2 branches
-    final l1 = Offset(size.width * 0.85, size.height * 0.12);
-    final l2 = Offset(size.width * 0.85, size.height * 0.38);
-    final l3 = Offset(size.width * 0.85, size.height * 0.62);
-    final l4 = Offset(size.width * 0.85, size.height * 0.88);
+    final topPad = size.height * 0.10;
+    final step = (size.height - (topPad * 2)) / 3.0;
 
-    canvas.drawLine(b1, l1, branchPaint);
-    canvas.drawLine(b1, l2, branchPaint);
-    canvas.drawLine(b2, l3, branchPaint);
-    canvas.drawLine(b2, l4, branchPaint);
+    final b1 = Offset(stage1X, size.height * 0.28);
+    final b2 = Offset(stage1X, size.height * 0.72);
 
-    // Labels
-    _drawText(canvas, "Yazı (1/2)", Offset(size.width * 0.2, size.height * 0.28));
-    _drawText(canvas, "Tura (1/2)", Offset(size.width * 0.2, size.height * 0.65));
-    _drawText(canvas, "Y (1/2) -> P(YY)=1/4", Offset(l1.dx - 10, l1.dy - 6));
-    _drawText(canvas, "T (1/2) -> P(YT)=1/4", Offset(l2.dx - 10, l2.dy - 6));
-    _drawText(canvas, "Y (1/2) -> P(TY)=1/4", Offset(l3.dx - 10, l3.dy - 6));
-    _drawText(canvas, "T (1/2) -> P(TT)=1/4", Offset(l4.dx - 10, l4.dy - 6));
+    final l1 = Offset(stage2X, topPad + step * 0); // YY
+    final l2 = Offset(stage2X, topPad + step * 1); // YT
+    final l3 = Offset(stage2X, topPad + step * 2); // TY
+    final l4 = Offset(stage2X, topPad + step * 3); // TT
+
+    final leaves = [l1, l2, l3, l4];
+
+    final bool b1Active = selectedPathIndex != null && (selectedPathIndex == 0 || selectedPathIndex == 1);
+    final bool b2Active = selectedPathIndex != null && (selectedPathIndex == 2 || selectedPathIndex == 3);
+
+    canvas.drawLine(root, b1, b1Active ? activePaint : branchPaint);
+    canvas.drawLine(root, b2, b2Active ? activePaint : branchPaint);
+
+    canvas.drawLine(b1, l1, selectedPathIndex == 0 ? activePaint : branchPaint);
+    canvas.drawLine(b1, l2, selectedPathIndex == 1 ? activePaint : branchPaint);
+    canvas.drawLine(b2, l3, selectedPathIndex == 2 ? activePaint : branchPaint);
+    canvas.drawLine(b2, l4, selectedPathIndex == 3 ? activePaint : branchPaint);
+
+    final nodePaint = Paint()..color = Colors.blueGrey;
+    final activeNodePaint = Paint()..color = Colors.teal;
+    canvas.drawCircle(root, 4.0, nodePaint);
+    canvas.drawCircle(b1, 4.0, b1Active ? activeNodePaint : nodePaint);
+    canvas.drawCircle(b2, 4.0, b2Active ? activeNodePaint : nodePaint);
+    for (int i = 0; i < leaves.length; i++) {
+      canvas.drawCircle(leaves[i], 4.0, selectedPathIndex == i ? activeNodePaint : nodePaint);
+    }
+
+    _drawText(canvas, "Yazı (1/2)", Offset(size.width * 0.16, size.height * 0.32));
+    _drawText(canvas, "Tura (1/2)", Offset(size.width * 0.16, size.height * 0.63));
+    _drawText(canvas, "Y (1/2) -> P(YY)=1/4", Offset(l1.dx - 12, l1.dy - 6));
+    _drawText(canvas, "T (1/2) -> P(YT)=1/4", Offset(l2.dx - 12, l2.dy - 6));
+    _drawText(canvas, "Y (1/2) -> P(TY)=1/4", Offset(l3.dx - 12, l3.dy - 6));
+    _drawText(canvas, "T (1/2) -> P(TT)=1/4", Offset(l4.dx - 12, l4.dy - 6));
   }
 
   void _drawText(Canvas canvas, String text, Offset offset) {
@@ -502,5 +703,6 @@ class _TreePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _TreePainter oldDelegate) => false;
+  bool shouldRepaint(covariant _TreePainter oldDelegate) =>
+      oldDelegate.selectedPathIndex != selectedPathIndex;
 }

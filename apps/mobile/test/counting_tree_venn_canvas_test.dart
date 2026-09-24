@@ -179,4 +179,67 @@ void main() {
       );
     });
   });
+
+  group('CountingTreeVennCanvas Touch Hit-Testing & Dynamic Layout Tests (Stage 62)', () {
+    testWidgets('Touching near intersection center selects intersection region with 24dp tolerance',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: CountingTreeVennCanvas(
+                initialMode: ProbabilityCanvasMode.venn,
+                probA: 0.6,
+                probB: 0.5,
+                probIntersection: 0.3,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final vennDetector = find.byKey(const Key('venn_gesture_detector'));
+      expect(vennDetector, findsOneWidget);
+
+      // Tap center of Venn diagram which corresponds to the expanded intersection zone (width * 0.5, height * 0.5)
+      await tester.tap(vennDetector);
+      await tester.pumpAndSettle();
+
+      // Verify that the region selection badge is displayed for A ∩ B
+      expect(find.byKey(const Key('venn_selected_region_badge')), findsOneWidget);
+      expect(find.textContaining('Genişletilmiş Dokunma Alanı'), findsOneWidget);
+    });
+
+    testWidgets('Touching dynamic probability tree branch selects path and shows badge',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: CountingTreeVennCanvas(
+                initialMode: ProbabilityCanvasMode.tree,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final treeDetector = find.byKey(const Key('tree_gesture_detector'));
+      expect(treeDetector, findsOneWidget);
+
+      // Tap near the top leaf branch (l1) of the tree
+      final treeTopLeft = tester.getTopLeft(treeDetector);
+      final treeSize = tester.getSize(treeDetector);
+
+      // Target leaf 1 (YY): around stage2X (width * 0.82) and topPad (height * 0.10)
+      final targetOffset = treeTopLeft + Offset(treeSize.width * 0.82, treeSize.height * 0.10);
+      await tester.tapAt(targetOffset);
+      await tester.pumpAndSettle();
+
+      // Verify selected path badge appears
+      expect(find.byKey(const Key('tree_selected_path_badge')), findsOneWidget);
+      expect(find.textContaining('P(Yazı, Yazı)'), findsOneWidget);
+    });
+  });
 }
+
