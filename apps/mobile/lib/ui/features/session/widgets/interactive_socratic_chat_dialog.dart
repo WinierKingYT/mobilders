@@ -278,6 +278,26 @@ class _InteractiveSocraticChatDialogState extends State<InteractiveSocraticChatD
             ),
           ),
 
+          // 3-Aşamalı Sokratik İskele Göstergesi
+          Container(
+            key: const Key('socratic_stage_indicator_bar'),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: const BoxDecoration(
+              color: Color(0xFF090D16),
+              border: Border(bottom: BorderSide(color: Color(0xFF1E293B))),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildStageChip("1. Empati & Kabul", _messages.length <= 1),
+                const Icon(Icons.arrow_forward_ios, size: 10, color: Colors.white24),
+                _buildStageChip("2. Somut Sezgi", _messages.length == 2 || _messages.length == 3),
+                const Icon(Icons.arrow_forward_ios, size: 10, color: Colors.white24),
+                _buildStageChip("3. Kendi Keşfin", _messages.length >= 4),
+              ],
+            ),
+          ),
+
           // Message List
           Expanded(
             child: ListView.builder(
@@ -463,6 +483,27 @@ class _InteractiveSocraticChatDialogState extends State<InteractiveSocraticChatD
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStageChip(String title, bool isActive) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isActive ? const Color(0xFF0284C7).withValues(alpha: 0.25) : Colors.transparent,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isActive ? const Color(0xFF38BDF8) : Colors.white12,
+        ),
+      ),
+      child: Text(
+        title,
+        style: TextStyle(
+          color: isActive ? const Color(0xFF38BDF8) : Colors.white38,
+          fontSize: 10,
+          fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+        ),
       ),
     );
   }
