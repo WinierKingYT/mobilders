@@ -191,5 +191,58 @@ void main() {
       final size3 = tester.getSize(find.byKey(dockKey));
       expect(size3.height, 310.0);
     });
+
+    testWidgets('Samsung One UI navigation bar isolation safely expands dock container and applies bottom padding', (tester) async {
+      const samsungNavBarHeight = 28.0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(
+              viewPadding: EdgeInsets.only(bottom: samsungNavBarHeight),
+              padding: EdgeInsets.only(bottom: samsungNavBarHeight),
+            ),
+            child: Scaffold(
+              body: ZeroLayoutShiftDock(
+                currentMode: InputMode.touchpad,
+                onModeChanged: (_) {},
+                child: Container(key: const ValueKey('content'), height: 260),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final dockContainer = tester.widget<Container>(find.byKey(const Key('zero_layout_shift_dock_container')));
+      // Total height = base (310.0) + systemNavBarHeight (28.0) = 338.0
+      expect(dockContainer.constraints?.maxHeight, 338.0);
+      expect(dockContainer.padding, const EdgeInsets.only(bottom: samsungNavBarHeight));
+    });
+
+    testWidgets('Soft keyboard spring damping handles IME insets without layout shift jank', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(
+              viewInsets: EdgeInsets.only(bottom: 280.0),
+            ),
+            child: Scaffold(
+              body: ZeroLayoutShiftDock(
+                currentMode: InputMode.virtualKeyboard,
+                onModeChanged: (_) {},
+                child: Container(key: const ValueKey('content'), height: 260),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AnimatedPadding), findsOneWidget);
+      final dockContainer = tester.widget<Container>(find.byKey(const Key('zero_layout_shift_dock_container')));
+      expect(dockContainer.constraints?.maxHeight, 310.0);
+    });
   });
 }
+

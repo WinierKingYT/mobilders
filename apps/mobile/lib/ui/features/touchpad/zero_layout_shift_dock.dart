@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../../core/services/haptic_feedback_service.dart';
@@ -23,25 +24,43 @@ class ZeroLayoutShiftDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double safeDockHeight = dockHeight.isFinite && !dockHeight.isNaN && dockHeight >= 100.0
+    final mediaQuery = MediaQuery.of(context);
+    // Samsung One UI Navigation Bar Isolation:
+    // Distinguish between persistent navigation gesture bar (viewPadding.bottom)
+    // and IME virtual keyboard insets (viewInsets.bottom).
+    final double systemNavBarHeight = math.max(
+      mediaQuery.viewPadding.bottom,
+      mediaQuery.padding.bottom,
+    );
+    final double imeKeyboardInset = mediaQuery.viewInsets.bottom;
+
+    final double baseDockHeight = dockHeight.isFinite && !dockHeight.isNaN && dockHeight >= 100.0
         ? dockHeight
         : 310.0;
-    return Container(
-      height: safeDockHeight,
-      decoration: BoxDecoration(
-        color: AppColors.bgSurface,
-        border: Border(
-          top: BorderSide(
-            color: isZenModeActive
-                ? const Color(0xFF38BDF8).withValues(alpha: 0.4)
-                : AppColors.bgCard,
-            width: 1.5,
+    final double totalSafeHeight = baseDockHeight + systemNavBarHeight;
+
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      padding: EdgeInsets.only(bottom: imeKeyboardInset > 0 ? 0.0 : 0.0),
+      child: Container(
+        key: const Key('zero_layout_shift_dock_container'),
+        height: totalSafeHeight,
+        padding: EdgeInsets.only(bottom: systemNavBarHeight),
+        decoration: BoxDecoration(
+          color: AppColors.bgSurface,
+          border: Border(
+            top: BorderSide(
+              color: isZenModeActive
+                  ? const Color(0xFF38BDF8).withValues(alpha: 0.4)
+                  : AppColors.bgCard,
+              width: 1.5,
+            ),
           ),
         ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.max,
-        children: [
+        child: Column(
+          mainAxisSize: MainAxisSize.max,
+          children: [
           // Tactical Mode Switcher Ribbon (Zero Layout Shift header)
           _buildModeRibbon(context),
           const Divider(height: 1, color: AppColors.bgCard),
@@ -71,8 +90,9 @@ class ZeroLayoutShiftDock extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildModeRibbon(BuildContext context) {
     return Container(
