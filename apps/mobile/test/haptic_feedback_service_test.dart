@@ -9,6 +9,7 @@ void main() {
   setUp(() {
     hapticService = HapticFeedbackService();
     hapticService.isEnabled = true;
+    hapticService.throttleIntervalMs = 0;
     hapticService.clearHistory();
     hapticService.testListener = null;
   });
@@ -70,6 +71,51 @@ void main() {
 
       expect(hapticService.triggeredHistory.length, HapticFeedbackService.maxHistoryLength);
       expect(hapticService.triggeredHistory.length, 100);
+    });
+  });
+
+  group('Haptic Throttling & Hardware Protection Tests', () {
+    setUp(() {
+      hapticService.throttleIntervalMs = 40;
+      hapticService.clearHistory();
+    });
+
+    test('Rapid successive pulses within 40ms are throttled to protect hardware', () async {
+      for (int i = 0; i < 10; i++) {
+        await hapticService.keyPress();
+      }
+
+      expect(hapticService.triggeredHistory.length, 1);
+      expect(hapticService.throttledCount, 9);
+    });
+
+    test('Pulses spaced apart by >= 40ms are all successfully triggered', () async {
+      await hapticService.keyPress();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await hapticService.keyPress();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await hapticService.keyPress();
+
+      expect(hapticService.triggeredHistory.length, 3);
+      expect(hapticService.throttledCount, 0);
+    });
+
+    test('Critical error feedback bypasses throttling window', () async {
+      await hapticService.keyPress();
+      await hapticService.stepError(force: true);
+
+      expect(hapticService.triggeredHistory.length, 2);
+      expect(hapticService.triggeredHistory.last, HapticType.heavyImpact);
+    });
+
+    test('Setting throttleIntervalMs to 0 disables throttling', () async {
+      hapticService.throttleIntervalMs = 0;
+      for (int i = 0; i < 5; i++) {
+        await hapticService.keyPress();
+      }
+
+      expect(hapticService.triggeredHistory.length, 5);
+      expect(hapticService.throttledCount, 0);
     });
   });
 }
