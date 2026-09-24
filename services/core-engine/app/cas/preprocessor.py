@@ -46,8 +46,9 @@ class ImplicitMultiplicationPreprocessor:
         s = re.sub(r"\b([XYZ])\b", lambda m: m.group(1).lower(), s)
 
         # 3. LaTeX kesirleri: \frac{a}{b} -> ((a)/(b))
+        MAX_FRACTION_DEPTH = 12
         frac_iter = 0
-        while r"\frac" in s and frac_iter < 20:
+        while r"\frac" in s and frac_iter < MAX_FRACTION_DEPTH:
             frac_iter += 1
             new_s = re.sub(r"\\frac\{([^{}]+)\}\{([^{}]+)\}", r"((\1)/(\2))", s)
             if new_s == s:
@@ -55,6 +56,10 @@ class ImplicitMultiplicationPreprocessor:
                 if new_s == s:
                     break
             s = new_s
+
+        if r"\frac" in s:
+            # Fraction recursion depth exceeded: strip to prevent stack overflow/hang
+            s = re.sub(r"\\frac", "", s)
 
         # 4. LaTeX karekök: \sqrt{a} -> sqrt(a)
         sqrt_iter = 0
@@ -90,12 +95,13 @@ class ImplicitMultiplicationPreprocessor:
         if not s:
             return ""
 
-        # 2. 'x2' veya 'b2' gibi doğrudan yapışık üs yazımları: x2 -> x**2 (önünde işlem veya parantez olan değişkenler)
-        # Sadece değişkenin hemen ardından gelen 2 için (örn: x2 -> x**2, y2 -> y**2)
+        # 1. Kesir sonrası değişkenlerin deterministik parantezlenmesi: 1/2x -> ((1)/(2))*x
+        s = re.sub(r"(\d+)\s*/\s*(\d+)\s*([a-zA-Z])", r"((\1)/(\2))*\3", s)
+
+        # 2. 'x2' veya 'b2' gibi doğrudan yapışık üs yazımları: x2 -> x**2
         s = re.sub(r"\b([a-zA-Z])2\b", r"\1**2", s)
 
         # 3. Katsayı ile değişken arasına çarpma ekle: 2x -> 2*x, 12x -> 12*x, 3.5x -> 3.5*x
-        # Önünde veya arkasında '*' veya '**' olmamasına dikkat et
         s = re.sub(r"(\d+)([a-zA-Z])", r"\1*\2", s)
 
         # 4. Parantez çarpımları:
@@ -105,18 +111,18 @@ class ImplicitMultiplicationPreprocessor:
         # 5. Sayı veya değişken ile açılan parantez: 3(x+1) -> 3*(x+1), x(x+6) -> x*(x+6)
         # Ancak bilinen fonksiyon çağrılarını (sin, cos, tan, log, ln, sqrt, Poly vb.) koru
         known_functions = {
-            "sqrt", "Abs", "degree", "rem", "quo", "Poly",
+            "sqrt", "abs", "degree", "rem", "quo", "poly",
             "sin", "cos", "tan", "cot", "sec", "csc",
             "asin", "acos", "atan",
             "log", "ln", "exp",
-            "diff", "limit", "Derivative", "Limit",
-            "integrate", "Integral"
+            "diff", "limit", "derivative",
+            "integrate", "integral"
         }
 
         def _paren_mult(match):
             prefix = match.group(1)
             ws = match.group(2)
-            if prefix in known_functions:
+            if prefix.lower() in known_functions:
                 return f"{prefix}{ws}("
             return f"{prefix}*{ws}("
 
@@ -125,7 +131,19 @@ class ImplicitMultiplicationPreprocessor:
         # 6. Kapanan parantez ile sayı veya değişken: (x+1)3 -> (x+1)*3, (x+1)x -> (x+1)*x
         s = re.sub(r"\)(\s*)(\d|[a-zA-Z])", r")*\1\2", s)
 
-        # 7. Bilinen kuadratik terim kalıpları: '4ac' -> '4*a*c'
+        # 7. Çoklu değişkenlerin örtük çarpımı: ab -> a*b, bc -> b*c, 2ab -> 2*a*b
+        single_letter_vars = set("xyzabcknmrpqdutvwXYZABCT")
+        def _expand_var_product(match):
+            token = match.group(0)
+            if token.lower() in known_functions or token in {"Delta", "pi", "oo", "inf"}:
+                return token
+            if len(token) >= 2 and all(c in single_letter_vars for c in token):
+                return "*".join(list(token))
+            return token
+
+        s = re.sub(r"\b[a-zA-Z]{2,4}\b", _expand_var_product, s)
+
+        # 8. Bilinen kuadratik terim kalıpları: '4ac' -> '4*a*c'
         s = re.sub(r"\b4ac\b", "4*a*c", s)
         s = re.sub(r"\b4\*a\*c\b", "4*a*c", s)
 

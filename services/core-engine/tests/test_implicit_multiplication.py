@@ -120,3 +120,38 @@ def test_implicit_multiplication_latex_fractions_and_roots():
     # \left(x + 1\right)\left(x + 2\right) = 0
     is_equiv, _, _ = cas.verify_equivalence(r"\left(x + 1\right)\left(x + 2\right) = 0", "x**2 + 3*x + 2 = 0")
     assert is_equiv is True
+
+
+def test_implicit_multiplication_fraction_variable_priority():
+    # 1/2x should be parsed deterministically as ((1)/(2))*x, distinct from 1/(2*x)
+    raw = "1/2x = 3"
+    processed = ImplicitMultiplicationPreprocessor.preprocess(raw)
+    assert "((1)/(2))*x" in processed
+
+    cas = SymbolicEquivalenceEngine()
+    is_equiv, _, _ = cas.verify_equivalence("1/2x = 3", "x/2 = 3")
+    assert is_equiv is True
+
+    # 1/(2x) is reciprocal
+    is_equiv_recip, _, _ = cas.verify_equivalence("1/(2x) = 3", "1/(2*x) = 3")
+    assert is_equiv_recip is True
+
+
+def test_implicit_multiplication_multivariable_product():
+    # ab -> a*b, 2ab -> 2*a*b, bc -> b*c
+    raw = "2ab + bc = 10"
+    processed = ImplicitMultiplicationPreprocessor.preprocess(raw)
+    assert "2*a*b + b*c = 10" in processed
+
+    cas = SymbolicEquivalenceEngine()
+    is_equiv, _, _ = cas.verify_equivalence("2ab = 6", "2*a*b = 6")
+    assert is_equiv is True
+
+
+def test_implicit_multiplication_fraction_depth_limit():
+    # Nested \frac beyond depth limit should not cause infinite loop or stack crash
+    nested = r"\frac{1}{" * 25 + "2" + "}" * 25
+    res = ImplicitMultiplicationPreprocessor.preprocess(nested)
+    assert isinstance(res, str)
+    assert r"\frac" not in res
+
