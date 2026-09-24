@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:personal_learning_engine/data/services/engine_api_service.dart';
+import 'package:personal_learning_engine/ui/features/session/views/euclidean_canvas.dart';
 import 'package:personal_learning_engine/ui/features/session/views/proof_canvas.dart';
 
 void main() {
@@ -225,6 +226,152 @@ void main() {
 
       expect(result['all_steps_valid'], true);
       expect(result['domino_chain'], hasLength(5));
+    });
+  });
+
+  group('EuclideanCanvas & Proof Logic Sequence Tests (Stage 61)', () {
+    testWidgets('EuclideanCanvas magnetic snap-to-vertex engages within 24dp and ignores far touches', (tester) async {
+      EuclideanVertex? selectedVertex;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: SizedBox(
+                width: 400,
+                child: EuclideanCanvas(
+                  initialPreset: EuclideanShapePreset.isosceles,
+                  initialShowAuxiliary: true,
+                  onVertexSelected: (v) => selectedVertex = v,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      var gestureFinder = find.byKey(const Key('euclidean_gesture_detector'));
+      expect(gestureFinder, findsOneWidget);
+
+      var topLeft = tester.getTopLeft(gestureFinder);
+      var size = tester.getSize(gestureFinder);
+
+      // Top vertex A is at: (size.width / 2.0, size.height * 0.18)
+      final vertexAPos = Offset(size.width / 2.0, size.height * 0.18);
+
+      // 1. Touch 10dp away from Vertex A (<= 24dp): should snap!
+      final nearTouch = topLeft + vertexAPos + const Offset(8, 6); // dist = 10dp <= 24dp
+      await tester.tapAt(nearTouch);
+      await tester.pumpAndSettle();
+
+      expect(selectedVertex, isNotNull);
+      expect(selectedVertex!.id, equals('A'));
+      expect(find.byKey(const Key('snapped_vertex_badge')), findsOneWidget);
+      expect(find.textContaining("Manyetik Kenetlenme (24dp): A"), findsOneWidget);
+
+      // 2. Touch 100dp away from any vertex (> 24dp): should NOT snap
+      topLeft = tester.getTopLeft(gestureFinder);
+      final farTouch = topLeft + Offset(size.width * 0.1, size.height * 0.1);
+      await tester.tapAt(farTouch);
+      await tester.pumpAndSettle();
+
+      expect(selectedVertex, isNull);
+      expect(find.byKey(const Key('snapped_vertex_badge')), findsNothing);
+
+      // 3. Switch to Right Triangle and test 90° vertex snap
+      await tester.tap(find.byKey(const Key('preset_right')));
+      await tester.pumpAndSettle();
+
+      gestureFinder = find.byKey(const Key('euclidean_gesture_detector'));
+      topLeft = tester.getTopLeft(gestureFinder);
+      size = tester.getSize(gestureFinder);
+
+      // Vertex B is at (size.width * 0.22, size.height * 0.80)
+      final vertexBPos = Offset(size.width * 0.22, size.height * 0.80);
+      final nearVertexB = topLeft + vertexBPos + const Offset(12, 0); // 12dp <= 24dp
+      await tester.tapAt(nearVertexB);
+      await tester.pumpAndSettle();
+
+      expect(selectedVertex, isNotNull);
+      expect(selectedVertex!.id, equals('B'));
+      expect(find.textContaining("90° Dik Açı"), findsOneWidget);
+    });
+
+    testWidgets('ProofCanvas enforces strict premise-first sequence and rejects out-of-order conclusions', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ProofCanvas(
+                initialMode: ProofCanvasMode.theoremProof,
+                initialTheoremId: 'THM-IRR-SQRT2',
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 1. Attempt to apply deduction (Modus Tollens) before establishing hypothesis (¬P)
+      await tester.tap(find.byKey(const Key('dropdown_proof_rule')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text("Modus Tollens (Sonucu Yadsıma)").last);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const Key('input_proof_step')), 'q çifttir, o halde çelişki');
+      await tester.tap(find.byKey(const Key('btn_verify_proof_step')));
+      await tester.pumpAndSettle();
+
+      // Order violation rejected!
+      expect(find.byKey(const Key('box_step_feedback')), findsOneWidget);
+      expect(find.textContaining("Mantıksal Sıralama Hatası"), findsOneWidget);
+      expect(find.byKey(const Key('proof_step_chain')), findsNothing);
+
+      // 2. Now submit Step 1 correctly with Contradiction Assumption
+      await tester.tap(find.byKey(const Key('dropdown_proof_rule')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text("Çelişki İçin Ters Kabul (¬P)").last);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const Key('input_proof_step')), 'Varsayalım ki √2 = p/q rasyoneldir');
+      await tester.tap(find.byKey(const Key('btn_verify_proof_step')));
+      await tester.pumpAndSettle();
+
+      // Step 1 accepted!
+      expect(find.textContaining("1. adım mantıksal olarak geçerlidir"), findsOneWidget);
+      expect(find.byKey(const Key('proof_step_chain')), findsOneWidget);
+
+      // 3. Now attempt out-of-order jump (Induction base step on contradiction proof)
+      await tester.tap(find.byKey(const Key('dropdown_proof_rule')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text("Tümevarım Taban Adımı").last);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const Key('input_proof_step')), 'n=1 için taban');
+      await tester.tap(find.byKey(const Key('btn_verify_proof_step')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining("Mantıksal Sıralama Hatası"), findsOneWidget);
+
+      // 4. Submit Step 2 correctly with Modus Ponens (Algebraic deduction)
+      await tester.tap(find.byKey(const Key('dropdown_proof_rule')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text("Modus Ponens (Öncülü Olumlama)").last);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byKey(const Key('input_proof_step')), '2q² = p² olduğundan p çift sayıdır');
+      await tester.tap(find.byKey(const Key('btn_verify_proof_step')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining("2. adım mantıksal olarak geçerlidir"), findsOneWidget);
+      expect(find.textContaining("Doğrulanan İspat Adımları (2)"), findsOneWidget);
+
+      // 5. Test Reset Button clears step chain
+      await tester.tap(find.byKey(const Key('btn_reset_proof_steps')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('proof_step_chain')), findsNothing);
     });
   });
 }

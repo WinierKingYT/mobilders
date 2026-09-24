@@ -8,14 +8,43 @@ enum EuclideanShapePreset {
   circleTangent,
 }
 
+class EuclideanVertex {
+  final String id;
+  final String label;
+  final Offset position;
+  final String description;
+
+  const EuclideanVertex({
+    required this.id,
+    required this.label,
+    required this.position,
+    this.description = '',
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EuclideanVertex &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          label == other.label;
+
+  @override
+  int get hashCode => id.hashCode ^ label.hashCode;
+}
+
 class EuclideanCanvas extends StatefulWidget {
   final EuclideanShapePreset initialPreset;
   final bool initialShowAuxiliary;
+  final ValueChanged<EuclideanVertex?>? onVertexSelected;
+
+  static const double magneticSnapThreshold = 24.0; // 24dp snapping threshold
 
   const EuclideanCanvas({
     super.key,
     this.initialPreset = EuclideanShapePreset.isosceles,
     this.initialShowAuxiliary = false,
+    this.onVertexSelected,
   });
 
   @override
@@ -25,6 +54,7 @@ class EuclideanCanvas extends StatefulWidget {
 class _EuclideanCanvasState extends State<EuclideanCanvas> {
   late EuclideanShapePreset _preset;
   late bool _showAuxiliary;
+  EuclideanVertex? _selectedVertex;
 
   @override
   void initState() {
@@ -38,10 +68,103 @@ class _EuclideanCanvasState extends State<EuclideanCanvas> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialPreset != widget.initialPreset) {
       _preset = widget.initialPreset;
+      _selectedVertex = null;
     }
     if (oldWidget.initialShowAuxiliary != widget.initialShowAuxiliary) {
       _showAuxiliary = widget.initialShowAuxiliary;
     }
+  }
+
+  List<EuclideanVertex> _computeVertices(Size size) {
+    if (size.width <= 0 || size.height <= 0) return const [];
+    switch (_preset) {
+      case EuclideanShapePreset.isosceles:
+        final top = Offset(size.width / 2.0, size.height * 0.18);
+        final left = Offset(size.width * 0.18, size.height * 0.82);
+        final right = Offset(size.width * 0.82, size.height * 0.82);
+        final list = [
+          EuclideanVertex(id: 'A', label: 'A (Tepe)', position: top, description: 'İkizkenar Üçgen Tepe Köşesi'),
+          EuclideanVertex(id: 'B', label: 'B (Sol Taban)', position: left, description: 'Taban Sol Köşesi'),
+          EuclideanVertex(id: 'C', label: 'C (Sağ Taban)', position: right, description: 'Taban Sağ Köşesi'),
+        ];
+        if (_showAuxiliary) {
+          list.add(EuclideanVertex(
+            id: 'H',
+            label: 'H (Dikme Ayağı)',
+            position: Offset((left.dx + right.dx) / 2.0, left.dy),
+            description: 'Yükseklik & Kenarortay Değme Noktası',
+          ));
+        }
+        return list;
+
+      case EuclideanShapePreset.rightTriangle:
+        final vertexA = Offset(size.width * 0.22, size.height * 0.22);
+        final vertexB = Offset(size.width * 0.22, size.height * 0.80);
+        final vertexC = Offset(size.width * 0.82, size.height * 0.80);
+        final list = [
+          EuclideanVertex(id: 'A', label: 'A (Dikey Köşe)', position: vertexA, description: 'Dik Kenar Üst Noktası'),
+          EuclideanVertex(id: 'B', label: 'B (90° Dik Açı)', position: vertexB, description: '90° Dik Açı Köşesi'),
+          EuclideanVertex(id: 'C', label: 'C (Yatay Köşe)', position: vertexC, description: 'Hipotenüs Sağ Ucu'),
+        ];
+        if (_showAuxiliary) {
+          list.add(EuclideanVertex(
+            id: 'M',
+            label: 'M (Muhteşem Üçlü)',
+            position: Offset((vertexA.dx + vertexC.dx) / 2.0, (vertexA.dy + vertexC.dy) / 2.0),
+            description: 'Hipotenüs Orta Noktası',
+          ));
+        }
+        return list;
+
+      case EuclideanShapePreset.trapezoid:
+        final topLeft = Offset(size.width * 0.35, size.height * 0.25);
+        final topRight = Offset(size.width * 0.65, size.height * 0.25);
+        final bottomLeft = Offset(size.width * 0.15, size.height * 0.80);
+        final bottomRight = Offset(size.width * 0.85, size.height * 0.80);
+        final list = [
+          EuclideanVertex(id: 'A', label: 'A (Sol Üst)', position: topLeft),
+          EuclideanVertex(id: 'B', label: 'B (Sağ Üst)', position: topRight),
+          EuclideanVertex(id: 'C', label: 'C (Sağ Alt)', position: bottomRight),
+          EuclideanVertex(id: 'D', label: 'D (Sol Alt)', position: bottomLeft),
+        ];
+        if (_showAuxiliary) {
+          list.add(EuclideanVertex(
+            id: 'E',
+            label: 'E (Paralel Ayağı)',
+            position: Offset(topRight.dx - (topLeft.dx - bottomLeft.dx), bottomRight.dy),
+          ));
+        }
+        return list;
+
+      case EuclideanShapePreset.circleTangent:
+        final center = Offset(size.width * 0.45, size.height * 0.45);
+        const double radius = 70.0;
+        final tangentPoint = Offset(center.dx, center.dy + radius);
+        final list = [
+          EuclideanVertex(id: 'O', label: 'O (Merkez)', position: center, description: 'Çember Merkez Noktası'),
+          EuclideanVertex(id: 'T', label: 'T (Teğet Değme)', position: tangentPoint, description: 'Teğet Değme Noktası'),
+        ];
+        return list;
+    }
+  }
+
+  void _handleTouch(Offset localPos, Size size) {
+    final vertices = _computeVertices(size);
+    EuclideanVertex? nearest;
+    double minDistance = double.infinity;
+
+    for (final v in vertices) {
+      final dist = (v.position - localPos).distance;
+      if (dist <= EuclideanCanvas.magneticSnapThreshold && dist < minDistance) {
+        minDistance = dist;
+        nearest = v;
+      }
+    }
+
+    setState(() {
+      _selectedVertex = nearest;
+    });
+    widget.onVertexSelected?.call(nearest);
   }
 
   String get _presetTitle {
@@ -136,14 +259,18 @@ class _EuclideanCanvasState extends State<EuclideanCanvas> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    _presetTitle,
-                    style: const TextStyle(
-                      color: Colors.cyanAccent,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                  Expanded(
+                    child: Text(
+                      _presetTitle,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.cyanAccent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   OutlinedButton.icon(
                     key: const Key("btn_toggle_auxiliary"),
                     icon: Icon(
@@ -180,6 +307,37 @@ class _EuclideanCanvasState extends State<EuclideanCanvas> {
           ),
         ),
 
+        // Snapped Vertex Indicator Badge
+        if (_selectedVertex != null)
+          Container(
+            key: const Key('snapped_vertex_badge'),
+            margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+            padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6.0),
+            decoration: BoxDecoration(
+              color: Colors.cyanAccent.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8.0),
+              border: Border.all(color: Colors.cyanAccent),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.gps_fixed, size: 14, color: Colors.cyanAccent),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    "Manyetik Kenetlenme (24dp): ${_selectedVertex!.label}",
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.cyanAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
         // Custom Paint Canvas
         Container(
           height: 260,
@@ -191,14 +349,29 @@ class _EuclideanCanvasState extends State<EuclideanCanvas> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12.0),
-            child: RepaintBoundary(
-              child: CustomPaint(
-                key: const Key("euclidean_canvas"),
-                painter: _EuclideanPainter(
-                  preset: _preset,
-                  showAuxiliary: _showAuxiliary,
-                ),
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final size = Size(constraints.maxWidth, 260.0);
+                final vertices = _computeVertices(size);
+                return GestureDetector(
+                  key: const Key("euclidean_gesture_detector"),
+                  behavior: HitTestBehavior.opaque,
+                  onTapDown: (details) => _handleTouch(details.localPosition, size),
+                  onPanUpdate: (details) => _handleTouch(details.localPosition, size),
+                  child: RepaintBoundary(
+                    child: CustomPaint(
+                      key: const Key("euclidean_canvas"),
+                      size: size,
+                      painter: _EuclideanPainter(
+                        preset: _preset,
+                        showAuxiliary: _showAuxiliary,
+                        selectedVertex: _selectedVertex,
+                        vertices: vertices,
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ),
@@ -210,10 +383,14 @@ class _EuclideanCanvasState extends State<EuclideanCanvas> {
 class _EuclideanPainter extends CustomPainter {
   final EuclideanShapePreset preset;
   final bool showAuxiliary;
+  final EuclideanVertex? selectedVertex;
+  final List<EuclideanVertex> vertices;
 
   _EuclideanPainter({
     required this.preset,
     required this.showAuxiliary,
+    this.selectedVertex,
+    this.vertices = const [],
   });
 
   @override
@@ -232,6 +409,29 @@ class _EuclideanPainter extends CustomPainter {
       case EuclideanShapePreset.circleTangent:
         _paintCircleTangent(canvas, size);
         break;
+    }
+
+    // Draw vertex guide dots
+    final dotPaint = Paint()
+      ..color = Colors.cyanAccent.withValues(alpha: 0.6)
+      ..style = PaintingStyle.fill;
+    for (final v in vertices) {
+      canvas.drawCircle(v.position, 3.5, dotPaint);
+    }
+
+    // Draw magnetic snap halo around selected vertex
+    if (selectedVertex != null) {
+      final haloPaint = Paint()
+        ..color = Colors.cyanAccent.withValues(alpha: 0.25)
+        ..style = PaintingStyle.fill;
+      final ringPaint = Paint()
+        ..color = Colors.cyanAccent
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5;
+
+      canvas.drawCircle(selectedVertex!.position, 16.0, haloPaint);
+      canvas.drawCircle(selectedVertex!.position, 16.0, ringPaint);
+      canvas.drawCircle(selectedVertex!.position, 4.0, Paint()..color = Colors.white);
     }
   }
 
@@ -434,6 +634,8 @@ class _EuclideanPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _EuclideanPainter oldDelegate) {
-    return oldDelegate.preset != preset || oldDelegate.showAuxiliary != showAuxiliary;
+    return oldDelegate.preset != preset ||
+        oldDelegate.showAuxiliary != showAuxiliary ||
+        oldDelegate.selectedVertex != selectedVertex;
   }
 }

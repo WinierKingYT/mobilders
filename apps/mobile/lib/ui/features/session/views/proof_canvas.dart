@@ -31,6 +31,7 @@ class _ProofCanvasState extends State<ProofCanvas> {
   String _selectedRule = 'CONTRADICTION_ASSUMPTION';
   String? _stepFeedback;
   bool _isStepValid = true;
+  final List<Map<String, dynamic>> _completedSteps = [];
 
   final Map<String, String> _theoremTitles = {
     'THM-IRR-SQRT2': '√2 Sayısının İrrasyonelliği (Çelişki)',
@@ -305,6 +306,7 @@ class _ProofCanvasState extends State<ProofCanvas> {
             if (val != null) {
               setState(() {
                 _selectedTheoremId = val;
+                _completedSteps.clear();
                 _stepFeedback = null;
               });
             }
@@ -360,18 +362,7 @@ class _ProofCanvasState extends State<ProofCanvas> {
                   key: const Key('btn_verify_proof_step'),
                   icon: const Icon(Icons.check_circle_outline),
                   label: const Text("Adımı Doğrula"),
-                  onPressed: () {
-                    final text = _stepInputController.text.toLowerCase();
-                    setState(() {
-                      if (text.contains("taban_adimi_gerekmez") || text.contains("0=>0=0") || text.contains("tersi_dengidir")) {
-                        _isStepValid = false;
-                        _stepFeedback = "Mantıksal Yanılgı Teşhis Edildi: Çıkarım kurallarını kontrol edin.";
-                      } else {
-                        _isStepValid = true;
-                        _stepFeedback = "Tebrikler! 1. adım mantıksal olarak geçerlidir.";
-                      }
-                    });
-                  },
+                  onPressed: _verifyTheoremProofStep,
                 ),
               ],
             ),
@@ -396,8 +387,120 @@ class _ProofCanvasState extends State<ProofCanvas> {
             ),
           ),
         ],
+        if (_completedSteps.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+            key: const Key('proof_step_chain'),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Doğrulanan İspat Adımları (${_completedSteps.length})",
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green),
+                    ),
+                    TextButton.icon(
+                      key: const Key('btn_reset_proof_steps'),
+                      icon: const Icon(Icons.refresh, size: 14),
+                      label: const Text("Sıfırla", style: TextStyle(fontSize: 11)),
+                      onPressed: () {
+                        setState(() {
+                          _completedSteps.clear();
+                          _stepFeedback = null;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                ..._completedSteps.map((step) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle, size: 15, color: Colors.green),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "${step['stepNumber']}. ${step['statement']} [${step['rule']}]",
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
+              ],
+            ),
+          ),
+        ],
       ],
     );
+  }
+
+  void _verifyTheoremProofStep() {
+    final text = _stepInputController.text.trim();
+    final lower = text.toLowerCase();
+
+    // 1. Fallacy check
+    if (lower.contains("taban_adimi_gerekmez") ||
+        lower.contains("0=>0=0") ||
+        lower.contains("tersi_dengidir")) {
+      setState(() {
+        _isStepValid = false;
+        _stepFeedback = "Mantıksal Yanılgı Teşhis Edildi: Çıkarım kurallarını kontrol edin.";
+      });
+      return;
+    }
+
+    // 2. Sequential Logic Check (Adım Sıralama Denetimi)
+    if (_selectedTheoremId == 'THM-IRR-SQRT2') {
+      // Step 1: Must be Contradiction Assumption
+      if (_completedSteps.isEmpty) {
+        if (_selectedRule != 'CONTRADICTION_ASSUMPTION' && !lower.contains("varsay") && !lower.contains("kabul")) {
+          setState(() {
+            _isStepValid = false;
+            _stepFeedback = "Mantıksal Sıralama Hatası: Çelişki ispatına başlamadan önce hipotez / ters kabul (¬P) adımı kurulmalıdır.";
+          });
+          return;
+        }
+      } else if (_completedSteps.length == 1) {
+        // Step 2: Must be deduction / algebraic equality
+        if (_selectedRule == 'INDUCTION_BASE' || _selectedRule == 'CONTRAPOSITIVE_CONVERSION') {
+          setState(() {
+            _isStepValid = false;
+            _stepFeedback = "Mantıksal Sıralama Hatası: İkinci adımda cebirsel çıkarım veya Modus Ponens uygulanmalıdır.";
+          });
+          return;
+        }
+      }
+    } else if (_selectedTheoremId == 'THM-GAUSS-SUM' || _selectedTheoremId == 'THM-EXP-INEQ') {
+      // Induction: Step 1 must be base step
+      if (_completedSteps.isEmpty && _selectedRule != 'INDUCTION_BASE' && !lower.contains("n=1") && !lower.contains("taban")) {
+        setState(() {
+          _isStepValid = false;
+          _stepFeedback = "Mantıksal Sıralama Hatası: Tümevarımda taban adımı (n=1) doğrulanmadan genel iddia kabul edilemez.";
+        });
+        return;
+      }
+    }
+
+    setState(() {
+      _isStepValid = true;
+      final stepNum = _completedSteps.length + 1;
+      _completedSteps.add({
+        'stepNumber': stepNum,
+        'statement': text.isNotEmpty ? text : "Adım $stepNum",
+        'rule': _selectedRule,
+      });
+      _stepFeedback = "Tebrikler! $stepNum. adım mantıksal olarak geçerlidir.";
+    });
   }
 
   // =========================================================================
