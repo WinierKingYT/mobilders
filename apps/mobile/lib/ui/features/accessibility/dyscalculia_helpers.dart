@@ -176,11 +176,108 @@ class ColorCodedAlgebraicExpression extends StatelessWidget {
               color: badgeColor,
               fontSize: 18,
               fontWeight: FontWeight.bold,
+              letterSpacing: 1.2,
               fontFamily: 'monospace',
             ),
           ),
         );
       }).toList(),
+    );
+  }
+}
+
+/// Place-value color constants engineered specifically for dyscalculic learners
+/// to reduce perceptual crowding and visual grouping fatigue.
+class DyscalculiaPlaceValueColors {
+  static const Color thousands = Color(0xFFA855F7); // Purple (Binler)
+  static const Color hundreds = Color(0xFF38BDF8);  // Cyan/Sky Blue (Yüzler)
+  static const Color tens = Color(0xFFF59E0B);      // Amber/Turuncu (Onlar)
+  static const Color units = Color(0xFF10B981);     // Emerald/Yeşil (Birler)
+  static const Color decimal = Color(0xFFEC4899);   // Pink (Ondalık)
+
+  /// Returns distinct color according to digit index from right (0-indexed: 0=units, 1=tens, 2=hundreds, 3=thousands)
+  static Color getColorForDigit(int digitIndexFromRight) {
+    switch (digitIndexFromRight % 4) {
+      case 0:
+        return units;
+      case 1:
+        return tens;
+      case 2:
+        return hundreds;
+      case 3:
+        return thousands;
+      default:
+        return units;
+    }
+  }
+}
+
+/// Dyscalculia Number Formatter & Display Widget
+/// Applies distinct place-value colors to each digit and enforces letter-spacing: 1.2
+/// to eliminate digit inversion, crowding, and dyslexic number swapping.
+class DyscalculiaNumberView extends StatelessWidget {
+  final String numberString;
+  final double fontSize;
+  final bool enablePlaceValueColoring;
+
+  const DyscalculiaNumberView({
+    super.key,
+    required this.numberString,
+    this.fontSize = 22.0,
+    this.enablePlaceValueColoring = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enablePlaceValueColoring) {
+      return Text(
+        numberString,
+        style: TextStyle(
+          fontSize: fontSize,
+          letterSpacing: 1.2,
+          fontFamily: 'monospace',
+          fontWeight: FontWeight.bold,
+          color: const Color(0xFFF8FAFC),
+        ),
+      );
+    }
+
+    final chars = numberString.split('');
+    final digitsOnly = chars.where((c) => RegExp(r'[0-9]').hasMatch(c)).toList();
+    int digitIdx = digitsOnly.length - 1;
+
+    final spans = <TextSpan>[];
+    for (int i = 0; i < chars.length; i++) {
+      final ch = chars[i];
+      if (RegExp(r'[0-9]').hasMatch(ch)) {
+        final color = DyscalculiaPlaceValueColors.getColorForDigit(digitIdx);
+        spans.add(TextSpan(
+          text: ch,
+          style: TextStyle(
+            color: color,
+            fontSize: fontSize,
+            letterSpacing: 1.2,
+            fontFamily: 'monospace',
+            fontWeight: FontWeight.bold,
+          ),
+        ));
+        digitIdx--;
+      } else {
+        spans.add(TextSpan(
+          text: ch,
+          style: TextStyle(
+            color: const Color(0xFF94A3B8),
+            fontSize: fontSize,
+            letterSpacing: 1.2,
+            fontFamily: 'monospace',
+            fontWeight: FontWeight.bold,
+          ),
+        ));
+      }
+    }
+
+    return RichText(
+      text: TextSpan(children: spans),
     );
   }
 }
