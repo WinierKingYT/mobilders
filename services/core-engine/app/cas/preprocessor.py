@@ -21,6 +21,11 @@ class ImplicitMultiplicationPreprocessor:
         # DoS guard: limit text length to 1000 chars
         s = text.strip()[:1000]
 
+        # 0. Zero-width and invisible character stripping (\u200B, \u00A0, \u200C, \u200D, \uFEFF, \u2060)
+        for ch in ('\u200B', '\u200C', '\u200D', '\uFEFF', '\u2060'):
+            s = s.replace(ch, "")
+        s = s.replace('\u00A0', " ")
+
         # 1. Unicode operatör ve karakter normalizasyonu
         s = s.replace("−", "-").replace("–", "-").replace("—", "-")
         s = s.replace("×", "*").replace("·", "*").replace("•", "*")

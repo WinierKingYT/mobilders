@@ -161,6 +161,33 @@ void main() {
       );
       expect(blockedDot, '2.5');
     });
+
+    test('Zero-width and invisible whitespace characters are stripped cleanly', () {
+      const invisibleMess = 'x\u200B +\u00A0 \u200C3\u200D =\uFEFF 5';
+      final cleaned = InstantMathSanitizer.stripInvisibleChars(invisibleMess);
+      expect(cleaned, 'x +  3 = 5');
+
+      final standardized = InstantMathSanitizer.standardizeMathExpression('2\u200B\\cdot x\uFEFF + 1');
+      expect(standardized, '2* x + 1');
+
+      final report = InstantMathSanitizer.validateSanity('x\u200B +\u00A0 3\uFEFF = 5');
+      expect(report.isValid, isTrue);
+    });
+
+    test('LaTeX cdot and times tokens are standardized to multiplication operator', () {
+      final withCdot = InstantMathSanitizer.sanitizeInput(
+        currentText: '2x',
+        incomingToken: r'\cdot',
+      );
+      expect(withCdot, '2x * ');
+
+      final withTimes = InstantMathSanitizer.sanitizeInput(
+        currentText: '4',
+        incomingToken: r'\times',
+      );
+      expect(withTimes, '4 * ');
+    });
   });
 }
+
 

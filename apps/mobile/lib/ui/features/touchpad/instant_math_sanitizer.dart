@@ -55,6 +55,37 @@ class InstantMathSanitizer {
 
   static const Color errorColor = Color(0xFFEF4444); // Error Red
 
+  static const List<String> invisibleChars = [
+    '\u200B', // zero-width space
+    '\u00A0', // non-breaking space
+    '\u200C', // zero-width non-joiner
+    '\u200D', // zero-width joiner
+    '\uFEFF', // BOM / zero-width no-break space
+    '\u2060', // word joiner
+  ];
+
+  /// Strips zero-width and invisible whitespace characters.
+  static String stripInvisibleChars(String text) {
+    var cleaned = text;
+    for (final char in invisibleChars) {
+      if (char == '\u00A0') {
+        cleaned = cleaned.replaceAll(char, ' ');
+      } else {
+        cleaned = cleaned.replaceAll(char, '');
+      }
+    }
+    return cleaned;
+  }
+
+  /// Standardizes invisible characters and LaTeX multiplication/division operators
+  static String standardizeMathExpression(String text) {
+    var cleaned = stripInvisibleChars(text);
+    cleaned = cleaned.replaceAll(r'\cdot', '*');
+    cleaned = cleaned.replaceAll(r'\times', '*');
+    cleaned = cleaned.replaceAll(r'\div', '/');
+    return cleaned;
+  }
+
   static bool isOpeningBracket(String ch) => ch == '(' || ch == '[' || ch == '{';
   static bool isClosingBracket(String ch) => ch == ')' || ch == ']' || ch == '}';
   static bool isBracket(String ch) => isOpeningBracket(ch) || isClosingBracket(ch);
@@ -182,27 +213,37 @@ class InstantMathSanitizer {
     required String currentText,
     required String incomingToken,
   }) {
-    final trimmedCurrent = currentText.trimRight();
-    final trimmedIncoming = incomingToken.trim();
+    final sanitizedCurrent = stripInvisibleChars(currentText);
+    var sanitizedIncoming = stripInvisibleChars(incomingToken);
 
-    if (trimmedIncoming.isEmpty) return currentText + incomingToken;
+    // Standardize LaTeX multiplication / division tokens
+    if (sanitizedIncoming == r'\cdot' || sanitizedIncoming == r'\times') {
+      sanitizedIncoming = '*';
+    } else if (sanitizedIncoming == r'\div') {
+      sanitizedIncoming = '/';
+    }
+
+    final trimmedCurrent = sanitizedCurrent.trimRight();
+    final trimmedIncoming = sanitizedIncoming.trim();
+
+    if (trimmedIncoming.isEmpty) return sanitizedCurrent + sanitizedIncoming;
 
     // Handle duplicate decimal point or comma
     if (trimmedIncoming == '.' || trimmedIncoming == ',') {
       // Find current active number token from the end
-      int i = currentText.length - 1;
+      int i = sanitizedCurrent.length - 1;
       while (i >= 0) {
-        final code = currentText.codeUnitAt(i);
+        final code = sanitizedCurrent.codeUnitAt(i);
         final isDigit = code >= 48 && code <= 57; // '0'..'9'
         final isDot = code == 46 || code == 44; // '.' or ','
         if (!isDigit && !isDot) break;
         if (isDot) {
           // Already has a decimal separator in this number literal! Block duplicate
-          return currentText;
+          return sanitizedCurrent;
         }
         i--;
       }
-      return '$currentText.';
+      return '$sanitizedCurrent.';
     }
 
     // Handle operator input (including Unicode operators)
@@ -223,8 +264,8 @@ class InstantMathSanitizer {
       }
 
       // Find last non-whitespace character in currentText
-      int opIndex = currentText.length - 1;
-      while (opIndex >= 0 && currentText[opIndex] == ' ') {
+      int opIndex = sanitizedCurrent.length - 1;
+      while (opIndex >= 0 && sanitizedCurrent[opIndex] == ' ') {
         opIndex--;
       }
 
@@ -232,7 +273,7 @@ class InstantMathSanitizer {
         return op == '-' ? '-' : '';
       }
 
-      String lastChar = currentText[opIndex];
+      String lastChar = sanitizedCurrent[opIndex];
       // Canonicalize lastChar for comparison
       if (lastChar == '−' || lastChar == '–' || lastChar == '—') {
         lastChar = '-';
@@ -244,35 +285,36 @@ class InstantMathSanitizer {
 
       // After opening bracket: only allow unary minus
       if (isOpeningBracket(lastChar)) {
-        return op == '-' ? '$currentText-' : currentText;
+        return op == '-' ? '$sanitizedCurrent-' : sanitizedCurrent;
       }
 
       // After an existing operator
       if (isOperatorChar(lastChar)) {
         // Special case: allow multiplication, division, or equals by negative number (e.g. * -)
         if (op == '-' && (lastChar == '*' || lastChar == '/' || lastChar == '=')) {
-          return currentText.endsWith(' ') ? '$currentText-' : '$currentText -';
+          return sanitizedCurrent.endsWith(' ') ? '$sanitizedCurrent-' : '$sanitizedCurrent -';
         }
 
         // Replace the previous operator cleanly (student changed mind)
         int prefixEnd = opIndex;
-        while (prefixEnd > 0 && currentText[prefixEnd - 1] == ' ') {
+        while (prefixEnd > 0 && sanitizedCurrent[prefixEnd - 1] == ' ') {
           prefixEnd--;
         }
-        final prefix = currentText.substring(0, prefixEnd);
+        final prefix = sanitizedCurrent.substring(0, prefixEnd);
         return prefix.isEmpty ? (op == '-' ? '-' : '') : '$prefix $op ';
       }
 
       // Normal operator insertion with clean spacing
-      return currentText.endsWith(' ') ? '$currentText$op ' : '$currentText $op ';
+      return sanitizedCurrent.endsWith(' ') ? '$sanitizedCurrent$op ' : '$sanitizedCurrent $op ';
     }
 
     // Default: append incoming token
-    return currentText + incomingToken;
+    return sanitizedCurrent + sanitizedIncoming;
   }
 
   /// Rapidly validates mathematical syntax sanity with execution benchmark
   static MathSanityReport validateSanity(String expression) {
+    final standardized = standardizeMathExpression(expression);
     final stopwatch = Stopwatch()..start();
 
     int unmatchedClosing = 0;
@@ -281,7 +323,7 @@ class InstantMathSanitizer {
     bool duplicateDecimals = false;
 
     // 1. Bracket scan
-    final bracketTokens = scanRainbowBrackets(expression);
+    final bracketTokens = scanRainbowBrackets(standardized);
     for (var token in bracketTokens) {
       if (token.isMismatched) unmatchedClosing++;
     }
@@ -297,7 +339,7 @@ class InstantMathSanitizer {
     unclosedOpening = depthTracker > 0 ? depthTracker : 0;
 
     // 2. Scan for consecutive operators & duplicate decimals
-    final cleaned = expression.replaceAll(' ', '');
+    final cleaned = standardized.replaceAll(' ', '');
     for (int i = 0; i < cleaned.length - 1; i++) {
       final c1 = cleaned[i];
       final c2 = cleaned[i + 1];
@@ -311,7 +353,7 @@ class InstantMathSanitizer {
     }
 
     // Check decimal points
-    final parts = expression.split(RegExp(r'[\s+\-*/^=(),]'));
+    final parts = standardized.split(RegExp(r'[\s+\-*/^=(),]'));
     for (var part in parts) {
       if (part.indexOf('.') != part.lastIndexOf('.')) {
         duplicateDecimals = true;
