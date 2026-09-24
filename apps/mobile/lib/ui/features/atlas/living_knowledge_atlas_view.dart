@@ -52,6 +52,7 @@ class _LivingKnowledgeAtlasViewState extends State<LivingKnowledgeAtlasView> {
   late List<AtlasNodeModel> _allNodes;
   String _selectedDomain = 'Tümü';
   String _searchQuery = '';
+  bool _isCanvasMode = false;
 
   final List<String> _domains = [
     'Tümü',
@@ -153,6 +154,39 @@ class _LivingKnowledgeAtlasViewState extends State<LivingKnowledgeAtlasView> {
           ),
         ),
 
+        // View Mode Toggle (Liste vs DAG Kanvası)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              SegmentedButton<bool>(
+                key: const Key('toggle_atlas_view_mode'),
+                segments: const [
+                  ButtonSegment<bool>(
+                    value: false,
+                    icon: Icon(Icons.list_alt, size: 16),
+                    label: Text('Liste', style: TextStyle(fontSize: 12)),
+                  ),
+                  ButtonSegment<bool>(
+                    value: true,
+                    icon: Icon(Icons.hub_outlined, size: 16),
+                    label: Text('DAG Kanvası', style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+                selected: {_isCanvasMode},
+                onSelectionChanged: (set) => setState(() => _isCanvasMode = set.first),
+                style: SegmentedButton.styleFrom(
+                  backgroundColor: Colors.white10,
+                  selectedBackgroundColor: AppColors.accentCorrect.withValues(alpha: 0.3),
+                  selectedForegroundColor: Colors.white,
+                  foregroundColor: Colors.white70,
+                ),
+              ),
+            ],
+          ),
+        ),
+
         // Domain Filter Chips
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -184,7 +218,7 @@ class _LivingKnowledgeAtlasViewState extends State<LivingKnowledgeAtlasView> {
           ),
         ),
 
-        // Nodes List
+        // Content Area: List or DAG Canvas with RepaintBoundary Isolation
         Expanded(
           child: _filteredNodes.isEmpty
               ? const Center(
@@ -193,17 +227,87 @@ class _LivingKnowledgeAtlasViewState extends State<LivingKnowledgeAtlasView> {
                     style: TextStyle(color: Colors.white54),
                   ),
                 )
-              : ListView.builder(
-                  key: const Key('atlas_nodes_list'),
-                  padding: const EdgeInsets.all(12.0),
-                  itemCount: _filteredNodes.length,
-                  itemBuilder: (context, index) {
-                    final node = _filteredNodes[index];
-                    return _buildNodeCard(node);
-                  },
-                ),
+              : (_isCanvasMode
+                  ? _buildDagCanvasView()
+                  : ListView.builder(
+                      key: const Key('atlas_nodes_list'),
+                      padding: const EdgeInsets.all(12.0),
+                      itemCount: _filteredNodes.length,
+                      itemBuilder: (context, index) {
+                        final node = _filteredNodes[index];
+                        // RepaintBoundary isolates each list item into its own GPU display list
+                        return RepaintBoundary(
+                          key: Key('repaint_node_${node.id}'),
+                          child: _buildNodeCard(node),
+                        );
+                      },
+                    )),
         ),
       ],
+    );
+  }
+
+  Widget _buildDagCanvasView() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return ClipRect(
+          child: InteractiveViewer(
+            key: const Key('atlas_dag_interactive_viewer'),
+            boundaryMargin: const EdgeInsets.all(300),
+            minScale: 0.4,
+            maxScale: 2.5,
+            child: SizedBox(
+              width: 1400,
+              height: 1000,
+              child: Stack(
+                children: [
+                  // Layer 1: Static Grid isolated via RepaintBoundary
+                  const Positioned.fill(
+                    child: RepaintBoundary(
+                      key: Key('atlas_grid_repaint_boundary'),
+                      child: CustomPaint(
+                        painter: KnowledgeDagGridPainter(),
+                      ),
+                    ),
+                  ),
+                  // Layer 2: Dynamic DAG Nodes & Prerequisite Edges isolated via RepaintBoundary
+                  Positioned.fill(
+                    child: RepaintBoundary(
+                      key: const Key('atlas_dag_repaint_boundary'),
+                      child: CustomPaint(
+                        painter: KnowledgeDagPainter(
+                          nodes: _filteredNodes,
+                          sanitizedZoomScale: 1.0,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Layer 3: Interactive Node Tap Targets with NaN-guarded coordinates
+                  ..._filteredNodes.map((node) {
+                    final pos = KnowledgeDagPainter.calculateNodePosition(
+                      node: node,
+                      allNodes: _filteredNodes,
+                    );
+                    return Positioned(
+                      left: pos.dx - 24,
+                      top: pos.dy - 24,
+                      child: GestureDetector(
+                        key: Key('dag_node_tap_${node.id}'),
+                        onTap: () => _showNodeDetailSheet(node),
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          color: Colors.transparent,
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -494,5 +598,167 @@ class _LivingKnowledgeAtlasViewState extends State<LivingKnowledgeAtlasView> {
         description: 'Zar atma, yazı-tura ve adil şans dağılımı.',
       ),
     ];
+  }
+}
+
+/// Static grid painter isolated via RepaintBoundary to eliminate GPU jank
+class KnowledgeDagGridPainter extends CustomPainter {
+  const KnowledgeDagGridPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.04)
+      ..strokeWidth = 1.0;
+
+    const gridSize = 40.0;
+    final w = KnowledgeDagPainter.sanitizeCoordinate(size.width, fallback: 1400);
+    final h = KnowledgeDagPainter.sanitizeCoordinate(size.height, fallback: 1000);
+
+    for (double x = 0; x <= w; x += gridSize) {
+      canvas.drawLine(Offset(x, 0), Offset(x, h), paint);
+    }
+    for (double y = 0; y <= h; y += gridSize) {
+      canvas.drawLine(Offset(0, y), Offset(w, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Dynamic DAG node and prerequisite graph painter isolated via RepaintBoundary
+class KnowledgeDagPainter extends CustomPainter {
+  final List<AtlasNodeModel> nodes;
+  final double sanitizedZoomScale;
+
+  KnowledgeDagPainter({
+    required this.nodes,
+    double sanitizedZoomScale = 1.0,
+  }) : sanitizedZoomScale = sanitizeCoordinate(sanitizedZoomScale, fallback: 1.0);
+
+  /// Strict NaN and Infinity guard protecting rendering engine during rapid pinch-zooms
+  static double sanitizeCoordinate(double val, {double fallback = 0.0}) {
+    if (val.isNaN || val.isInfinite) return fallback;
+    return val;
+  }
+
+  static Offset sanitizeOffset(Offset offset, {Offset fallback = Offset.zero}) {
+    if (offset.dx.isNaN || offset.dx.isInfinite || offset.dy.isNaN || offset.dy.isInfinite) {
+      return fallback;
+    }
+    return offset;
+  }
+
+  static Offset calculateNodePosition({
+    required AtlasNodeModel node,
+    required List<AtlasNodeModel> allNodes,
+  }) {
+    final sameLevelNodes = allNodes.where((n) => n.level == node.level).toList();
+    final indexInLevel = sameLevelNodes.indexOf(node);
+    final safeIndex = indexInLevel >= 0 ? indexInLevel : 0;
+
+    final x = sanitizeCoordinate(120.0 + (node.level * 220.0), fallback: 120.0);
+    final y = sanitizeCoordinate(90.0 + (safeIndex * 110.0), fallback: 90.0);
+    return Offset(x, y);
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (nodes.isEmpty) return;
+
+    final edgePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.22)
+      ..strokeWidth = 1.8
+      ..style = PaintingStyle.stroke;
+
+    final nodePosMap = <String, Offset>{};
+    for (final node in nodes) {
+      nodePosMap[node.id] = calculateNodePosition(node: node, allNodes: nodes);
+    }
+
+    // Draw DAG prerequisite curves
+    for (final node in nodes) {
+      final childPos = nodePosMap[node.id];
+      if (childPos == null) continue;
+
+      for (final prereqId in node.prerequisites) {
+        final parentPos = nodePosMap[prereqId];
+        if (parentPos != null) {
+          final p1 = sanitizeOffset(parentPos);
+          final p2 = sanitizeOffset(childPos);
+
+          final path = Path()
+            ..moveTo(p1.dx, p1.dy)
+            ..cubicTo(
+              sanitizeCoordinate(p1.dx + 80),
+              p1.dy,
+              sanitizeCoordinate(p2.dx - 80),
+              p2.dy,
+              p2.dx,
+              p2.dy,
+            );
+          canvas.drawPath(path, edgePaint);
+        }
+      }
+    }
+
+    // Draw DAG Nodes with status colors
+    for (final node in nodes) {
+      final pos = nodePosMap[node.id];
+      if (pos == null) continue;
+      final safePos = sanitizeOffset(pos);
+
+      Color statusColor;
+      switch (node.status) {
+        case 'MASTERED':
+          statusColor = AppColors.accentCorrect;
+          break;
+        case 'IN_ZPD':
+          statusColor = Colors.blueAccent;
+          break;
+        default:
+          statusColor = Colors.grey;
+      }
+
+      // Outer glow / halo
+      final bgPaint = Paint()
+        ..color = statusColor.withValues(alpha: 0.25)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(safePos, 22.0, bgPaint);
+
+      // Node border
+      final circlePaint = Paint()
+        ..color = statusColor
+        ..strokeWidth = 2.0
+        ..style = PaintingStyle.stroke;
+      canvas.drawCircle(safePos, 20.0, circlePaint);
+
+      // Node ID text
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: node.id.replaceFirst('N_ROOT_', 'R').replaceFirst('N', ''),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11.0,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      textPainter.paint(
+        canvas,
+        Offset(
+          sanitizeCoordinate(safePos.dx - (textPainter.width / 2)),
+          sanitizeCoordinate(safePos.dy - (textPainter.height / 2)),
+        ),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant KnowledgeDagPainter oldDelegate) {
+    return oldDelegate.nodes != nodes || oldDelegate.sanitizedZoomScale != sanitizedZoomScale;
   }
 }

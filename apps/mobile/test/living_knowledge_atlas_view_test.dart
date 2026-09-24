@@ -160,4 +160,56 @@ void main() {
       expect(zpd, ['N_ROOT_01', 'N_ROOT_02']);
     });
   });
+
+  group('LivingKnowledgeAtlasView DAG Canvas & RepaintBoundary Tests (Stage 35)', () {
+    testWidgets('Toggling to DAG Kanvası renders InteractiveViewer and RepaintBoundary layers',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: LivingKnowledgeAtlasView(),
+          ),
+        ),
+      );
+
+      // Verify list view is default with RepaintBoundary on items
+      expect(find.byKey(const Key('atlas_nodes_list')), findsOneWidget);
+      expect(find.byKey(const Key('repaint_node_N_ROOT_01')), findsOneWidget);
+
+      // Switch to DAG Canvas mode
+      await tester.tap(find.text('DAG Kanvası'));
+      await tester.pumpAndSettle();
+
+      // Verify DAG InteractiveViewer and isolated RepaintBoundary layers
+      expect(find.byKey(const Key('atlas_dag_interactive_viewer')), findsOneWidget);
+      expect(find.byKey(const Key('atlas_grid_repaint_boundary')), findsOneWidget);
+      expect(find.byKey(const Key('atlas_dag_repaint_boundary')), findsOneWidget);
+
+      // Tapping node in DAG canvas opens detail sheet
+      expect(find.byKey(const Key('dag_node_tap_N_ROOT_01')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('dag_node_tap_N_ROOT_01')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('btn_start_learning_path')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('btn_start_learning_path')));
+      await tester.pumpAndSettle();
+    });
+
+    test('KnowledgeDagPainter sanitizeCoordinate and sanitizeOffset guard against NaN and Infinity', () {
+      expect(KnowledgeDagPainter.sanitizeCoordinate(120.5), equals(120.5));
+      expect(KnowledgeDagPainter.sanitizeCoordinate(double.nan), equals(0.0));
+      expect(KnowledgeDagPainter.sanitizeCoordinate(double.nan, fallback: 50.0), equals(50.0));
+      expect(KnowledgeDagPainter.sanitizeCoordinate(double.infinity), equals(0.0));
+      expect(KnowledgeDagPainter.sanitizeCoordinate(double.negativeInfinity, fallback: -1.0), equals(-1.0));
+
+      const validOffset = Offset(100.0, 200.0);
+      expect(KnowledgeDagPainter.sanitizeOffset(validOffset), equals(validOffset));
+
+      const nanOffset = Offset(double.nan, 200.0);
+      expect(KnowledgeDagPainter.sanitizeOffset(nanOffset), equals(Offset.zero));
+
+      const infOffset = Offset(100.0, double.infinity);
+      expect(KnowledgeDagPainter.sanitizeOffset(infOffset, fallback: const Offset(10, 20)), equals(const Offset(10, 20)));
+    });
+  });
 }

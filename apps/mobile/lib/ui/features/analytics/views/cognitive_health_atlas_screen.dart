@@ -176,33 +176,35 @@ class _CognitiveHealthAtlasScreenState extends State<CognitiveHealthAtlasScreen>
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
           ),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.black26,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white12),
-            ),
-            child: hasData
-                ? Column(
-                    children: [
-                      _buildReliabilityBar('0.0 - 0.2 Güven Aralığı', 0.18, 0.15),
-                      _buildReliabilityBar('0.2 - 0.4 Güven Aralığı', 0.32, 0.30),
-                      _buildReliabilityBar('0.4 - 0.6 Güven Aralığı', 0.52, 0.50),
-                      _buildReliabilityBar('0.6 - 0.8 Güven Aralığı', 0.74, 0.70),
-                      _buildReliabilityBar('0.8 - 1.0 Güven Aralığı', 0.91, 0.88),
-                    ],
-                  )
-                : const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(
-                      child: Text(
-                        'Henüz güven aralığı verisi toplanmadı.\nSeanslarda güven düzeyinizi bildirdikçe güven-başarı kalibrasyon grafiği burada çizilecektir.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.4),
+          RepaintBoundary(
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: hasData
+                  ? Column(
+                      children: [
+                        _buildReliabilityBar('0.0 - 0.2 Güven Aralığı', 0.18, 0.15),
+                        _buildReliabilityBar('0.2 - 0.4 Güven Aralığı', 0.32, 0.30),
+                        _buildReliabilityBar('0.4 - 0.6 Güven Aralığı', 0.52, 0.50),
+                        _buildReliabilityBar('0.6 - 0.8 Güven Aralığı', 0.74, 0.70),
+                        _buildReliabilityBar('0.8 - 1.0 Güven Aralığı', 0.91, 0.88),
+                      ],
+                    )
+                  : const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Text(
+                          'Henüz güven aralığı verisi toplanmadı.\nSeanslarda güven düzeyinizi bildirdikçe güven-başarı kalibrasyon grafiği burada çizilecektir.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.4),
+                        ),
                       ),
                     ),
-                  ),
+            ),
           ),
         ],
       ),
@@ -258,61 +260,63 @@ class _CognitiveHealthAtlasScreenState extends State<CognitiveHealthAtlasScreen>
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
           ),
           const SizedBox(height: 12),
-          Container(
-            height: 180,
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.black26,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white12),
-            ),
-            child: Stack(
-              children: [
-                Center(
-                  child: Container(
-                    height: 1,
-                    color: Colors.white24,
+          RepaintBoundary(
+            child: Container(
+              height: 180,
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: Stack(
+                children: [
+                  Center(
+                    child: Container(
+                      height: 1,
+                      color: Colors.white24,
+                    ),
                   ),
-                ),
-                Center(
-                  child: Container(
-                    width: 1,
-                    color: Colors.white24,
+                  Center(
+                    child: Container(
+                      width: 1,
+                      color: Colors.white24,
+                    ),
                   ),
-                ),
-                const Positioned(
-                  top: 8,
-                  left: 8,
-                  child: Text('Yüksek Verimlilik (E > 0)', style: TextStyle(color: Colors.greenAccent, fontSize: 11)),
-                ),
-                const Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: Text('Aşırı Yüklenme (E < 0)', style: TextStyle(color: Colors.redAccent, fontSize: 11)),
-                ),
-                Positioned(
-                  top: hasData ? 35 : 75,
-                  right: hasData ? 90 : 70,
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 14,
-                        height: 14,
-                        decoration: BoxDecoration(
-                          color: hasData ? AppColors.accentCorrect : Colors.grey,
-                          shape: BoxShape.circle,
+                  const Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Text('Yüksek Verimlilik (E > 0)', style: TextStyle(color: Colors.greenAccent, fontSize: 11)),
+                  ),
+                  const Positioned(
+                    bottom: 8,
+                    right: 8,
+                    child: Text('Aşırı Yüklenme (E < 0)', style: TextStyle(color: Colors.redAccent, fontSize: 11)),
+                  ),
+                  Positioned(
+                    top: hasData ? 35 : 75,
+                    right: hasData ? 90 : 70,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: hasData ? AppColors.accentCorrect : Colors.grey,
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        hasData ? 'Öğrenci Konumu (E=$paasStr)' : 'Öğrenci Konumu (Seans Bekleniyor)',
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        Text(
+                          hasData ? 'Öğrenci Konumu (E=$paasStr)' : 'Öğrenci Konumu (Seans Bekleniyor)',
+                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -349,33 +353,35 @@ class _CognitiveHealthAtlasScreenState extends State<CognitiveHealthAtlasScreen>
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
           ),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.black26,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white12),
-            ),
-            child: hasData
-                ? Column(
-                    children: [
-                      _buildRetentionRow('1. Gün', 0.98),
-                      _buildRetentionRow('3. Gün', 0.95),
-                      _buildRetentionRow('7. Gün', 0.91),
-                      _buildRetentionRow('10. Gün', 0.89),
-                      _buildRetentionRow('14. Gün (Hedef Baraj)', 0.867),
-                    ],
-                  )
-                : const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(
-                      child: Text(
-                        'Henüz aralıklı tekrar seansı yapılmadı.\nFSRS-4.5 DSR modeli, ilk seansınızın ardından kişisel unutma eğrinizi ve hatırlanabilirlik projeksiyonunuzu burada oluşturacaktır.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.4),
+          RepaintBoundary(
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: hasData
+                  ? Column(
+                      children: [
+                        _buildRetentionRow('1. Gün', 0.98),
+                        _buildRetentionRow('3. Gün', 0.95),
+                        _buildRetentionRow('7. Gün', 0.91),
+                        _buildRetentionRow('10. Gün', 0.89),
+                        _buildRetentionRow('14. Gün (Hedef Baraj)', 0.867),
+                      ],
+                    )
+                  : const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Text(
+                          'Henüz aralıklı tekrar seansı yapılmadı.\nFSRS-4.5 DSR modeli, ilk seansınızın ardından kişisel unutma eğrinizi ve hatırlanabilirlik projeksiyonunuzu burada oluşturacaktır.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.4),
+                        ),
                       ),
                     ),
-                  ),
+            ),
           ),
         ],
       ),
@@ -409,15 +415,16 @@ class _CognitiveHealthAtlasScreenState extends State<CognitiveHealthAtlasScreen>
         final String? zpdNode = g['zpd'] as String?;
         final nodes = g['nodes'] as List<String>;
 
-        return Card(
-          color: Colors.black26,
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: isAllMastered ? AppColors.accentCorrect : Colors.white12,
+        return RepaintBoundary(
+          child: Card(
+            color: Colors.black26,
+            margin: const EdgeInsets.only(bottom: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: isAllMastered ? AppColors.accentCorrect : Colors.white12,
+              ),
             ),
-          ),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -467,10 +474,11 @@ class _CognitiveHealthAtlasScreenState extends State<CognitiveHealthAtlasScreen>
               ],
             ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   Widget _buildMetricCard({
     required String title,
