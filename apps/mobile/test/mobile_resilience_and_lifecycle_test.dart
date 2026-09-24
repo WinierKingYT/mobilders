@@ -143,4 +143,94 @@ void main() {
       expect(find.text('Sokratik Öğretmen'), findsNothing);
     });
   });
+
+  group('CircuitBreaker & Jitter Retry Network Resilience Tests', () {
+    test('CircuitBreaker transitions from closed to open after failureThreshold', () {
+      final breaker = CircuitBreaker(failureThreshold: 3, resetTimeout: const Duration(milliseconds: 100));
+      expect(breaker.state, CircuitState.closed);
+      expect(breaker.isOpen, false);
+
+      breaker.recordFailure();
+      expect(breaker.state, CircuitState.closed);
+      expect(breaker.isOpen, false);
+
+      breaker.recordFailure();
+      expect(breaker.isOpen, false);
+
+      breaker.recordFailure(); // Reached threshold of 3
+      expect(breaker.state, CircuitState.open);
+      expect(breaker.isOpen, true);
+    });
+
+    test('CircuitBreaker transitions to halfOpen after resetTimeout and resets on success', () async {
+      final breaker = CircuitBreaker(failureThreshold: 2, resetTimeout: const Duration(milliseconds: 50));
+      breaker.recordFailure();
+      breaker.recordFailure();
+      expect(breaker.isOpen, true);
+
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      // Checking isOpen after timeout transitions to halfOpen and returns false (allows probe)
+      expect(breaker.isOpen, false);
+      expect(breaker.state, CircuitState.halfOpen);
+
+      breaker.recordSuccess();
+      expect(breaker.state, CircuitState.closed);
+      expect(breaker.failureCount, 0);
+    });
+
+    test('executeWithRetry retries transient errors and succeeds within maxRetries', () async {
+      final api = EngineApiService();
+      int callCount = 0;
+
+      final result = await api.executeWithRetry(() async {
+        callCount++;
+        if (callCount < 2) {
+          throw const FormatException('Transient socket drop');
+        }
+        return 'success_payload';
+      }, maxRetries: 2, minJitterMs: 10, maxJitterMs: 20);
+
+      expect(result, 'success_payload');
+      expect(callCount, 2);
+    });
+
+    test('When CircuitBreaker is open, executeWithRetry fails fast without making network requests', () async {
+      final breaker = CircuitBreaker(failureThreshold: 1);
+      breaker.recordFailure(); // Open circuit immediately
+      expect(breaker.isOpen, true);
+
+      final api = EngineApiService(circuitBreaker: breaker);
+      int attemptsMade = 0;
+
+      expect(
+        () => api.executeWithRetry(() async {
+          attemptsMade++;
+          return 'ok';
+        }),
+        throwsA(isA<Exception>()),
+      );
+
+      // Failed fast without invoking action
+      expect(attemptsMade, 0);
+    });
+
+    test('SessionViewModel submitStep falls back immediately to offline queue when circuit breaker trips', () async {
+      final breaker = CircuitBreaker(failureThreshold: 1);
+      breaker.recordFailure(); // Circuit is OPEN
+      expect(breaker.isOpen, true);
+
+      final api = EngineApiService(circuitBreaker: breaker);
+      final vm = SessionViewModel(
+        apiService: api,
+        sessionId: 'test_circuit_open',
+        targetEquation: 'x + 3 = 7',
+      );
+
+      final step = await vm.submitStep('x = 4');
+      expect(step, isNotNull);
+      expect(step!.isValid, false);
+      expect(step.errorMessage, contains('çevrimdışı'));
+      expect(vm.syncQueue.pendingCount, 1);
+    });
+  });
 }

@@ -1,24 +1,107 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import '../../domain/models/solution_step.dart';
 import '../../domain/models/diagnostic_item.dart';
 import '../../domain/models/misconception_profile_model.dart';
 import '../../domain/models/twin_question_model.dart';
 
+enum CircuitState { closed, open, halfOpen }
+
+/// Circuit Breaker protecting mobile clients from socket thrashing & repeated timeouts
+class CircuitBreaker {
+  final int failureThreshold;
+  final Duration resetTimeout;
+
+  CircuitState state = CircuitState.closed;
+  int failureCount = 0;
+  DateTime? lastFailureTime;
+
+  CircuitBreaker({
+    this.failureThreshold = 3,
+    this.resetTimeout = const Duration(seconds: 5),
+  });
+
+  bool get isOpen {
+    if (state == CircuitState.open) {
+      if (lastFailureTime != null &&
+          DateTime.now().difference(lastFailureTime!) >= resetTimeout) {
+        state = CircuitState.halfOpen;
+        return false;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  void recordSuccess() {
+    failureCount = 0;
+    state = CircuitState.closed;
+  }
+
+  void recordFailure() {
+    failureCount++;
+    lastFailureTime = DateTime.now();
+    if (failureCount >= failureThreshold) {
+      state = CircuitState.open;
+    }
+  }
+
+  void reset() {
+    failureCount = 0;
+    state = CircuitState.closed;
+    lastFailureTime = null;
+  }
+}
+
 class EngineApiService {
   final String baseUrl;
   final http.Client _client;
+  final CircuitBreaker circuitBreaker;
 
   EngineApiService({
     String? baseUrl,
     http.Client? client,
+    CircuitBreaker? circuitBreaker,
   })  : baseUrl = (baseUrl ?? _defaultBaseUrl()).replaceAll(RegExp(r'/+$'), ''),
-        _client = client ?? http.Client();
+        _client = client ?? http.Client(),
+        circuitBreaker = circuitBreaker ?? CircuitBreaker();
 
   static String _defaultBaseUrl() {
     // 127.0.0.1 routes correctly via adb reverse on Android and localhost on desktop/web
     return 'http://127.0.0.1:8000';
+  }
+
+  /// Executes an async network operation with jitter retry and circuit breaker protection
+  Future<T> executeWithRetry<T>(
+    Future<T> Function() action, {
+    int maxRetries = 2,
+    int minJitterMs = 200,
+    int maxJitterMs = 600,
+  }) async {
+    if (circuitBreaker.isOpen) {
+      throw const SocketException('Circuit breaker is OPEN: Server unreachable');
+    }
+
+    int attempts = 0;
+    final rng = math.Random();
+
+    while (true) {
+      try {
+        attempts++;
+        final result = await action();
+        circuitBreaker.recordSuccess();
+        return result;
+      } catch (e) {
+        if (attempts > maxRetries) {
+          circuitBreaker.recordFailure();
+          rethrow;
+        }
+        final jitter = minJitterMs + (maxJitterMs > minJitterMs ? rng.nextInt(maxJitterMs - minJitterMs + 1) : 0);
+        await Future<void>.delayed(Duration(milliseconds: jitter));
+      }
+    }
   }
 
   Future<SolutionStep> verifyStep({
@@ -33,66 +116,70 @@ class EngineApiService {
     String? clientMsgId,
     DateTime? clientTimestamp,
   }) async {
-    final uri = Uri.parse('$baseUrl/api/v1/session/step/verify');
-    final payload = {
-      'session_id': sessionId,
-      'node_id': nodeId,
-      'step_number': stepNumber,
-      'user_expression': userExpression,
-      'target_equation': targetEquation,
-      if (previousStep != null) 'previous_step': previousStep,
-      if (elapsedMs != null) 'elapsed_ms': elapsedMs,
-      if (currentPl != null) 'current_p_l': currentPl,
-      if (clientMsgId != null) 'client_msg_id': clientMsgId,
-      if (clientTimestamp != null) 'client_timestamp': clientTimestamp.toIso8601String(),
-    };
+    return executeWithRetry(() async {
+      final uri = Uri.parse('$baseUrl/api/v1/session/step/verify');
+      final payload = {
+        'session_id': sessionId,
+        'node_id': nodeId,
+        'step_number': stepNumber,
+        'user_expression': userExpression,
+        'target_equation': targetEquation,
+        if (previousStep != null) 'previous_step': previousStep,
+        if (elapsedMs != null) 'elapsed_ms': elapsedMs,
+        if (currentPl != null) 'current_p_l': currentPl,
+        if (clientMsgId != null) 'client_msg_id': clientMsgId,
+        if (clientTimestamp != null) 'client_timestamp': clientTimestamp.toIso8601String(),
+      };
 
-    final response = await _client.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(payload),
-    ).timeout(const Duration(seconds: 4));
+      final response = await _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 4));
 
-    if (response.statusCode == 200) {
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-      return SolutionStep.fromJson(
-        json,
-        stepNumber: stepNumber,
-        userExpression: userExpression,
-        elapsedMs: elapsedMs ?? 0,
-      );
-    } else {
-      throw HttpException(
-        'Server returned ${response.statusCode}: ${response.body}',
-        uri: uri,
-      );
-    }
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        return SolutionStep.fromJson(
+          json,
+          stepNumber: stepNumber,
+          userExpression: userExpression,
+          elapsedMs: elapsedMs ?? 0,
+        );
+      } else {
+        throw HttpException(
+          'Server returned ${response.statusCode}: ${response.body}',
+          uri: uri,
+        );
+      }
+    });
   }
 
   Future<Map<String, dynamic>> replayOfflineBatch({
     required String sessionId,
     required List<Map<String, dynamic>> events,
   }) async {
-    final uri = Uri.parse('$baseUrl/api/v1/session/replay-queue');
-    final payload = {
-      'session_id': sessionId,
-      'events': events,
-    };
+    return executeWithRetry(() async {
+      final uri = Uri.parse('$baseUrl/api/v1/session/replay-queue');
+      final payload = {
+        'session_id': sessionId,
+        'events': events,
+      };
 
-    final response = await _client.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(payload),
-    ).timeout(const Duration(seconds: 4));
+      final response = await _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 4));
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
-    } else {
-      throw HttpException(
-        'Server returned ${response.statusCode}: ${response.body}',
-        uri: uri,
-      );
-    }
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } else {
+        throw HttpException(
+          'Server returned ${response.statusCode}: ${response.body}',
+          uri: uri,
+        );
+      }
+    });
   }
 
   /// Requests multi-turn Socratic tutoring guidance from the core engine.
