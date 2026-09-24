@@ -99,7 +99,7 @@ void main() {
     // 3. Verify Integral problem and DAG node
     expect(find.text("N111: Belirsiz İntegral"), findsOneWidget);
     expect(find.text("BUG-INT-01"), findsOneWidget);
-    expect(find.textContaining("integrasyon sabiti"), findsOneWidget);
+    expect(find.textContaining("integrasyon sabiti"), findsWidgets);
   });
 
   testWidgets('MathScannerView switches to valid scenario and shows celebration state', (WidgetTester tester) async {
@@ -183,6 +183,77 @@ void main() {
     expect(find.text("N08: Eşitsizlikler"), findsOneWidget);
     expect(find.text("BUG-QUAD-06"), findsOneWidget);
     expect(find.textContaining("eşitsizlik yönü ne olmalı?"), findsOneWidget);
+  });
+
+  group('MathScannerView Loupe Magnifier & Diagnostic Step Error Highlights (Stage 63)', () {
+    testWidgets('Dragging crop handle activates loupe magnifier with 2.0x precision reticle', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: MathScannerView(),
+            ),
+          ),
+        ),
+      );
+
+      // Verify crop box and handles exist
+      expect(find.byKey(const Key('scanner_crop_box')), findsOneWidget);
+      final handle = find.byKey(const Key('crop_handle_top_left'));
+      expect(handle, findsOneWidget);
+
+      // Loupe should not be visible before drag
+      expect(find.byKey(const Key('crop_loupe_magnifier')), findsNothing);
+
+      // Start dragging handle
+      final gesture = await tester.startGesture(tester.getCenter(handle));
+      await tester.pump();
+      await gesture.moveBy(const Offset(20, 20));
+      await tester.pump();
+
+      // Loupe magnifier must appear with reticle and label
+      expect(find.byKey(const Key('crop_loupe_magnifier')), findsOneWidget);
+      expect(find.text("2.0x Hassas Ayar"), findsOneWidget);
+
+      // End drag
+      await gesture.up();
+      await tester.pump();
+
+      // Loupe disappears after gesture release
+      expect(find.byKey(const Key('crop_loupe_magnifier')), findsNothing);
+    });
+
+    testWidgets('Scanned steps with errors display red highlight container, error badge, and diagnostic report', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: MathScannerView(
+                initialProblem: "(x + 3)² = 25",
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Tap shutter to reveal diagnostic result
+      await tester.tap(find.byIcon(Icons.camera_alt));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+      await tester.pump();
+
+      // Verify red highlight container for error step 1
+      expect(find.byKey(const Key('step_error_highlight_1')), findsOneWidget);
+
+      // Verify "Hatalı Adım" badge
+      expect(find.byKey(const Key('step_error_badge')), findsOneWidget);
+      expect(find.text("Hatalı Adım"), findsOneWidget);
+
+      // Verify diagnostic error reason
+      expect(find.byKey(const Key('step_error_reason_1')), findsOneWidget);
+      expect(find.textContaining("Teşhis Raporu:"), findsOneWidget);
+      expect(find.textContaining("çarpımın iki katı (2ab)"), findsWidgets);
+    });
   });
 }
 

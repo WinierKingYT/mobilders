@@ -171,6 +171,9 @@ class _MathScannerViewState extends State<MathScannerView> with SingleTickerProv
   late String _currentDagNodeTitle;
   late List<ScannedNotebookStep> _steps;
   late String _socraticHint;
+  Rect? _cropRect;
+  int? _activeCorner; // 0: TL, 1: TR, 2: BL, 3: BR
+  Offset? _loupeLocalPosition;
 
   @override
   void initState() {
@@ -443,60 +446,254 @@ class _MathScannerViewState extends State<MathScannerView> with SingleTickerProv
   }
 
   Widget _buildViewfinder(BuildContext context) {
-    return Container(
-      height: 220,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color(0xFF020617),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF1E293B)),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Alignment Corner Brackets
-          Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.5), width: 1.5),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(
-                child: Text(
-                  "Defterdeki matematiksel adımları\nbu çerçevenin içine hizalayınız",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
-                ),
-              ),
-            ),
-          ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final containerWidth = constraints.maxWidth;
+        const containerHeight = 220.0;
+        final crop = _cropRect ??
+            Rect.fromLTWH(20.0, 20.0, containerWidth - 40.0, containerHeight - 40.0);
 
-          // Animated Scanline
-          AnimatedBuilder(
-            animation: _scanController,
-            builder: (context, child) {
-              return Positioned(
-                top: 25 + _scanController.value * 170,
-                left: 20,
-                right: 20,
+        return Container(
+          height: containerHeight,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: const Color(0xFF020617),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF1E293B)),
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Alignment Corner Brackets / Interactive Crop Box
+              Positioned(
+                left: crop.left,
+                top: crop.top,
+                width: crop.width,
+                height: crop.height,
                 child: Container(
-                  height: 2,
+                  key: const Key('scanner_crop_box'),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF38BDF8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF38BDF8).withValues(alpha: 0.8),
-                        blurRadius: 6,
-                        spreadRadius: 1,
+                    border: Border.all(
+                      color: const Color(0xFF38BDF8).withValues(alpha: 0.7),
+                      width: 1.8,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    color: const Color(0xFF38BDF8).withValues(alpha: 0.05),
+                  ),
+                  child: Center(
+                    child: Text(
+                      "Defterdeki matematiksel adımları\nbu çerçevenin içine hizalayınız",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontSize: 12,
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              );
-            },
+              ),
+
+              // Animated Scanline inside crop box
+              AnimatedBuilder(
+                animation: _scanController,
+                builder: (context, child) {
+                  return Positioned(
+                    top: crop.top + 5 + _scanController.value * (crop.height - 10),
+                    left: crop.left + 5,
+                    width: crop.width - 10,
+                    child: Container(
+                      height: 2,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF38BDF8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF38BDF8).withValues(alpha: 0.8),
+                            blurRadius: 6,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              // 4 Corner Handles with Loupe Drag
+              _buildCornerHandle(
+                key: const Key('crop_handle_top_left'),
+                center: Offset(crop.left, crop.top),
+                onPanStart: (pos) => _onHandlePanStart(0, pos, crop),
+                onPanUpdate: (delta, pos) => _onHandlePanUpdate(0, delta, pos, containerWidth, containerHeight),
+                onPanEnd: _onHandlePanEnd,
+              ),
+              _buildCornerHandle(
+                key: const Key('crop_handle_top_right'),
+                center: Offset(crop.right, crop.top),
+                onPanStart: (pos) => _onHandlePanStart(1, pos, crop),
+                onPanUpdate: (delta, pos) => _onHandlePanUpdate(1, delta, pos, containerWidth, containerHeight),
+                onPanEnd: _onHandlePanEnd,
+              ),
+              _buildCornerHandle(
+                key: const Key('crop_handle_bottom_left'),
+                center: Offset(crop.left, crop.bottom),
+                onPanStart: (pos) => _onHandlePanStart(2, pos, crop),
+                onPanUpdate: (delta, pos) => _onHandlePanUpdate(2, delta, pos, containerWidth, containerHeight),
+                onPanEnd: _onHandlePanEnd,
+              ),
+              _buildCornerHandle(
+                key: const Key('crop_handle_bottom_right'),
+                center: Offset(crop.right, crop.bottom),
+                onPanStart: (pos) => _onHandlePanStart(3, pos, crop),
+                onPanUpdate: (delta, pos) => _onHandlePanUpdate(3, delta, pos, containerWidth, containerHeight),
+                onPanEnd: _onHandlePanEnd,
+              ),
+
+              // Loupe Magnifier overlay when dragging
+              if (_activeCorner != null && _loupeLocalPosition != null)
+                _buildLoupeMagnifier(_loupeLocalPosition!, containerWidth),
+            ],
           ),
-        ],
+        );
+      },
+    );
+  }
+
+  Widget _buildCornerHandle({
+    required Key key,
+    required Offset center,
+    required void Function(Offset localPos) onPanStart,
+    required void Function(Offset delta, Offset localPos) onPanUpdate,
+    required VoidCallback onPanEnd,
+  }) {
+    return Positioned(
+      left: center.dx - 14,
+      top: center.dy - 14,
+      child: GestureDetector(
+        key: key,
+        behavior: HitTestBehavior.opaque,
+        onPanStart: (d) => onPanStart(center),
+        onPanUpdate: (d) => onPanUpdate(d.delta, center + d.localPosition - const Offset(14, 14)),
+        onPanEnd: (_) => onPanEnd(),
+        child: Container(
+          width: 28,
+          height: 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFF0284C7),
+            border: Border.all(color: Colors.white, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF38BDF8).withValues(alpha: 0.5),
+                blurRadius: 4,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+          child: Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _onHandlePanStart(int corner, Offset pos, Rect currentCrop) {
+    setState(() {
+      _cropRect = currentCrop;
+      _activeCorner = corner;
+      _loupeLocalPosition = pos;
+    });
+  }
+
+  void _onHandlePanUpdate(int corner, Offset delta, Offset pos, double maxWidth, double maxHeight) {
+    if (_cropRect == null) return;
+    setState(() {
+      _loupeLocalPosition = pos;
+      double left = _cropRect!.left;
+      double top = _cropRect!.top;
+      double right = _cropRect!.right;
+      double bottom = _cropRect!.bottom;
+
+      switch (corner) {
+        case 0: // Top-Left
+          left = (left + delta.dx).clamp(10.0, right - 50.0);
+          top = (top + delta.dy).clamp(10.0, bottom - 50.0);
+          break;
+        case 1: // Top-Right
+          right = (right + delta.dx).clamp(left + 50.0, maxWidth - 10.0);
+          top = (top + delta.dy).clamp(10.0, bottom - 50.0);
+          break;
+        case 2: // Bottom-Left
+          left = (left + delta.dx).clamp(10.0, right - 50.0);
+          bottom = (bottom + delta.dy).clamp(top + 50.0, maxHeight - 10.0);
+          break;
+        case 3: // Bottom-Right
+          right = (right + delta.dx).clamp(left + 50.0, maxWidth - 10.0);
+          bottom = (bottom + delta.dy).clamp(top + 50.0, maxHeight - 10.0);
+          break;
+      }
+      _cropRect = Rect.fromLTRB(left, top, right, bottom);
+    });
+  }
+
+  void _onHandlePanEnd() {
+    setState(() {
+      _activeCorner = null;
+      _loupeLocalPosition = null;
+    });
+  }
+
+  Widget _buildLoupeMagnifier(Offset pos, double maxWidth) {
+    final loupeX = (pos.dx - 40.0).clamp(10.0, maxWidth - 90.0);
+    final loupeY = (pos.dy - 85.0).clamp(-20.0, 130.0);
+
+    return Positioned(
+      left: loupeX,
+      top: loupeY,
+      child: Container(
+        key: const Key('crop_loupe_magnifier'),
+        width: 80,
+        height: 80,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: const Color(0xFF0F172A),
+          border: Border.all(color: const Color(0xFF38BDF8), width: 2.5),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF38BDF8).withValues(alpha: 0.5),
+              blurRadius: 12,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: ClipOval(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              CustomPaint(
+                size: const Size(80, 80),
+                painter: _LoupeReticlePainter(),
+              ),
+              const Positioned(
+                bottom: 8,
+                child: Text(
+                  "2.0x Hassas Ayar",
+                  style: TextStyle(
+                    color: Color(0xFF38BDF8),
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -604,7 +801,10 @@ class _MathScannerViewState extends State<MathScannerView> with SingleTickerProv
 
   Widget _buildStepRow(ScannedNotebookStep step) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 6),
+      key: step.isValid
+          ? Key('step_row_${step.stepIndex}')
+          : Key('step_error_highlight_${step.stepIndex}'),
+      margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: step.isValid
@@ -612,48 +812,110 @@ class _MathScannerViewState extends State<MathScannerView> with SingleTickerProv
             : const Color(0xFF7F1D1D).withValues(alpha: 0.25),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: step.isValid ? const Color(0xFF1E293B) : const Color(0xFFEF4444).withValues(alpha: 0.6),
+          color: step.isValid
+              ? const Color(0xFF1E293B)
+              : const Color(0xFFEF4444).withValues(alpha: 0.85),
+          width: step.isValid ? 1.0 : 1.8,
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            step.isValid ? Icons.check_circle : Icons.error_outline,
-            color: step.isValid ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-            size: 18,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            "Adım ${step.stepIndex}:",
-            style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              step.latex,
-              style: TextStyle(
-                color: step.isValid ? Colors.white : const Color(0xFFFCA5A5),
-                fontSize: 13,
-                fontFamily: "monospace",
-                fontWeight: step.isValid ? FontWeight.normal : FontWeight.bold,
+          Row(
+            children: [
+              Icon(
+                step.isValid ? Icons.check_circle : Icons.error_outline,
+                color: step.isValid ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                size: 18,
               ),
-            ),
-          ),
-          if (step.bugId != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEF4444).withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: const Color(0xFFEF4444)),
+              const SizedBox(width: 8),
+              Text(
+                "Adım ${step.stepIndex}:",
+                style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
               ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  step.latex,
+                  style: TextStyle(
+                    color: step.isValid ? Colors.white : const Color(0xFFFCA5A5),
+                    fontSize: 13,
+                    fontFamily: "monospace",
+                    fontWeight: step.isValid ? FontWeight.normal : FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (!step.isValid)
+                Container(
+                  key: const Key('step_error_badge'),
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF4444).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFFEF4444)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 12),
+                      SizedBox(width: 3),
+                      Text(
+                        "Hatalı Adım",
+                        style: TextStyle(color: Color(0xFFFCA5A5), fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              if (step.bugId != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF4444).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFFEF4444)),
+                  ),
+                  child: Text(
+                    step.bugId!,
+                    style: const TextStyle(color: Color(0xFFFCA5A5), fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+            ],
+          ),
+          if (!step.isValid && step.errorReason != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6.0, left: 26.0),
               child: Text(
-                step.bugId!,
-                style: const TextStyle(color: Color(0xFFFCA5A5), fontSize: 10, fontWeight: FontWeight.bold),
+                "Teşhis Raporu: ${step.errorReason!}",
+                key: Key('step_error_reason_${step.stepIndex}'),
+                style: const TextStyle(
+                  color: Color(0xFFFCA5A5),
+                  fontSize: 11,
+                  fontStyle: FontStyle.italic,
+                ),
               ),
             ),
         ],
       ),
     );
   }
+}
+
+class _LoupeReticlePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = const Color(0xFF38BDF8).withValues(alpha: 0.5)
+      ..strokeWidth = 1.0;
+    canvas.drawLine(Offset(size.width * 0.5, 0), Offset(size.width * 0.5, size.height), p);
+    canvas.drawLine(Offset(0, size.height * 0.5), Offset(size.width, size.height * 0.5), p);
+    final ringPaint = Paint()
+      ..color = const Color(0xFF38BDF8).withValues(alpha: 0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.5), size.width * 0.28, ringPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
