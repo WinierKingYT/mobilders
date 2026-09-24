@@ -64,6 +64,9 @@ class PersonalLearningEngineApp extends StatelessWidget {
         title: 'Kişisel Öğrenme Motoru',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
+        scrollBehavior: const MaterialScrollBehavior().copyWith(
+          physics: const BouncingScrollPhysics(),
+        ),
         home: const MainNavigationShell(),
       ),
     );

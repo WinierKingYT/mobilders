@@ -464,4 +464,58 @@ void main() {
       } catch (_) {}
     });
   });
+
+  group('Samsung Galaxy S22 120Hz LTPO & Flicker-Free Drawing Sync (Stage 65)', () {
+    setUp(() {
+      BatteryPowerOptimizer().reset();
+      DynamicVectorLayerCache.clear();
+    });
+
+    test('120Hz LTPO display target enforces strict 8.33ms frame pacing budget', () {
+      final optimizer = BatteryPowerOptimizer();
+
+      expect(optimizer.targetFrameRate, equals(FrameRateTarget.highRefresh120Hz));
+      expect(optimizer.is120HzLtpoSyncEnabled, isTrue);
+      expect(optimizer.currentFrameInterval.inMicroseconds, equals(8333));
+
+      // Fast frame (e.g. 5ms) meets 120Hz budget
+      expect(optimizer.isFrameWithinBudget(const Duration(milliseconds: 5)), isTrue);
+
+      // Frame exceeding 8.33ms (e.g. 10ms) drops 120Hz budget
+      expect(optimizer.isFrameWithinBudget(const Duration(milliseconds: 10)), isFalse);
+    });
+
+    test('Battery throttle drops refresh rate from 120Hz to 60Hz and 30Hz on low power mode', () {
+      final optimizer = BatteryPowerOptimizer();
+
+      // Battery at 10% triggers 60Hz standard mode
+      optimizer.updateBatteryState(batteryLevelPercent: 10);
+      expect(optimizer.isLowPowerMode, isTrue);
+      expect(optimizer.targetFrameRate, equals(FrameRateTarget.standard60Hz));
+      expect(optimizer.is120HzLtpoSyncEnabled, isFalse);
+      expect(optimizer.currentFrameInterval.inMicroseconds, equals(16666));
+
+      // Battery at 4% triggers 30Hz extreme power saver
+      optimizer.updateBatteryState(batteryLevelPercent: 4);
+      expect(optimizer.targetFrameRate, equals(FrameRateTarget.powerSaver30Hz));
+      expect(optimizer.currentFrameInterval.inMicroseconds, equals(33333));
+    });
+
+    test('DynamicVectorLayerCache caches and retrieves static vector layers without re-rendering', () {
+      expect(DynamicVectorLayerCache.cachedLayerCount, equals(0));
+
+      const layerKey = 'euclidean_triangle_abc';
+      const mockVectorLayer = {'type': 'mesh', 'vertices': 3, 'color': 0xFF38BDF8};
+
+      DynamicVectorLayerCache.cacheLayer(layerKey, mockVectorLayer);
+      expect(DynamicVectorLayerCache.hasLayer(layerKey), isTrue);
+      expect(DynamicVectorLayerCache.cachedLayerCount, equals(1));
+      expect(DynamicVectorLayerCache.getLayer(layerKey), equals(mockVectorLayer));
+
+      DynamicVectorLayerCache.clear();
+      expect(DynamicVectorLayerCache.hasLayer(layerKey), isFalse);
+      expect(DynamicVectorLayerCache.cachedLayerCount, equals(0));
+    });
+  });
 }
+

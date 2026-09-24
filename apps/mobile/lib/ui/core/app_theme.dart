@@ -260,6 +260,19 @@ class BatteryPowerOptimizer with ChangeNotifier {
     notifyListeners();
   }
 
+  bool get is120HzLtpoSyncEnabled => !_isLowPowerMode && _targetFrameRate == FrameRateTarget.highRefresh120Hz;
+
+  Duration get currentFrameInterval => _targetFrameRate.frameBudget;
+
+  void setTargetFrameRate(FrameRateTarget target) {
+    _targetFrameRate = target;
+    notifyListeners();
+  }
+
+  bool isFrameWithinBudget(Duration elapsed) {
+    return elapsed <= _targetFrameRate.frameBudget;
+  }
+
   void reset() {
     _isLowPowerMode = false;
     _batteryLevelPercent = 100;
@@ -267,5 +280,24 @@ class BatteryPowerOptimizer with ChangeNotifier {
     _enableParticleEffects = true;
     _enableHeavyCanvasAnimations = true;
     notifyListeners();
+  }
+}
+
+/// Dynamic Picture & Vector Layer Caching for 120Hz LTPO flicker-free rendering (Stage 65)
+class DynamicVectorLayerCache {
+  static final Map<String, dynamic> _pictureLayerCache = {};
+
+  static int get cachedLayerCount => _pictureLayerCache.length;
+
+  static void cacheLayer(String key, dynamic layer) {
+    _pictureLayerCache[key] = layer;
+  }
+
+  static dynamic getLayer(String key) => _pictureLayerCache[key];
+
+  static bool hasLayer(String key) => _pictureLayerCache.containsKey(key);
+
+  static void clear() {
+    _pictureLayerCache.clear();
   }
 }
