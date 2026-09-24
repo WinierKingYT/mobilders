@@ -29,6 +29,12 @@ class EZDiffusionSolver:
     """
 
     DEFAULT_SCALE_S = 0.1  # Standard scaling constant in literature
+    EPSILON = 1e-7
+
+    @classmethod
+    def is_robotic_or_chance_guess(cls, reaction_time_sec: float) -> bool:
+        """Determines if a reaction time is below physiological human limit (<100ms) indicating bot/rapid chance guess."""
+        return reaction_time_sec < 0.100
 
     @classmethod
     def solve(
@@ -62,7 +68,7 @@ class EZDiffusionSolver:
             raise ValueError(
                 f"Degenerate response time: MRT={mrt:.3f}s is below physiological minimum (100ms) [ERR_DDM_DEGENERATE_DATA 3002]"
             )
-        if vrt <= 1e-7:
+        if vrt <= cls.EPSILON:
             raise ValueError(
                 f"Degenerate variance: VRT={vrt:.6f}s^2 is zero or negative [ERR_DDM_DEGENERATE_DATA 3002]"
             )
@@ -77,12 +83,15 @@ class EZDiffusionSolver:
         else:
             pc_corrected = max(0.001, min(0.999, pc_corrected))
 
+        # Epsilon clamping: ensure pc_corrected is strictly bounded
+        pc_corrected = max(cls.EPSILON, min(1.0 - cls.EPSILON, pc_corrected))
+
         # Avoid exact 0.5 singularity where logit L = 0
         if abs(pc_corrected - 0.5) < 1e-6:
             pc_corrected = 0.5001
 
-        # 2. Logit transformation
-        logit_l = math.log(pc_corrected / (1.0 - pc_corrected))
+        # 2. Logit transformation with epsilon protection
+        logit_l = math.log(pc_corrected / max(cls.EPSILON, 1.0 - pc_corrected))
 
         # 3. Intermediate term: x = L * (Pc^2 * L - Pc * L + Pc - 0.5) / VRT
         numerator = logit_l * (
@@ -91,21 +100,23 @@ class EZDiffusionSolver:
             + pc_corrected
             - 0.5
         )
-        x = max(1e-12, numerator / vrt)
+        safe_vrt = max(cls.EPSILON, vrt)
+        x = max(1e-12, numerator / safe_vrt)
 
         # 4. Drift rate (v)
         sign = 1.0 if pc_corrected > 0.5 else -1.0
         drift_rate = sign * s * (x ** 0.25)
 
         # 5. Boundary separation (a)
-        if abs(drift_rate) < 1e-9:
+        if abs(drift_rate) < cls.EPSILON:
             boundary_separation = 0.05
         else:
             boundary_separation = (s ** 2 * logit_l) / drift_rate
+        boundary_separation = max(cls.EPSILON, boundary_separation)
 
         # 6. Mean Decision Time (M_karar) and Non-Decision Time (Ter)
-        # Using the exact identity: (1 - e^y)/(1 + e^y) = 2*Pc - 1 where y = -v*a / s^2 = -L
-        mean_decision_time = (boundary_separation / (2.0 * drift_rate)) * (2.0 * pc_corrected - 1.0)
+        effective_drift = drift_rate if abs(drift_rate) >= cls.EPSILON else (cls.EPSILON if drift_rate >= 0 else -cls.EPSILON)
+        mean_decision_time = (boundary_separation / (2.0 * effective_drift)) * (2.0 * pc_corrected - 1.0)
         non_decision_time = mrt - mean_decision_time
 
         # If non-decision time is non-physiologically negative, bound it cleanly
@@ -190,8 +201,8 @@ class EZDiffusionSolver:
 
         paired = list(zip(reaction_times, correctness))
         if filter_outliers:
-            # Filter background interruptions (>15s) and physiological reflex glitches (<0.15s)
-            paired = [(rt, c) for rt, c in paired if 0.15 <= rt <= 15.0]
+            # Filter background interruptions (>15s) and robotic rapid guessing (<0.100s / 100ms)
+            paired = [(rt, c) for rt, c in paired if not cls.is_robotic_or_chance_guess(rt) and rt <= 15.0]
 
         if len(paired) < 3:
             raise ValueError("At least 3 valid non-outlier trials required to compute DDM variance")

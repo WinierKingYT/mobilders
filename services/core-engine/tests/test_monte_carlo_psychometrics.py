@@ -127,3 +127,42 @@ def test_gate2_monte_carlo_2pl_cat_convergence():
     assert max_se <= 0.35, f"Max SE {max_se:.4f} exceeds 0.35"
     assert pct_meeting_threshold >= 98.0, f"Only {pct_meeting_threshold}% reached SE <= 0.35"
     assert corr >= 0.85, f"Ability correlation r={corr:.4f} below 0.85"
+
+
+def test_ddm_fsrs_epsilon_clamping_and_robotic_guess_filter():
+    """Aşama 45: DDM & FSRS sayısal kararlılık epsilon clamping ve robotik tahmin filtresi."""
+    from app.psychometrics.ddm import EZDiffusionSolver
+    from app.retention.fsrs import FSRSEngine, Rating
+    from app.simulation.student_twin import StudentTwinProfile
+
+    # 1. DDM extreme edge cases with epsilon clamping
+    # pc = 0.0 or 1.0 or extreme vrt
+    ddm_p0 = EZDiffusionSolver.solve(mrt=1.5, vrt=0.01, pc=0.0, n_trials=5)
+    assert math.isfinite(ddm_p0.drift_rate)
+    assert math.isfinite(ddm_p0.boundary_separation)
+
+    ddm_p1 = EZDiffusionSolver.solve(mrt=1.5, vrt=0.01, pc=1.0, n_trials=5)
+    assert math.isfinite(ddm_p1.drift_rate)
+    assert math.isfinite(ddm_p1.boundary_separation)
+
+    # 2. Robotic rapid guessing filter (RT < 100ms)
+    assert EZDiffusionSolver.is_robotic_or_chance_guess(0.050) is True
+    assert EZDiffusionSolver.is_robotic_or_chance_guess(0.099) is True
+    assert EZDiffusionSolver.is_robotic_or_chance_guess(0.150) is False
+
+    raw_rts = [0.050, 0.080, 1.200, 1.500, 1.800]
+    raw_corrects = [True, False, True, True, False]
+    filt_rts, filt_corrects = StudentTwinProfile.filter_robotic_responses(raw_rts, raw_corrects)
+    assert len(filt_rts) == 3
+    assert all(rt >= 0.100 for rt in filt_rts)
+
+    # 3. FSRS epsilon clamping
+    fsrs = FSRSEngine()
+    r_ext = fsrs.retrievability(elapsed_days=10000.0, stability=1e-7)
+    assert math.isfinite(r_ext)
+    assert r_ext >= 1e-7
+
+    due = fsrs.calculate_due_interval(stability=1e-7, target_retention=0.90)
+    assert math.isfinite(due)
+    assert due >= 0.1
+

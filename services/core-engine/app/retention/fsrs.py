@@ -45,6 +45,7 @@ class FSRSEngine:
 
     FACTOR = 19.0 / 81.0  # (1/0.90^2 - 1) for 90% target retention
     CIRCADIAN_SLEEP_HOURS = 14.0  # Minimum hours for sleep-dependent consolidation
+    EPSILON = 1e-7
 
     def __init__(self, weights: Optional[Tuple[float, ...]] = None):
         self.w = weights if weights is not None else self.DEFAULT_WEIGHTS
@@ -57,11 +58,10 @@ class FSRSEngine:
         """
         if elapsed_days <= 0.0:
             return 1.0
-        if stability <= 0.01:
-            stability = 0.01
+        safe_s = max(self.EPSILON, stability)
 
-        r = (1.0 + self.FACTOR * (elapsed_days / stability)) ** -0.5
-        return max(0.0, min(1.0, r))
+        r = (1.0 + self.FACTOR * (elapsed_days / safe_s)) ** -0.5
+        return max(self.EPSILON, min(1.0, r))
 
     def init_dsr(self, rating: Rating) -> DSRState:
         """
@@ -154,10 +154,9 @@ class FSRSEngine:
         Calculates interval in days until retrievability drops to target_retention.
         Formula: t = S / FACTOR * ((1 / R)^2 - 1)
         """
-        if stability <= 0.01:
-            return 0.1
-        target = max(0.5, min(0.99, target_retention))
-        interval = (stability / self.FACTOR) * ((1.0 / (target ** 2)) - 1.0)
+        safe_s = max(self.EPSILON, stability)
+        target = max(self.EPSILON, min(1.0 - self.EPSILON, target_retention))
+        interval = (safe_s / self.FACTOR) * ((1.0 / (target ** 2)) - 1.0)
         return max(0.1, round(interval, 2))
 
     def is_due_for_warmup(
