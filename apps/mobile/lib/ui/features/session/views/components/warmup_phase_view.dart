@@ -7,6 +7,8 @@ class WarmupQuestion {
   final int correctOption;
   final String successFeedback;
   final String retryFeedback;
+  final String? ruleCardTitle;
+  final String? ruleCardContent;
 
   const WarmupQuestion({
     required this.prompt,
@@ -14,6 +16,8 @@ class WarmupQuestion {
     required this.correctOption,
     required this.successFeedback,
     required this.retryFeedback,
+    this.ruleCardTitle,
+    this.ruleCardContent,
   });
 }
 
@@ -28,6 +32,8 @@ class WarmupPhaseView extends StatefulWidget {
       correctOption: 8,
       successFeedback: "Harika! 3(8 - 4) = 3(4) = 12. Bilişsel hazırlık tamamlandı!",
       retryFeedback: "3(x - 4) = 12 ise x - 4 = 4 olmalı. Tekrar dene!",
+      ruleCardTitle: "Parantez Dağılma ve Sadeleştirme Kuralı",
+      ruleCardContent: "a(x - b) = c denkleminde önce iki tarafı a'ya bölerek (x - b = c/a) veya a'yı dağıtarak (ax - ab = c) çözüme ulaşabilirsin.",
     ),
     WarmupQuestion(
       prompt: "Hatırlama Sorusu: 2(x + 3) = 16 ise x kaçtır?",
@@ -35,6 +41,8 @@ class WarmupPhaseView extends StatefulWidget {
       correctOption: 5,
       successFeedback: "Harika! 2(5 + 3) = 2(8) = 16. Bilişsel hazırlık tamamlandı!",
       retryFeedback: "2(x + 3) = 16 ise x + 3 = 8 olmalı. Tekrar dene!",
+      ruleCardTitle: "Çarpanı Sadeleştirme",
+      ruleCardContent: "İki tarafı 2'ye böl: x + 3 = 8, ardından +3'ü karşıya -3 olarak geçir: x = 5.",
     ),
     WarmupQuestion(
       prompt: "Hatırlama Sorusu: 4(x - 2) = 20 ise x kaçtır?",
@@ -42,6 +50,8 @@ class WarmupPhaseView extends StatefulWidget {
       correctOption: 7,
       successFeedback: "Harika! 4(7 - 2) = 4(5) = 20. Bilişsel hazırlık tamamlandı!",
       retryFeedback: "4(x - 2) = 20 ise x - 2 = 5 olmalı. Tekrar dene!",
+      ruleCardTitle: "Doğrusal Önkoşul Mantığı",
+      ruleCardContent: "4(x - 2) = 20 -> x - 2 = 5 -> x = 7.",
     ),
     WarmupQuestion(
       prompt: "Hatırlama Sorusu: 5(x + 1) = 35 ise x kaçtır?",
@@ -49,6 +59,8 @@ class WarmupPhaseView extends StatefulWidget {
       correctOption: 6,
       successFeedback: "Harika! 5(6 + 1) = 5(7) = 35. Bilişsel hazırlık tamamlandı!",
       retryFeedback: "5(x + 1) = 35 ise x + 1 = 7 olmalı. Tekrar dene!",
+      ruleCardTitle: "Çarpım ve Toplam İzolasyonu",
+      ruleCardContent: "x + 1 = 35 / 5 = 7 -> x = 6.",
     ),
   ];
 
@@ -64,6 +76,7 @@ class WarmupPhaseView extends StatefulWidget {
 
 class _WarmupPhaseViewState extends State<WarmupPhaseView> {
   int? _selectedWarmupOption;
+  bool _isRuleCardExpanded = false;
 
   WarmupQuestion get _currentQuestion =>
       widget.question ?? WarmupPhaseView.defaultWarmupBank.first;
@@ -115,6 +128,84 @@ class _WarmupPhaseViewState extends State<WarmupPhaseView> {
               ),
             ),
           ),
+          if (question.ruleCardTitle != null && question.ruleCardContent != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: _isRuleCardExpanded
+                      ? const Color(0xFF38BDF8)
+                      : const Color(0xFF334155),
+                ),
+              ),
+              child: Column(
+                children: [
+                  InkWell(
+                    key: const Key('warmup_rule_card_toggle'),
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () {
+                      HapticFeedbackService().selectionClick();
+                      setState(() => _isRuleCardExpanded = !_isRuleCardExpanded);
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.lightbulb_outline,
+                            color: Color(0xFFFBBF24),
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "💡 Hızlı Hatırla: ${question.ruleCardTitle!}",
+                              style: const TextStyle(
+                                color: Color(0xFFF1F5F9),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            _isRuleCardExpanded
+                                ? Icons.keyboard_arrow_up
+                                : Icons.keyboard_arrow_down,
+                            color: const Color(0xFF94A3B8),
+                            size: 20,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (_isRuleCardExpanded)
+                    Padding(
+                      key: const Key('warmup_rule_card_content'),
+                      padding: const EdgeInsets.only(left: 12, right: 12, bottom: 12),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF475569)),
+                        ),
+                        child: Text(
+                          question.ruleCardContent!,
+                          style: const TextStyle(
+                            color: Color(0xFFCBD5E1),
+                            fontSize: 12,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
 
           // Interactive Options

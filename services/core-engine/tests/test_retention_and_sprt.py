@@ -136,6 +136,22 @@ def test_fsrs_session_fatigue_discount():
     assert fatigued_review.stability < normal_review.stability
 
 
+def test_fsrs_due_interval_and_warmup_detection():
+    """Verify calculation of due interval and warmup injection detection."""
+    fsrs = FSRSEngine()
+    stability = 2.3  # Initial stability for Rating.GOOD
+
+    # Due interval for target retention 0.90 should match stability
+    due_interval = fsrs.calculate_due_interval(stability, target_retention=0.90)
+    assert 2.2 <= due_interval <= 2.4
+
+    # Before due date (e.g. 1 day elapsed), it is NOT due for warmup
+    assert fsrs.is_due_for_warmup(elapsed_days=1.0, stability=stability) is False
+
+    # After due date (e.g. 3 days elapsed), it IS due for warmup
+    assert fsrs.is_due_for_warmup(elapsed_days=3.0, stability=stability) is True
+
+
 # ==========================================
 # 3. PART-WHOLE PROPAGATION MATRIX TESTS
 # ==========================================

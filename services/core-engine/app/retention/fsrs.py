@@ -148,3 +148,27 @@ class FSRSEngine:
             repetitions=current_state.repetitions + 1,
             lapses=new_lapses,
         )
+
+    def calculate_due_interval(self, stability: float, target_retention: float = 0.90) -> float:
+        """
+        Calculates interval in days until retrievability drops to target_retention.
+        Formula: t = S / FACTOR * ((1 / R)^2 - 1)
+        """
+        if stability <= 0.01:
+            return 0.1
+        target = max(0.5, min(0.99, target_retention))
+        interval = (stability / self.FACTOR) * ((1.0 / (target ** 2)) - 1.0)
+        return max(0.1, round(interval, 2))
+
+    def is_due_for_warmup(
+        self,
+        elapsed_days: float,
+        stability: float,
+        threshold_retention: float = 0.90,
+    ) -> bool:
+        """
+        Determines if a knowledge component is due for warmup retrieval consolidation.
+        """
+        r = self.retrievability(elapsed_days, stability)
+        return r <= threshold_retention
+
