@@ -170,24 +170,65 @@ class OfflineSyncQueue extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Enqueue step to local storage and memory ledger.
+  /// Enqueue step to local storage and memory ledger with idempotency key deduplication.
   void enqueueStep(UnsyncedStepEvent event) {
-    if (_events.length >= maxQueueSize) {
-      _events.removeAt(0);
+    final existingIndex = _events.indexWhere((e) => e.clientMsgId == event.clientMsgId);
+    if (existingIndex >= 0) {
+      final existing = _events[existingIndex];
+      if (existing.isSynced) return; // Already synced, idempotent no-op
+      // Update existing pending event (idempotent upsert)
+      _events[existingIndex] = event;
+    } else {
+      if (_events.length >= maxQueueSize) {
+        _events.removeAt(0);
+      }
+      _events.add(event);
     }
-    _events.add(event);
     _persistToDisk();
     notifyListeners();
   }
 
-  /// Enqueue a focus attempt for offline synchronization.
+  /// Enqueue a focus attempt for offline synchronization with idempotency key deduplication.
   void enqueueFocusAttempt(UnsyncedFocusAttemptEvent event) {
-    if (_focusEvents.length >= maxQueueSize) {
-      _focusEvents.removeAt(0);
+    final existingIndex = _focusEvents.indexWhere((e) => e.clientMsgId == event.clientMsgId);
+    if (existingIndex >= 0) {
+      final existing = _focusEvents[existingIndex];
+      if (existing.isSynced) return; // Already synced, idempotent no-op
+      _focusEvents[existingIndex] = event;
+    } else {
+      if (_focusEvents.length >= maxQueueSize) {
+        _focusEvents.removeAt(0);
+      }
+      _focusEvents.add(event);
     }
-    _focusEvents.add(event);
     _persistToDisk();
     notifyListeners();
+  }
+
+  /// Checks whether a step event with the given clientMsgId exists in the queue.
+  bool hasStepWithClientMsgId(String clientMsgId) =>
+      _events.any((e) => e.clientMsgId == clientMsgId);
+
+  /// Checks whether a focus attempt event with the given clientMsgId exists in the queue.
+  bool hasFocusAttemptWithClientMsgId(String clientMsgId) =>
+      _focusEvents.any((e) => e.clientMsgId == clientMsgId);
+
+  /// Finds a step event by clientMsgId.
+  UnsyncedStepEvent? findStepByClientMsgId(String clientMsgId) {
+    try {
+      return _events.firstWhere((e) => e.clientMsgId == clientMsgId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Finds a focus attempt event by clientMsgId.
+  UnsyncedFocusAttemptEvent? findFocusAttemptByClientMsgId(String clientMsgId) {
+    try {
+      return _focusEvents.firstWhere((e) => e.clientMsgId == clientMsgId);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Mark a focus attempt as synced and remove from pending queue.
@@ -222,8 +263,15 @@ class OfflineSyncQueue extends ChangeNotifier {
     _isSyncing = true;
     notifyListeners();
 
+    // Deduplicate any duplicate clientMsgIds (keep newest)
+    final Map<String, UnsyncedStepEvent> uniqueMap = {};
+    for (final ev in pending) {
+      uniqueMap[ev.clientMsgId] = ev;
+    }
+    final deduplicatedPending = uniqueMap.values.toList();
+
     // Sort chronologically by client-timestamp (CRDT requirement)
-    pending.sort((a, b) => a.clientTimestamp.compareTo(b.clientTimestamp));
+    deduplicatedPending.sort((a, b) => a.clientTimestamp.compareTo(b.clientTimestamp));
 
     int syncedCount = 0;
     List<Map<String, dynamic>> replayedSteps = [];
@@ -231,8 +279,8 @@ class OfflineSyncQueue extends ChangeNotifier {
     bool isTargetReached = false;
 
     try {
-      final payloadEvents = pending.map((e) => e.toJson()).toList();
-      final sessionId = pending.first.sessionId;
+      final payloadEvents = deduplicatedPending.map((e) => e.toJson()).toList();
+      final sessionId = deduplicatedPending.first.sessionId;
 
       final res = await apiService.replayOfflineBatch(
         sessionId: sessionId,
@@ -250,21 +298,44 @@ class OfflineSyncQueue extends ChangeNotifier {
             .toList();
       }
 
-      if (returnedSynced > 0) {
-        for (int i = 0; i < min(returnedSynced, pending.length); i++) {
-          pending[i].isSynced = true;
+      // Check for conflict-resolved or duplicate IDs reported by server
+      final duplicateIds = (res['duplicate_msg_ids'] as List<dynamic>?)
+              ?.map((id) => id.toString())
+              .toSet() ??
+          {};
+
+      for (int i = 0; i < min(returnedSynced, deduplicatedPending.length); i++) {
+        deduplicatedPending[i].isSynced = true;
+      }
+      for (final ev in deduplicatedPending) {
+        if (duplicateIds.contains(ev.clientMsgId)) {
+          ev.isSynced = true;
         }
-        syncedCount = returnedSynced;
+      }
+
+      syncedCount = deduplicatedPending.where((e) => e.isSynced).length;
+      _events.removeWhere((e) => e.isSynced);
+      await _persistToDisk();
+    } catch (err) {
+      final errStr = err.toString();
+      // If server returned 409 Conflict indicating already processed / duplicate
+      if (errStr.contains('409') ||
+          errStr.toLowerCase().contains('conflict') ||
+          errStr.toLowerCase().contains('already processed')) {
+        for (final event in deduplicatedPending) {
+          event.isSynced = true;
+        }
+        syncedCount = deduplicatedPending.length;
         _events.removeWhere((e) => e.isSynced);
         await _persistToDisk();
+      } else {
+        // Network still offline or error occurred; record retry and calculate backoff
+        for (final event in deduplicatedPending) {
+          event.retryCount += 1;
+          event.syncError = errStr;
+        }
+        await _persistToDisk();
       }
-    } catch (err) {
-      // Network still offline or error occurred; record retry and calculate backoff
-      for (final event in pending) {
-        event.retryCount += 1;
-        event.syncError = err.toString();
-      }
-      await _persistToDisk();
     } finally {
       _isSyncing = false;
       notifyListeners();

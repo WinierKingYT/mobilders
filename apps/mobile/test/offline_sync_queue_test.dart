@@ -262,7 +262,97 @@ void main() {
       if (await mainFile.exists()) await mainFile.delete();
       if (await bakFile.exists()) await bakFile.delete();
     });
+
+    test('enqueueStep and enqueueFocusAttempt perform idempotent upsert deduplication by clientMsgId', () {
+      final queue = OfflineSyncQueue();
+
+      final step1 = UnsyncedStepEvent(
+        clientMsgId: 'idempotent-step-1',
+        sessionId: 's1',
+        nodeId: 'N15',
+        stepNumber: 1,
+        userExpression: 'x + 1 = 3',
+        targetEquation: 'x = 2',
+        clientTimestamp: DateTime.now(),
+      );
+
+      queue.enqueueStep(step1);
+      expect(queue.pendingCount, 1);
+      expect(queue.hasStepWithClientMsgId('idempotent-step-1'), isTrue);
+
+      // Re-enqueuing with same clientMsgId but updated expression
+      final step1Updated = UnsyncedStepEvent(
+        clientMsgId: 'idempotent-step-1',
+        sessionId: 's1',
+        nodeId: 'N15',
+        stepNumber: 1,
+        userExpression: 'x = 2',
+        targetEquation: 'x = 2',
+        clientTimestamp: DateTime.now(),
+      );
+
+      queue.enqueueStep(step1Updated);
+      expect(queue.pendingCount, 1); // Not duplicated
+      expect(queue.findStepByClientMsgId('idempotent-step-1')?.userExpression, 'x = 2');
+
+      // Focus attempt idempotency
+      final focus1 = UnsyncedFocusAttemptEvent(
+        clientMsgId: 'idempotent-focus-1',
+        episodeId: 'ep1',
+        expectedSequence: 1,
+        rawAttempt: 'x = 3',
+        clientTimestamp: DateTime.now(),
+      );
+
+      queue.enqueueFocusAttempt(focus1);
+      expect(queue.pendingFocusCount, 1);
+      expect(queue.hasFocusAttemptWithClientMsgId('idempotent-focus-1'), isTrue);
+
+      // Re-enqueuing duplicate focus attempt
+      queue.enqueueFocusAttempt(focus1);
+      expect(queue.pendingFocusCount, 1);
+      expect(queue.findFocusAttemptByClientMsgId('idempotent-focus-1')?.rawAttempt, 'x = 3');
+    });
+
+    test('replayBatch resolves 409 Conflict as synced instead of failing with infinite retries', () async {
+      final queue = OfflineSyncQueue();
+      final conflictApi = MockReplayEngineApiService();
+
+      queue.enqueueStep(UnsyncedStepEvent(
+        clientMsgId: 'conflict-step-1',
+        sessionId: 'sess-conflict',
+        nodeId: 'N15',
+        stepNumber: 1,
+        userExpression: 'x = 5',
+        targetEquation: 'x - 5 = 0',
+        clientTimestamp: DateTime.now(),
+      ));
+
+      expect(queue.pendingCount, 1);
+
+      // Simulate 409 Conflict from server
+      conflictApi.shouldSucceed = false;
+      // We subclass or override to throw 409 Conflict
+      final throwingApi = _ConflictEngineApiService();
+
+      final result = await queue.replayBatch(throwingApi);
+      expect(result.syncedCount, 1);
+      expect(queue.pendingCount, 0); // Purged as conflict-resolved
+      expect(queue.pendingEvents, isEmpty);
+    });
   });
+}
+
+class _ConflictEngineApiService extends EngineApiService {
+  _ConflictEngineApiService() : super(baseUrl: 'http://localhost:8000');
+
+  @override
+  Future<Map<String, dynamic>> replayOfflineBatch({
+    required String sessionId,
+    required List<Map<String, dynamic>> events,
+  }) async {
+    throw Exception('409 Conflict: clientMsgId already processed in session');
+  }
 }
 
 class FakeRandom implements Random {
