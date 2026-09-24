@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../../../core/services/haptic_feedback_service.dart';
 import '../../../../data/models/focus_domain_models.dart';
@@ -28,6 +29,10 @@ class FocusSessionViewModel extends ChangeNotifier {
   InputMode _inputMode = InputMode.touchpad;
   bool _isZenMode = false;
   bool _isDisposed = false;
+
+  final StreamController<FocusEpisodeState> _stateStreamController =
+      StreamController<FocusEpisodeState>.broadcast();
+  final List<StreamSubscription> _subscriptions = [];
 
   FocusSessionViewModel({
     required FocusApiService apiService,
@@ -517,16 +522,39 @@ class FocusSessionViewModel extends ChangeNotifier {
   }
 
   bool get isDisposed => _isDisposed;
+  Stream<FocusEpisodeState> get stateStream => _stateStreamController.stream;
+  bool get areStreamsClosed => _stateStreamController.isClosed;
+  int get activeSubscriptionsCount => _subscriptions.length;
+
+  void trackSubscription(StreamSubscription subscription) {
+    if (_isDisposed) {
+      subscription.cancel();
+      return;
+    }
+    _subscriptions.add(subscription);
+  }
 
   @override
   void dispose() {
     _isDisposed = true;
+    for (final sub in _subscriptions) {
+      sub.cancel();
+    }
+    _subscriptions.clear();
+    if (!_stateStreamController.isClosed) {
+      _stateStreamController.close();
+    }
     super.dispose();
   }
 
   @override
   void notifyListeners() {
     if (!_isDisposed) {
+      if (_currentState != null &&
+          !_stateStreamController.isClosed &&
+          _stateStreamController.hasListener) {
+        _stateStreamController.add(_currentState!);
+      }
       super.notifyListeners();
     }
   }

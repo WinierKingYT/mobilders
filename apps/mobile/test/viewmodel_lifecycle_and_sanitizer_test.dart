@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:http/http.dart' as http;
@@ -51,6 +52,61 @@ void main() {
 
       // Calling notifyListeners post-dispose should not throw
       expect(() => vm.notifyListeners(), returnsNormally);
+    });
+
+    test('FocusSessionViewModel cleans up streams and cancels tracked subscriptions on dispose', () async {
+      final mockClient = MockClient((request) async => http.Response('{}', 200));
+      final api = FocusApiService(client: mockClient);
+      final vm = FocusSessionViewModel(apiService: api);
+
+      expect(vm.areStreamsClosed, isFalse);
+      expect(vm.activeSubscriptionsCount, equals(0));
+
+      final testStream = Stream<int>.periodic(const Duration(milliseconds: 50), (i) => i);
+      final sub = testStream.listen((_) {});
+      vm.trackSubscription(sub);
+      expect(vm.activeSubscriptionsCount, equals(1));
+
+      // Stream subscription should be tracked before dispose
+      final stateSub = vm.stateStream.listen((_) {});
+      vm.trackSubscription(stateSub);
+      expect(vm.activeSubscriptionsCount, equals(2));
+
+      // Dispose ViewModel
+      vm.dispose();
+
+      expect(vm.isDisposed, isTrue);
+      expect(vm.areStreamsClosed, isTrue);
+      expect(vm.activeSubscriptionsCount, equals(0));
+
+      // Attempting to track subscription post-dispose cancels immediately
+      bool lateFired = false;
+      final lateSub = Stream.value(1).listen((_) {
+        lateFired = true;
+      });
+      vm.trackSubscription(lateSub);
+      await Future.delayed(const Duration(milliseconds: 20));
+      expect(lateFired, isFalse);
+    });
+
+    test('DiagnosticViewModel cleans up streams and cancels tracked subscriptions on dispose', () {
+      final mockClient = MockClient((request) async => http.Response('{}', 200));
+      final api = EngineApiService(client: mockClient);
+      final vm = DiagnosticViewModel(apiService: api, sessionId: 'test_diag_sess');
+
+      expect(vm.areStreamsClosed, isFalse);
+      expect(vm.activeSubscriptionsCount, equals(0));
+
+      final testStream = Stream<int>.fromIterable([1, 2, 3]);
+      final sub = testStream.listen((_) {});
+      vm.trackSubscription(sub);
+      expect(vm.activeSubscriptionsCount, equals(1));
+
+      vm.dispose();
+
+      expect(vm.isDisposed, isTrue);
+      expect(vm.areStreamsClosed, isTrue);
+      expect(vm.activeSubscriptionsCount, equals(0));
     });
   });
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../../../data/services/engine_api_service.dart';
 import '../../../../domain/models/diagnostic_item.dart';
@@ -17,6 +18,10 @@ class DiagnosticViewModel extends ChangeNotifier {
   Map<String, double>? _seededMastery;
   List<String>? _zpdCandidates;
   bool _isDisposed = false;
+
+  final StreamController<DiagnosticItem?> _itemStreamController =
+      StreamController<DiagnosticItem?>.broadcast();
+  final List<StreamSubscription> _subscriptions = [];
 
   DiagnosticViewModel({
     required EngineApiService apiService,
@@ -250,16 +255,37 @@ class DiagnosticViewModel extends ChangeNotifier {
   }
 
   bool get isDisposed => _isDisposed;
+  Stream<DiagnosticItem?> get itemStream => _itemStreamController.stream;
+  bool get areStreamsClosed => _itemStreamController.isClosed;
+  int get activeSubscriptionsCount => _subscriptions.length;
+
+  void trackSubscription(StreamSubscription subscription) {
+    if (_isDisposed) {
+      subscription.cancel();
+      return;
+    }
+    _subscriptions.add(subscription);
+  }
 
   @override
   void dispose() {
     _isDisposed = true;
+    for (final sub in _subscriptions) {
+      sub.cancel();
+    }
+    _subscriptions.clear();
+    if (!_itemStreamController.isClosed) {
+      _itemStreamController.close();
+    }
     super.dispose();
   }
 
   @override
   void notifyListeners() {
     if (!_isDisposed) {
+      if (!_itemStreamController.isClosed && _itemStreamController.hasListener) {
+        _itemStreamController.add(_currentItem);
+      }
       super.notifyListeners();
     }
   }
