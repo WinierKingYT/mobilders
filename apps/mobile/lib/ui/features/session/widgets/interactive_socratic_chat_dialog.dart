@@ -27,6 +27,9 @@ class InteractiveSocraticChatDialog extends StatefulWidget {
   final String? userExpression;
   final Function(String correctedExpression)? onApplyCorrectedStep;
   final EngineApiService? apiService;
+  final List<SocraticChatMessage>? initialMessages;
+  final ValueChanged<List<SocraticChatMessage>>? onHistoryChanged;
+  final String? sessionHistoryKey;
 
   const InteractiveSocraticChatDialog({
     super.key,
@@ -35,7 +38,23 @@ class InteractiveSocraticChatDialog extends StatefulWidget {
     this.userExpression,
     this.onApplyCorrectedStep,
     this.apiService,
+    this.initialMessages,
+    this.onHistoryChanged,
+    this.sessionHistoryKey,
   });
+
+  /// In-memory session message history cache keyed by session/equation parity.
+  static final Map<String, List<SocraticChatMessage>> _historyCache = {};
+
+  static void clearHistoryCache([String? key]) {
+    if (key != null) {
+      _historyCache.remove(key);
+    } else {
+      _historyCache.clear();
+    }
+  }
+
+  static List<SocraticChatMessage>? getCachedHistory(String key) => _historyCache[key];
 
   static Future<void> show(
     BuildContext context, {
@@ -44,6 +63,9 @@ class InteractiveSocraticChatDialog extends StatefulWidget {
     String? userExpression,
     Function(String correctedExpression)? onApplyCorrectedStep,
     EngineApiService? apiService,
+    List<SocraticChatMessage>? initialMessages,
+    ValueChanged<List<SocraticChatMessage>>? onHistoryChanged,
+    String? sessionHistoryKey,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -55,6 +77,9 @@ class InteractiveSocraticChatDialog extends StatefulWidget {
         userExpression: userExpression,
         onApplyCorrectedStep: onApplyCorrectedStep,
         apiService: apiService,
+        initialMessages: initialMessages,
+        onHistoryChanged: onHistoryChanged,
+        sessionHistoryKey: sessionHistoryKey,
       ),
     );
   }
@@ -81,7 +106,14 @@ class _InteractiveSocraticChatDialogState extends State<InteractiveSocraticChatD
   void initState() {
     super.initState();
     _api = widget.apiService ?? EngineApiService();
-    _initDialogue();
+
+    final cacheKey = widget.sessionHistoryKey ?? widget.targetEquation;
+    final cached = widget.initialMessages ?? InteractiveSocraticChatDialog._historyCache[cacheKey];
+    if (cached != null && cached.isNotEmpty) {
+      _messages.addAll(cached);
+    } else {
+      _initDialogue();
+    }
   }
 
   @override
@@ -89,6 +121,12 @@ class _InteractiveSocraticChatDialogState extends State<InteractiveSocraticChatD
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _syncHistory() {
+    final cacheKey = widget.sessionHistoryKey ?? widget.targetEquation;
+    InteractiveSocraticChatDialog._historyCache[cacheKey] = List.from(_messages);
+    widget.onHistoryChanged?.call(List.unmodifiable(_messages));
   }
 
   void _initDialogue() async {
@@ -108,26 +146,42 @@ class _InteractiveSocraticChatDialogState extends State<InteractiveSocraticChatD
           }
         : null;
 
-    final res = await _api.requestSocraticGuidance(
-      userInput: userExpr,
-      targetEquation: widget.targetEquation,
-      diagnosticBug: bugMap,
-      conversationHistory: [],
-    );
+    try {
+      final res = await _api.requestSocraticGuidance(
+        userInput: userExpr,
+        targetEquation: widget.targetEquation,
+        diagnosticBug: bugMap,
+        conversationHistory: [],
+      );
 
-    if (mounted) {
-      final text = res['final_output'] as String? ??
-          (bug != null ? bug.remediationDirective : "Bu adımı birlikte inceleyelim mi?");
+      if (mounted) {
+        final text = res['final_output'] as String? ??
+            (bug != null ? bug.remediationDirective : "Bu adımı birlikte inceleyelim mi?");
 
-      setState(() {
-        _messages.add(SocraticChatMessage(
-          role: 'assistant',
-          content: text,
-          timestamp: DateTime.now(),
-        ));
-        _isLoading = false;
-      });
-      _scrollToBottom();
+        setState(() {
+          _messages.add(SocraticChatMessage(
+            role: 'assistant',
+            content: text,
+            timestamp: DateTime.now(),
+          ));
+          _isLoading = false;
+        });
+        _syncHistory();
+        _scrollToBottom();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _messages.add(SocraticChatMessage(
+            role: 'assistant',
+            content: bug != null ? bug.remediationDirective : "Bu adımı birlikte inceleyelim mi?",
+            timestamp: DateTime.now(),
+          ));
+          _isLoading = false;
+        });
+        _syncHistory();
+        _scrollToBottom();
+      }
     }
   }
 
@@ -146,6 +200,7 @@ class _InteractiveSocraticChatDialogState extends State<InteractiveSocraticChatD
       ));
       _isLoading = true;
     });
+    _syncHistory();
     _scrollToBottom();
 
     final history = _messages.map((m) => {
@@ -165,26 +220,42 @@ class _InteractiveSocraticChatDialogState extends State<InteractiveSocraticChatD
           }
         : null;
 
-    final res = await _api.requestSocraticGuidance(
-      userInput: trimmed,
-      targetEquation: widget.targetEquation,
-      diagnosticBug: bugMap,
-      conversationHistory: history,
-    );
+    try {
+      final res = await _api.requestSocraticGuidance(
+        userInput: trimmed,
+        targetEquation: widget.targetEquation,
+        diagnosticBug: bugMap,
+        conversationHistory: history,
+      );
 
-    if (mounted) {
-      final reply = res['final_output'] as String? ??
-          "Düşünceni adım olarak ifade etmeye ne dersin?";
+      if (mounted) {
+        final reply = res['final_output'] as String? ??
+            "Düşünceni adım olarak ifade etmeye ne dersin?";
 
-      setState(() {
-        _messages.add(SocraticChatMessage(
-          role: 'assistant',
-          content: reply,
-          timestamp: DateTime.now(),
-        ));
-        _isLoading = false;
-      });
-      _scrollToBottom();
+        setState(() {
+          _messages.add(SocraticChatMessage(
+            role: 'assistant',
+            content: reply,
+            timestamp: DateTime.now(),
+          ));
+          _isLoading = false;
+        });
+        _syncHistory();
+        _scrollToBottom();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _messages.add(SocraticChatMessage(
+            role: 'assistant',
+            content: "Bağlantıda bir aksaklık oldu, ancak düşünceni bir sonraki adım olarak yazabilirsin.",
+            timestamp: DateTime.now(),
+          ));
+          _isLoading = false;
+        });
+        _syncHistory();
+        _scrollToBottom();
+      }
     }
   }
 
@@ -359,7 +430,7 @@ class _InteractiveSocraticChatDialogState extends State<InteractiveSocraticChatD
                   backgroundColor: const Color(0xFF1E293B),
                   side: const BorderSide(color: Color(0xFF334155)),
                   padding: const EdgeInsets.symmetric(horizontal: 4),
-                  onPressed: () => _sendMessage(chipText),
+                  onPressed: _isLoading ? null : () => _sendMessage(chipText),
                 );
               },
             ),
@@ -392,18 +463,29 @@ class _InteractiveSocraticChatDialogState extends State<InteractiveSocraticChatD
                         borderSide: BorderSide.none,
                       ),
                     ),
-                    onSubmitted: _sendMessage,
+                    onSubmitted: _isLoading ? null : _sendMessage,
                   ),
                 ),
                 const SizedBox(width: 8),
                 IconButton.filled(
                   key: const Key('socratic_chat_send_button'),
-                  icon: const Icon(Icons.send, size: 18),
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white70,
+                          ),
+                        )
+                      : const Icon(Icons.send, size: 18),
                   style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFF0284C7),
+                    backgroundColor: _isLoading ? const Color(0xFF334155) : const Color(0xFF0284C7),
                     foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFF334155),
+                    disabledForegroundColor: Colors.white38,
                   ),
-                  onPressed: () => _sendMessage(_textController.text),
+                  onPressed: _isLoading ? null : () => _sendMessage(_textController.text),
                 ),
               ],
             ),
