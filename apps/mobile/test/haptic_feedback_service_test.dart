@@ -80,6 +80,11 @@ void main() {
       hapticService.clearHistory();
     });
 
+    tearDown(() {
+      hapticService.throttleIntervalMs = 0;
+      hapticService.clearHistory();
+    });
+
     test('Rapid successive pulses within 40ms are throttled to protect hardware', () async {
       for (int i = 0; i < 10; i++) {
         await hapticService.keyPress();

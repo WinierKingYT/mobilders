@@ -31,7 +31,8 @@ class HapticFeedbackService {
     await _trigger(HapticType.lightImpact, HapticFeedback.lightImpact, bypassThrottling: force);
   }
 
-  Future<void> stepSuccess({bool force = false}) async {
+  Future<void> stepSuccess({bool force = true}) async {
+    // Pedagogical milestone achievement bypasses throttling to guarantee tactile celebration
     await _trigger(HapticType.mediumImpact, () async {
       await HapticFeedback.mediumImpact();
     }, bypassThrottling: force);
@@ -42,27 +43,27 @@ class HapticFeedbackService {
     await _trigger(HapticType.heavyImpact, HapticFeedback.heavyImpact, bypassThrottling: force);
   }
 
-  Future<void> selectionClick({bool force = false}) async {
+  Future<void> selectionClick({bool force = true}) async {
     await _trigger(HapticType.selectionClick, HapticFeedback.selectionClick, bypassThrottling: force);
   }
 
-  Future<void> modeSwitch({bool force = false}) async {
+  Future<void> modeSwitch({bool force = true}) async {
     await _trigger(HapticType.mediumImpact, HapticFeedback.mediumImpact, bypassThrottling: force);
   }
 
-  Future<void> clearAction({bool force = false}) async {
+  Future<void> clearAction({bool force = true}) async {
     await _trigger(HapticType.heavyImpact, HapticFeedback.heavyImpact, bypassThrottling: force);
   }
 
-  Future<void> lightImpact({bool force = false}) async {
+  Future<void> lightImpact({bool force = true}) async {
     await _trigger(HapticType.lightImpact, HapticFeedback.lightImpact, bypassThrottling: force);
   }
 
-  Future<void> mediumImpact({bool force = false}) async {
+  Future<void> mediumImpact({bool force = true}) async {
     await _trigger(HapticType.mediumImpact, HapticFeedback.mediumImpact, bypassThrottling: force);
   }
 
-  Future<void> heavyImpact({bool force = false}) async {
+  Future<void> heavyImpact({bool force = true}) async {
     await _trigger(HapticType.heavyImpact, HapticFeedback.heavyImpact, bypassThrottling: force);
   }
 

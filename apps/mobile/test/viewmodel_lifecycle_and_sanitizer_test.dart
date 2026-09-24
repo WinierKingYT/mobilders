@@ -1,12 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter/widgets.dart';
 import 'package:personal_learning_engine/data/services/engine_api_service.dart';
 import 'package:personal_learning_engine/data/services/focus_api_service.dart';
 import 'package:personal_learning_engine/data/services/session_websocket_service.dart';
 import 'package:personal_learning_engine/data/services/session_restoration_manager.dart';
 import 'package:personal_learning_engine/ui/features/diagnostic/view_models/diagnostic_view_model.dart';
 import 'package:personal_learning_engine/ui/features/session/view_models/focus_session_view_model.dart';
+import 'package:personal_learning_engine/ui/features/session/view_models/session_view_model.dart';
 import 'package:personal_learning_engine/ui/features/touchpad/instant_math_sanitizer.dart';
 import 'package:personal_learning_engine/ui/features/touchpad/math_touchpad.dart';
 
@@ -133,6 +135,86 @@ void main() {
       expect(loaded, isNotNull);
       expect(loaded!.currentPl, equals(0.20));
       expect(loaded.currentPl.isFinite, isTrue);
+    });
+  });
+
+  group('SessionViewModel & WebSocket Background Scaling Tests (Stage 32)', () {
+    test('SessionWebSocketService pauseHeartbeat and resumeHeartbeat control active state', () {
+      final ws = SessionWebSocketService(url: 'ws://127.0.0.1:8000/ws/v1/session');
+      ws.startHeartbeat();
+      expect(ws.isHeartbeatActive, isTrue);
+
+      ws.pauseHeartbeat();
+      expect(ws.isHeartbeatActive, isFalse);
+
+      ws.resumeHeartbeat();
+      expect(ws.isHeartbeatActive, isTrue);
+
+      ws.dispose();
+      expect(ws.isHeartbeatActive, isFalse);
+    });
+
+    test('SessionViewModel freezeHesitationTimer and unfreezeHesitationTimer freeze timer accurately', () async {
+      final vm = SessionViewModel(
+        apiService: EngineApiService(),
+        sessionId: 'sess_test_freeze',
+        targetEquation: 'x + 2 = 5',
+      );
+
+      vm.startHesitationTimer(duration: const Duration(milliseconds: 200));
+      expect(vm.isHesitationFrozen, isFalse);
+
+      await Future.delayed(const Duration(milliseconds: 50));
+      vm.freezeHesitationTimer();
+      expect(vm.isHesitationFrozen, isTrue);
+      expect(vm.frozenHesitationRemaining, isNotNull);
+      expect(vm.frozenHesitationRemaining!.inMilliseconds, greaterThan(0));
+      expect(vm.frozenHesitationRemaining!.inMilliseconds, lessThanOrEqualTo(200));
+
+      // Wait beyond the original 200ms duration while frozen
+      await Future.delayed(const Duration(milliseconds: 200));
+      // Should not have fired whisper because timer was frozen
+      expect(vm.hesitationWhisper, isNull);
+
+      // Unfreeze
+      vm.unfreezeHesitationTimer();
+      expect(vm.isHesitationFrozen, isFalse);
+      expect(vm.frozenHesitationRemaining, isNull);
+
+      // Wait remaining duration
+      await Future.delayed(const Duration(milliseconds: 250));
+      expect(vm.hesitationWhisper, isNotNull);
+
+      vm.dispose();
+    });
+
+    test('SessionViewModel handleAppLifecycleStateChanged scales WebSocket and hesitation timer', () {
+      final ws = SessionWebSocketService(url: 'ws://127.0.0.1:8000/ws/v1/session');
+      ws.startHeartbeat();
+
+      final vm = SessionViewModel(
+        apiService: EngineApiService(),
+        sessionId: 'sess_test_lifecycle',
+        targetEquation: '2*x = 8',
+        webSocketService: ws,
+      );
+
+      vm.startHesitationTimer(duration: const Duration(seconds: 5));
+      expect(ws.isHeartbeatActive, isTrue);
+      expect(vm.isHesitationFrozen, isFalse);
+
+      // App backgrounded (paused)
+      vm.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      expect(ws.isHeartbeatActive, isFalse);
+      expect(vm.isHesitationFrozen, isTrue);
+
+      // App foregrounded (resumed)
+      vm.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      expect(ws.isHeartbeatActive, isTrue);
+      expect(vm.isHesitationFrozen, isFalse);
+
+      vm.dispose();
+      ws.dispose();
     });
   });
 }

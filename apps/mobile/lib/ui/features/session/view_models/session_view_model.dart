@@ -1,15 +1,18 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleState;
 import '../../../../core/services/haptic_feedback_service.dart';
 import '../../../../data/services/engine_api_service.dart';
 import '../../../../data/services/offline_sync_queue.dart';
 import '../../../../data/services/session_restoration_manager.dart';
+import '../../../../data/services/session_websocket_service.dart';
 import '../../../../domain/models/solution_step.dart';
 import '../../touchpad/math_touchpad.dart';
 
 class SessionViewModel extends ChangeNotifier {
   final EngineApiService _apiService;
   final OfflineSyncQueue _syncQueue;
+  SessionWebSocketService? webSocketService;
 
   String _sessionId;
   String _targetEquation;
@@ -28,6 +31,9 @@ class SessionViewModel extends ChangeNotifier {
   bool _isZenMode = false;
   String? _hesitationWhisper;
   Timer? _hesitationTimer;
+  DateTime? _hesitationTimerStartedAt;
+  Duration _hesitationDuration = const Duration(milliseconds: 6500);
+  Duration? _frozenHesitationRemaining;
   int _streak = 0;
   bool _isShieldActive = false;
 
@@ -38,6 +44,7 @@ class SessionViewModel extends ChangeNotifier {
     String nodeId = 'N15',
     double initialPl = 0.20,
     OfflineSyncQueue? syncQueue,
+    this.webSocketService,
   })  : _apiService = apiService,
         _syncQueue = syncQueue ?? OfflineSyncQueue(),
         _sessionId = sessionId,
@@ -157,14 +164,53 @@ class SessionViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool get isHesitationFrozen => _frozenHesitationRemaining != null;
+  Duration? get frozenHesitationRemaining => _frozenHesitationRemaining;
+
   void startHesitationTimer({Duration duration = const Duration(milliseconds: 6500)}) {
     _hesitationTimer?.cancel();
+    _hesitationDuration = duration;
+    _hesitationTimerStartedAt = DateTime.now();
+    _frozenHesitationRemaining = null;
     _hesitationTimer = Timer(duration, () {
       if (_hesitationWhisper == null && !_isTargetReached && !_isSubmitting) {
         _hesitationWhisper = generateContextualWhisper(_targetEquation);
         notifyListeners();
       }
     });
+  }
+
+  /// Freezes hesitation timer when app moves to background / screen turns off (Android Doze)
+  void freezeHesitationTimer() {
+    if (_hesitationTimer != null && _hesitationTimer!.isActive && _hesitationTimerStartedAt != null) {
+      final elapsed = DateTime.now().difference(_hesitationTimerStartedAt!);
+      final remaining = _hesitationDuration - elapsed;
+      _frozenHesitationRemaining = remaining.isNegative ? Duration.zero : remaining;
+      _hesitationTimer?.cancel();
+      _hesitationTimer = null;
+    }
+  }
+
+  /// Resumes hesitation timer with remaining frozen time when returning to foreground
+  void unfreezeHesitationTimer() {
+    if (_frozenHesitationRemaining != null && _frozenHesitationRemaining! > Duration.zero) {
+      startHesitationTimer(duration: _frozenHesitationRemaining!);
+      _frozenHesitationRemaining = null;
+    }
+  }
+
+  /// Handles app lifecycle state transitions to save battery and sleep timers (Android Doze compliance)
+  void handleAppLifecycleStateChanged(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      freezeHesitationTimer();
+      webSocketService?.pauseHeartbeat();
+    } else if (state == AppLifecycleState.resumed) {
+      unfreezeHesitationTimer();
+      webSocketService?.resumeHeartbeat();
+    }
   }
 
   void resetHesitationTimer({Duration duration = const Duration(milliseconds: 6500)}) {

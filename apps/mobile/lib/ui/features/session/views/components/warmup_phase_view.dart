@@ -87,7 +87,7 @@ class _WarmupPhaseViewState extends State<WarmupPhaseView> {
     final options = question.options;
     final isCorrect = _selectedWarmupOption == question.correctOption;
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

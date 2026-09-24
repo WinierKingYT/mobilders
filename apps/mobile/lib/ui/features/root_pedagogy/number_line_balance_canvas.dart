@@ -389,14 +389,17 @@ class _NumberLineBalanceCanvasState extends State<NumberLineBalanceCanvas> {
             children: [
               const Icon(Icons.sync_alt, color: Color(0xFF38BDF8), size: 14),
               const SizedBox(width: 6),
-              Text(
-                _lastDualAction != null
-                    ? 'Çift Kodlama Senkronizasyonu: Terazi ➔ Touchpad ($_lastDualAction uygulandı)'
-                    : 'Çift Kodlama: Canlı Senkronizasyon ve Dokunsal Eşleşme Aktif',
-                style: const TextStyle(
-                  color: Color(0xFF38BDF8),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Text(
+                  _lastDualAction != null
+                      ? 'Çift Kodlama Senkronizasyonu: Terazi ➔ Touchpad ($_lastDualAction uygulandı)'
+                      : 'Çift Kodlama: Canlı Senkronizasyon ve Dokunsal Eşleşme Aktif',
+                  style: const TextStyle(
+                    color: Color(0xFF38BDF8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

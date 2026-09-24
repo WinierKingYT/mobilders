@@ -27,9 +27,43 @@ class SessionWebSocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get affectiveAlerts => _affectiveAlertController.stream;
 
+  Timer? _heartbeatTimer;
+  Duration heartbeatInterval = const Duration(seconds: 25);
+  bool _isHeartbeatPaused = false;
+  bool get isHeartbeatActive => _heartbeatTimer != null && _heartbeatTimer!.isActive && !_isHeartbeatPaused;
+
   SessionWebSocketService({
     String? url,
   }) : serverUrl = url ?? "${ApiConstants.baseUrl.replaceFirst('http', 'ws')}/ws/v1/session";
+
+  /// Initiates heartbeat ping loop when connection is established
+  void startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _isHeartbeatPaused = false;
+    if (_isDisposed) return;
+    _heartbeatTimer = Timer.periodic(heartbeatInterval, (_) {
+      if (_isDisposed || _isHeartbeatPaused || !_isConnected) return;
+      sendEvent({
+        "type": "PING",
+        "client_timestamp": DateTime.now().toIso8601String(),
+      });
+    });
+  }
+
+  /// Pauses heartbeat ping timers when app enters background / Android Doze mode
+  /// to eliminate unnecessary radio wakeups and extend battery longevity.
+  void pauseHeartbeat() {
+    _isHeartbeatPaused = true;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+  }
+
+  /// Resumes periodic heartbeat ping timers when app returns to foreground.
+  void resumeHeartbeat() {
+    if (_isDisposed) return;
+    _isHeartbeatPaused = false;
+    startHeartbeat();
+  }
 
   void connect() {
     if (_isDisposed) return;
@@ -47,6 +81,7 @@ class SessionWebSocketService {
             final Map<String, dynamic> data = jsonDecode(message as String);
             if (data["type"] == "SESSION_READY") {
               _isConnected = true;
+              startHeartbeat();
               _flushOfflineQueue();
             } else if (data["type"] == "AFFECTIVE_ALERT") {
               final payload = data["payload"];
@@ -165,6 +200,8 @@ class SessionWebSocketService {
   }
 
   void disconnect() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
     _subscription?.cancel();
     _subscription = null;
     try {
@@ -176,6 +213,8 @@ class SessionWebSocketService {
 
   void dispose() {
     _isDisposed = true;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
     disconnect();
     if (!_messageController.isClosed) {
       _messageController.close();
