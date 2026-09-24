@@ -320,28 +320,32 @@ class _MathTouchpadState extends State<MathTouchpad> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Input Mode Quick Switch Bar
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton.icon(
-                  onPressed: () {
-                    HapticFeedbackService().modeSwitch();
-                    onModeChanged(InputMode.inkingCanvas);
-                  },
-                  icon: const Icon(Icons.draw_rounded, size: 16, color: Color(0xFF38BDF8)),
-                  label: const Text("El Yazısı Kanvası", style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12)),
-                ),
-                const SizedBox(width: 8),
-                TextButton.icon(
-                  onPressed: () {
-                    HapticFeedbackService().modeSwitch();
-                    onModeChanged(InputMode.virtualKeyboard);
-                  },
-                  icon: const Icon(Icons.keyboard_outlined, size: 16, color: AppColors.textMuted),
-                  label: const Text("Klavye", style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-                ),
-              ],
+            // Input Mode Quick Switch Bar (Responsive & Overflow-Safe)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              reverse: true,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton.icon(
+                    onPressed: () {
+                      HapticFeedbackService().modeSwitch();
+                      onModeChanged(InputMode.inkingCanvas);
+                    },
+                    icon: const Icon(Icons.draw_rounded, size: 16, color: Color(0xFF38BDF8)),
+                    label: const Text("El Yazısı Kanvası", style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12)),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: () {
+                      HapticFeedbackService().modeSwitch();
+                      onModeChanged(InputMode.virtualKeyboard);
+                    },
+                    icon: const Icon(Icons.keyboard_outlined, size: 16, color: AppColors.textMuted),
+                    label: const Text("Klavye", style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 2),
             // Row 1: Math Variables & Functions

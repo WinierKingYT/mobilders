@@ -32,11 +32,14 @@ class VisualNumberLine extends StatelessWidget {
             children: [
               const Icon(Icons.linear_scale, color: Color(0xFF38BDF8), size: 16),
               const SizedBox(width: 6),
-              const Text(
-                "Görsel Sayı Çizgisi (Diskalkuli Desteği)",
-                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
+              const Expanded(
+                child: Text(
+                  "Görsel Sayı Çizgisi (Diskalkuli Desteği)",
+                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: 6),
               Text(
                 "Konum: ${currentPosition.toInt()}",
                 style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.bold),

@@ -29,12 +29,13 @@ class TunnelFocusContainer extends StatelessWidget {
             child: Row(
               children: [
                 const Icon(Icons.center_focus_strong, color: Color(0xFF38BDF8), size: 16),
-                const SizedBox(width: 8),
-                const Text(
-                  "DEHB / Dikkat Odaklama Modu",
-                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                const Expanded(
+                  child: Text(
+                    "DEHB / Dikkat Odaklama Modu",
+                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                const Spacer(),
                 TextButton(
                   onPressed: onToggleTunnelMode,
                   child: const Text(
