@@ -307,6 +307,34 @@ void main() {
       expect(find.bySemanticsLabel('silme tuşu, basılı tutulduğunda sürekli siler'), findsOneWidget);
       expect(find.bySemanticsLabel('adımı onayla ve gönder'), findsOneWidget);
     });
+
+    testWidgets('Touchpad keys satisfy WCAG 48x48 dp minimum touch target requirements', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: Scaffold(
+            body: MathTouchpad(
+              controller: controller,
+              inputMode: InputMode.touchpad,
+              onModeChanged: (_) {},
+              onSubmit: () {},
+            ),
+          ),
+        ),
+      );
+
+      final keyX = tester.getRect(find.byKey(const Key('touchpad_key_x')));
+      expect(keyX.height, greaterThanOrEqualTo(48.0));
+      expect(keyX.width, greaterThanOrEqualTo(48.0));
+
+      final backspaceKey = tester.getRect(find.byKey(const Key('touchpad_key_backspace')));
+      expect(backspaceKey.height, greaterThanOrEqualTo(48.0));
+      expect(backspaceKey.width, greaterThanOrEqualTo(48.0));
+
+      final submitKey = tester.getRect(find.byKey(const Key('touchpad_submit_key')));
+      expect(submitKey.height, greaterThanOrEqualTo(48.0));
+      expect(submitKey.width, greaterThanOrEqualTo(48.0));
+    });
   });
 }
 

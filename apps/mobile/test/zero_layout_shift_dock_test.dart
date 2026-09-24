@@ -122,5 +122,74 @@ void main() {
       final zenText = tester.widget<Text>(find.text('Zen'));
       expect(zenText.style?.color, const Color(0xFF38BDF8));
     });
+
+    testWidgets('Mode ribbon pills and Zen toggle satisfy minimum touch target constraints', (tester) async {
+      await tester.pumpWidget(buildTestableWidget(
+        onToggleZen: () {},
+      ));
+      await tester.pumpAndSettle();
+
+      // Verify Touchpad pill width >= 48
+      final touchpadPill = tester.getRect(find.widgetWithText(InkWell, 'Touchpad'));
+      expect(touchpadPill.width >= 48.0, isTrue);
+      expect(touchpadPill.height >= 32.0, isTrue);
+
+      // Verify Klavye pill width >= 48
+      final keyboardPill = tester.getRect(find.widgetWithText(InkWell, 'Klavye'));
+      expect(keyboardPill.width >= 48.0, isTrue);
+
+      // Verify Zen button width >= 48
+      final zenPill = tester.getRect(find.widgetWithText(InkWell, 'Zen'));
+      expect(zenPill.width >= 48.0, isTrue);
+    });
+
+    testWidgets('Dock maintains zero layout shift (constant height) across all input mode changes', (tester) async {
+      InputMode currentMode = InputMode.touchpad;
+      final dockKey = GlobalKey();
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: ZeroLayoutShiftDock(
+            key: dockKey,
+            currentMode: currentMode,
+            onModeChanged: (_) {},
+            child: Container(key: const ValueKey('c1'), height: 260),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      final size1 = tester.getSize(find.byKey(dockKey));
+      expect(size1.height, 310.0);
+
+      // Switch to keyboard
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: ZeroLayoutShiftDock(
+            key: dockKey,
+            currentMode: InputMode.virtualKeyboard,
+            onModeChanged: (_) {},
+            child: Container(key: const ValueKey('c2'), height: 180),
+          ),
+        ),
+      ));
+      await tester.pump(const Duration(milliseconds: 100));
+      final size2 = tester.getSize(find.byKey(dockKey));
+      expect(size2.height, 310.0);
+
+      // Switch to inking
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: ZeroLayoutShiftDock(
+            key: dockKey,
+            currentMode: InputMode.inkingCanvas,
+            onModeChanged: (_) {},
+            child: Container(key: const ValueKey('c3'), height: 320),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+      final size3 = tester.getSize(find.byKey(dockKey));
+      expect(size3.height, 310.0);
+    });
   });
 }

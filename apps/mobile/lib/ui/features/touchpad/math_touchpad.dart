@@ -435,11 +435,12 @@ class _MathTouchpadState extends State<MathTouchpad> {
       label: _getSemanticLabel(label),
       button: true,
       child: SizedBox(
-        height: 42,
+        height: 48,
         child: ElevatedButton(
           key: Key('touchpad_key_$label'),
           onPressed: onPressed,
           style: ElevatedButton.styleFrom(
+            minimumSize: const Size(48, 48),
             backgroundColor: bgColor,
             foregroundColor: fgColor,
             elevation: isHighlighted ? 4 : 1,
@@ -469,7 +470,7 @@ class _MathTouchpadState extends State<MathTouchpad> {
     String? tooltip,
   }) {
     return SizedBox(
-      height: 42,
+      height: 48,
       child: Tooltip(
         message: tooltip ?? '',
         child: Semantics(
@@ -478,6 +479,7 @@ class _MathTouchpadState extends State<MathTouchpad> {
           child: ElevatedButton(
           onPressed: onPressed,
           style: ElevatedButton.styleFrom(
+            minimumSize: const Size(48, 48),
             backgroundColor: color ?? AppColors.touchpadOpBg,
             foregroundColor: textColor ?? AppColors.touchpadKeyText,
             elevation: 1,
@@ -501,7 +503,7 @@ class _MathTouchpadState extends State<MathTouchpad> {
       label: 'adımı onayla ve gönder',
       button: true,
       child: SizedBox(
-        height: 42,
+        height: 48,
         child: ElevatedButton(
           key: const Key('touchpad_submit_key'),
           onPressed: isSubmitting
@@ -511,6 +513,7 @@ class _MathTouchpadState extends State<MathTouchpad> {
                   onSubmit();
                 },
           style: ElevatedButton.styleFrom(
+            minimumSize: const Size(48, 48),
             backgroundColor: AppColors.touchpadActionBg,
             foregroundColor: Colors.white,
             elevation: 2,
@@ -534,7 +537,7 @@ class _MathTouchpadState extends State<MathTouchpad> {
       label: 'silme tuşu, basılı tutulduğunda sürekli siler',
       button: true,
       child: SizedBox(
-        height: 42,
+        height: 48,
         child: GestureDetector(
           key: const Key('touchpad_key_backspace'),
           behavior: HitTestBehavior.opaque,
@@ -543,6 +546,7 @@ class _MathTouchpadState extends State<MathTouchpad> {
           onLongPressEnd: (_) => _stopHoldToDelete(),
           onLongPressCancel: _stopHoldToDelete,
           child: Container(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
             decoration: BoxDecoration(
               color: AppColors.touchpadOpBg,
               borderRadius: BorderRadius.circular(8),

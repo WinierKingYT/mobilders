@@ -76,7 +76,7 @@ class ZeroLayoutShiftDock extends StatelessWidget {
 
   Widget _buildModeRibbon(BuildContext context) {
     return Container(
-      height: 38,
+      height: 42,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       color: AppColors.bgPrimary.withValues(alpha: 0.6),
       child: Row(
@@ -100,45 +100,48 @@ class ZeroLayoutShiftDock extends StatelessWidget {
           ),
           const Spacer(),
           if (onToggleZenMode != null)
-            InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: () {
-                HapticFeedbackService().modeSwitch();
-                onToggleZenMode!();
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isZenModeActive
-                      ? const Color(0xFF38BDF8).withValues(alpha: 0.25)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
+            ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 36),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () {
+                  HapticFeedbackService().modeSwitch();
+                  onToggleZenMode!();
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
                     color: isZenModeActive
-                        ? const Color(0xFF38BDF8)
-                        : AppColors.textMuted.withValues(alpha: 0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.self_improvement_rounded,
-                      size: 14,
-                      color: isZenModeActive ? const Color(0xFF38BDF8) : AppColors.textMuted,
+                        ? const Color(0xFF38BDF8).withValues(alpha: 0.25)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isZenModeActive
+                          ? const Color(0xFF38BDF8)
+                          : AppColors.textMuted.withValues(alpha: 0.3),
+                      width: 1,
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Zen',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.self_improvement_rounded,
+                        size: 14,
                         color: isZenModeActive ? const Color(0xFF38BDF8) : AppColors.textMuted,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      Text(
+                        'Zen',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isZenModeActive ? const Color(0xFF38BDF8) : AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -154,43 +157,46 @@ class ZeroLayoutShiftDock extends StatelessWidget {
   }) {
     final bool isSelected = currentMode == mode;
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(6),
-      onTap: () {
-        if (!isSelected) {
-          HapticFeedbackService().selectionClick();
-          onModeChanged(mode);
-        }
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.accentPrimary.withValues(alpha: 0.2) : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: isSelected ? AppColors.accentPrimary : Colors.transparent,
-            width: 1,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 36),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: () {
+          if (!isSelected) {
+            HapticFeedbackService().selectionClick();
+            onModeChanged(mode);
+          }
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.accentPrimary.withValues(alpha: 0.2) : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: isSelected ? AppColors.accentPrimary : Colors.transparent,
+              width: 1,
+            ),
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: isSelected ? AppColors.accentPrimary : AppColors.textMuted,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? Colors.white : AppColors.textMuted,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: isSelected ? AppColors.accentPrimary : AppColors.textMuted,
               ),
-            ),
-          ],
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? Colors.white : AppColors.textMuted,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
