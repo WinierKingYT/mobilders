@@ -5,6 +5,7 @@ Implements vectorized iBKT knowledge transitions, FSRS memory decay, and DDM res
 """
 
 from __future__ import annotations
+import gc
 import math
 import time
 from typing import Dict, List, Any, Optional
@@ -87,41 +88,49 @@ class VectorizedCohortSimulationFactory:
         failures_per_node = np.zeros((n, 10), dtype=np.int32)
 
         # 3. Vectorized 30-Day Simulation Loop
-        # In each virtual day, active students perform 4 learning trials on current frontier node
+        # In each virtual day, active students perform 3 learning trials on current frontier node
         total_trials_count = 0
         current_active_node = np.zeros(n, dtype=np.int32)
 
+        # Preallocated in-place memory buffers to eliminate allocation spikes during 100k agent runs
+        p_correct_buf = np.empty(n, dtype=np.float32)
+        rand_draw_buf = np.empty(n, dtype=np.float32)
+        one_minus_ps = 1.0 - p_s_arr
+        idx_range = np.arange(n)
+
         for day in range(1, days + 1):
-            # Daily practice batch: 4 trials per active agent
+            # Daily practice batch: 3 trials per active agent
             for trial_step in range(3):
                 node_idx = current_active_node
-                curr_L = L[np.arange(n), node_idx]
+                curr_L = L[idx_range, node_idx]
 
-                # Probability of correct trial outcome under iBKT
-                p_correct = curr_L * (1.0 - p_s_arr) + (1.0 - curr_L) * p_g_arr
-                rand_draw = np.random.rand(n).astype(np.float32)
-                is_correct = (rand_draw < p_correct)
+                # Probability of correct trial outcome under iBKT with in-place multiply
+                np.multiply(curr_L, one_minus_ps, out=p_correct_buf)
+                p_correct_buf += (1.0 - curr_L) * p_g_arr
 
-                trials_per_node[np.arange(n), node_idx] += 1
-                failures_per_node[np.arange(n), node_idx] += (~is_correct).astype(np.int32)
+                rand_draw_buf = np.random.rand(n).astype(np.float32)
+                is_correct = (rand_draw_buf < p_correct_buf)
+
+                trials_per_node[idx_range, node_idx] += 1
+                failures_per_node[idx_range, node_idx] += (~is_correct).astype(np.int32)
 
                 # Vectorized BKT Bayesian update
                 # P(L | obs=1) = L*(1-s) / (L*(1-s) + (1-L)*g)
                 # P(L | obs=0) = L*s / (L*s + (1-L)*(1-g))
-                num_correct = curr_L * (1.0 - p_s_arr)
-                denom_correct = np.maximum(1e-5, p_correct)
+                num_correct = curr_L * one_minus_ps
+                denom_correct = np.maximum(1e-5, p_correct_buf)
                 post_correct = num_correct / denom_correct
 
                 num_incorrect = curr_L * p_s_arr
-                denom_incorrect = np.maximum(1e-5, 1.0 - p_correct)
+                denom_incorrect = np.maximum(1e-5, 1.0 - p_correct_buf)
                 post_incorrect = num_incorrect / denom_incorrect
 
                 posterior_L = np.where(is_correct, post_correct, post_incorrect)
                 next_L = posterior_L + (1.0 - posterior_L) * p_t_arr
-                L[np.arange(n), node_idx] = np.clip(np.nan_to_num(next_L, nan=0.01), 0.01, 0.99)
+                L[idx_range, node_idx] = np.clip(np.nan_to_num(next_L, nan=0.01), 0.01, 0.99)
 
                 # Frontier advance condition: student masters node (L >= 0.85)
-                advanced = (L[np.arange(n), node_idx] >= 0.85) & (current_active_node < 9)
+                advanced = (L[idx_range, node_idx] >= 0.85) & (current_active_node < 9)
                 current_active_node = np.where(advanced, current_active_node + 1, current_active_node)
                 total_trials_count += n
 
@@ -130,6 +139,10 @@ class VectorizedCohortSimulationFactory:
             safe_s0 = np.maximum(0.1, np.nan_to_num(fsrs_s0_arr[:, np.newaxis], nan=2.0))
             fsrs_decay_factor = 1.0 / (1.0 + (1.0 / (9.0 * safe_s0)))
             L = np.clip(np.nan_to_num(L * (0.92 + (0.08 * fsrs_decay_factor)), nan=0.01), 0.01, 0.99)
+
+            # Periodic garbage collection sweep every 10 virtual days for RAM recovery
+            if day % 10 == 0:
+                gc.collect()
 
         # 4. Synthesize Node Health & Detect Bottlenecks
         pass_rates = {}
