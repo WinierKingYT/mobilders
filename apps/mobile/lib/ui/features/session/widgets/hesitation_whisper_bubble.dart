@@ -18,9 +18,20 @@ class HesitationWhisperBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
+    return TweenAnimationBuilder<Offset>(
+      key: const Key('hesitation_whisper_slide_anim'),
+      tween: Tween<Offset>(begin: const Offset(0.0, 0.2), end: Offset.zero),
+      duration: const Duration(milliseconds: 280),
       curve: Curves.easeOutCubic,
+      builder: (context, offset, child) {
+        return FractionalTranslation(
+          translation: offset,
+          child: child,
+        );
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
@@ -90,6 +101,7 @@ class HesitationWhisperBubble extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

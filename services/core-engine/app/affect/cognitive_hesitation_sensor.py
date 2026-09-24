@@ -19,7 +19,7 @@ class HesitationSignal(BaseModel):
 
 
 class CognitiveHesitationSensor:
-    HESITATION_THRESHOLD_MS = 8000.0  # 8.0 seconds of complete idle
+    HESITATION_THRESHOLD_MS = 6500.0  # 6.5 seconds intelligent hesitation threshold
     MAX_HESITATION_MS = 90000.0        # Above 90s, it escalates to Freezing
 
     @classmethod

@@ -157,7 +157,7 @@ class SessionViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void startHesitationTimer({Duration duration = const Duration(milliseconds: 8500)}) {
+  void startHesitationTimer({Duration duration = const Duration(milliseconds: 6500)}) {
     _hesitationTimer?.cancel();
     _hesitationTimer = Timer(duration, () {
       if (_hesitationWhisper == null && !_isTargetReached && !_isSubmitting) {
@@ -167,7 +167,7 @@ class SessionViewModel extends ChangeNotifier {
     });
   }
 
-  void resetHesitationTimer({Duration duration = const Duration(milliseconds: 8500)}) {
+  void resetHesitationTimer({Duration duration = const Duration(milliseconds: 6500)}) {
     if (_hesitationWhisper != null) {
       _hesitationWhisper = null;
       notifyListeners();
