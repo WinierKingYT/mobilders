@@ -56,3 +56,23 @@ def test_micro_triumph_evaluation_incorrect():
     assert result.dopamine_pulse is False
     assert result.confidence_bonus == 0.0
     assert "Yaklaştın" in result.feedback_message
+
+
+def test_micro_variant_generation_subtraction():
+    engine = MicroTriumphEngine()
+    variant = engine.generate_micro_variant("x - 4 = 10", rule_id="RULE_SUB")
+    assert variant.is_unassisted is True
+    assert variant.original_rule == "RULE_SUB"
+    # new_c = 5, new_rhs = 12, expected = 17
+    assert variant.target_expression == "x - 5 = 12"
+    assert variant.expected_answer == "17"
+
+
+def test_micro_variant_generation_two_step():
+    engine = MicroTriumphEngine()
+    variant = engine.generate_micro_variant("2x + 4 = 10", rule_id="RULE_TWO_STEP")
+    assert variant.is_unassisted is True
+    # new_coeff = 3, target_x = 4, new_c = 5, new_rhs = 3*4 + 5 = 17
+    assert variant.target_expression == "3x + 5 = 17"
+    assert variant.expected_answer == "4"
+

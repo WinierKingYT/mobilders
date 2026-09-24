@@ -68,7 +68,7 @@ class MicroTriumphEngine:
                 expected_answer=str(new_ans),
             )
 
-        # Variant for simple addition/subtraction: e.g. x + 5 = 12
+        # Variant for simple addition: e.g. x + 5 = 12
         match_add = re.match(r"^x\+(\d+)=(\d+)$", clean)
         if match_add:
             c = int(match_add.group(1))
@@ -82,6 +82,43 @@ class MicroTriumphEngine:
                 prompt=f"Tek başına bir mikro adım: x + {new_c} = {new_rhs} denkleminde x kaçtır?",
                 target_expression=f"x + {new_c} = {new_rhs}",
                 expected_answer=str(expected),
+            )
+
+        # Variant for simple subtraction: e.g. x - 4 = 10
+        match_sub = re.match(r"^x\-(\d+)=(\d+)$", clean)
+        if match_sub:
+            c = int(match_sub.group(1))
+            rhs = int(match_sub.group(2))
+            new_c = c + 1
+            new_rhs = rhs + 2
+            expected = new_rhs + new_c
+            return MicroVariant(
+                variant_id=f"mv_x_sub_{new_c}",
+                original_rule=rule_id,
+                prompt=f"Tek başına bir mikro adım: x - {new_c} = {new_rhs} denkleminde x kaçtır?",
+                target_expression=f"x - {new_c} = {new_rhs}",
+                expected_answer=str(expected),
+            )
+
+        # Variant for two-step linear equations: e.g. 2x + 4 = 10
+        match_lin = re.match(r"^(\d+)x([+-])(\d+)=(\d+)$", clean)
+        if match_lin:
+            coeff = int(match_lin.group(1))
+            op = match_lin.group(2)
+            c = int(match_lin.group(3))
+            new_coeff = coeff + 1 if coeff < 8 else 2
+            target_x = 4
+            new_c = c + 1
+            if op == "+":
+                new_rhs = new_coeff * target_x + new_c
+            else:
+                new_rhs = new_coeff * target_x - new_c
+            return MicroVariant(
+                variant_id=f"mv_{new_coeff}x_{op}_{new_c}",
+                original_rule=rule_id,
+                prompt=f"Şimdi aynı adımı kendin başar: {new_coeff}x {op} {new_c} = {new_rhs} ise x kaçtır?",
+                target_expression=f"{new_coeff}x {op} {new_c} = {new_rhs}",
+                expected_answer=str(target_x),
             )
 
         # Default fallback micro-variant: 3x = 15

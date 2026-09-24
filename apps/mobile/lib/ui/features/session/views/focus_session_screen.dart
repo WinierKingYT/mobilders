@@ -595,7 +595,17 @@ class _FocusSessionScreenState extends State<FocusSessionScreen> {
   Widget _buildNotificationBanner(FocusSessionViewModel vm) {
     final isError = vm.errorMessage != null;
     final message = vm.errorMessage ?? vm.feedbackMessage!;
-    final color = isError ? const Color(0xFFEF4444) : const Color(0xFF38BDF8);
+    final isTriumph = !isError && (
+      message.contains('Harika') ||
+      message.contains('Başarılı') ||
+      message.contains('Tebrikler') ||
+      message.contains('kaptın') ||
+      message.contains('Doğru') ||
+      message.contains('Tamamlandı')
+    );
+    final color = isError
+        ? const Color(0xFFEF4444)
+        : (isTriumph ? const Color(0xFF10B981) : const Color(0xFF38BDF8));
 
     return Container(
       width: double.infinity,
@@ -608,8 +618,13 @@ class _FocusSessionScreenState extends State<FocusSessionScreen> {
       ),
       child: Row(
         children: [
-          Icon(isError ? Icons.error_outline_rounded : Icons.info_outline_rounded,
-              color: color, size: 16),
+          Icon(
+            isError
+                ? Icons.error_outline_rounded
+                : (isTriumph ? Icons.stars_rounded : Icons.info_outline_rounded),
+            color: color,
+            size: 16,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
