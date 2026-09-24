@@ -16,6 +16,7 @@ class MathTouchpad extends StatelessWidget {
   final InputMode inputMode;
   final ValueChanged<InputMode> onModeChanged;
   final bool isSubmitting;
+  final String? highlightedToken;
 
   const MathTouchpad({
     super.key,
@@ -24,6 +25,7 @@ class MathTouchpad extends StatelessWidget {
     required this.inputMode,
     required this.onModeChanged,
     this.isSubmitting = false,
+    this.highlightedToken,
   });
 
   void _insertText(String text) {
@@ -378,22 +380,37 @@ class MathTouchpad extends StatelessWidget {
   }
 
   Widget _key(String label, VoidCallback onPressed, {int flex = 1, bool isOp = false}) {
+    final bool isHighlighted = highlightedToken != null &&
+        highlightedToken!.isNotEmpty &&
+        (label == highlightedToken ||
+            highlightedToken!.contains(label) ||
+            label.contains(highlightedToken!));
+
+    final Color bgColor = isHighlighted
+        ? const Color(0xFF0369A1)
+        : (isOp ? AppColors.touchpadOpBg : AppColors.touchpadKeyBg);
+    final Color fgColor = isHighlighted
+        ? Colors.white
+        : AppColors.touchpadKeyText;
+
     return SizedBox(
       height: 42,
       child: ElevatedButton(
+        key: Key('touchpad_key_$label'),
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: isOp ? AppColors.touchpadOpBg : AppColors.touchpadKeyBg,
-          foregroundColor: AppColors.touchpadKeyText,
-          elevation: 1,
+          backgroundColor: bgColor,
+          foregroundColor: fgColor,
+          elevation: isHighlighted ? 4 : 1,
           padding: EdgeInsets.zero,
+          side: isHighlighted ? const BorderSide(color: Color(0xFF38BDF8), width: 2) : BorderSide.none,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: isOp ? 17 : 19,
-            fontWeight: FontWeight.w600,
+            fontWeight: isHighlighted ? FontWeight.bold : FontWeight.w600,
             fontFamily: isOp ? null : 'monospace',
           ),
         ),

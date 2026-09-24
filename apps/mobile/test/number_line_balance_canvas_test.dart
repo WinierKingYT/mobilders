@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:personal_learning_engine/core/services/haptic_feedback_service.dart';
 import 'package:personal_learning_engine/ui/features/root_pedagogy/number_line_balance_canvas.dart';
 
 void main() {
@@ -139,6 +140,42 @@ void main() {
 
     expect(find.text('2x + 3 = 11'), findsWidgets);
     expect(latestEquation, '2x + 3 = 11');
+  });
+
+  testWidgets('Balance scale triggers onDualCodingAction and haptic feedback during manipulation', (WidgetTester tester) async {
+    String? dualAction;
+    final haptics = HapticFeedbackService();
+    haptics.triggeredHistory.clear();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: NumberLineBalanceCanvas(
+            initialMode: RootCanvasMode.balanceScale,
+            onDualCodingAction: (action) => dualAction = action,
+          ),
+        ),
+      ),
+    );
+
+    // Initial check: sync badge is active
+    expect(find.byKey(const Key('dual_coding_sync_badge')), findsOneWidget);
+    expect(find.textContaining('Çift Kodlama: Canlı Senkronizasyon'), findsOneWidget);
+
+    // Tap subtract 3
+    await tester.tap(find.text('Her İki Kefeden 3 Eksilt (-3)'));
+    await tester.pump();
+
+    expect(dualAction, '- 3');
+    expect(haptics.triggeredHistory.contains(HapticType.mediumImpact), isTrue);
+    expect(find.textContaining('- 3 uygulandı'), findsOneWidget);
+
+    // Tap reset
+    await tester.tap(find.byKey(const Key('btn_reset_balance')));
+    await tester.pump();
+
+    expect(dualAction, 'reset');
+    expect(haptics.triggeredHistory.contains(HapticType.selectionClick), isTrue);
   });
 }
 

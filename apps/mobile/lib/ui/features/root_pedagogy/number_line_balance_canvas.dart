@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/haptic_feedback_service.dart';
 
 enum RootCanvasMode {
   numberLine,
@@ -12,12 +13,14 @@ class NumberLineBalanceCanvas extends StatefulWidget {
   final RootCanvasMode initialMode;
   final double scaffoldOpacity;
   final ValueChanged<String>? onEquationChanged;
+  final ValueChanged<String>? onDualCodingAction;
 
   const NumberLineBalanceCanvas({
     super.key,
     this.initialMode = RootCanvasMode.numberLine,
     this.scaffoldOpacity = 1.0,
     this.onEquationChanged,
+    this.onDualCodingAction,
   });
 
   @override
@@ -38,6 +41,7 @@ class _NumberLineBalanceCanvasState extends State<NumberLineBalanceCanvas> {
   int _leftWeight = 3;
   int _rightWeight = 11;
   final int _boxValue = 4; // 2x + 3 = 11 => 2x = 8 => x = 4
+  String? _lastDualAction;
 
   @override
   void initState() {
@@ -341,7 +345,7 @@ class _NumberLineBalanceCanvasState extends State<NumberLineBalanceCanvas> {
         // Eşzamanlı Çift Yönlü Cebirsel Denklem Kartı
         Container(
           key: const Key('dynamic_algebraic_equation_card'),
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: const Color(0xFF0F172A),
@@ -365,6 +369,34 @@ class _NumberLineBalanceCanvasState extends State<NumberLineBalanceCanvas> {
                   fontFamily: 'monospace',
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Çift Kodlama Canlı Senkronizasyon Rozeti
+        Container(
+          key: const Key('dual_coding_sync_badge'),
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0284C7).withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF38BDF8)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.sync_alt, color: Color(0xFF38BDF8), size: 14),
+              const SizedBox(width: 6),
+              Text(
+                _lastDualAction != null
+                    ? 'Çift Kodlama Senkronizasyonu: Terazi ➔ Touchpad ($_lastDualAction uygulandı)'
+                    : 'Çift Kodlama: Canlı Senkronizasyon ve Dokunsal Eşleşme Aktif',
+                style: const TextStyle(
+                  color: Color(0xFF38BDF8),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -431,11 +463,14 @@ class _NumberLineBalanceCanvasState extends State<NumberLineBalanceCanvas> {
             ElevatedButton(
               onPressed: _leftWeight > 0 && _rightWeight >= 3
                   ? () => setState(() {
+                        HapticFeedbackService().mediumImpact();
                         _leftWeight -= 3;
                         _rightWeight -= 3;
+                        _lastDualAction = '- 3';
                         widget.onEquationChanged?.call(
                           _leftWeight == 0 ? "2x = $_rightWeight" : "2x + $_leftWeight = $_rightWeight",
                         );
+                        widget.onDualCodingAction?.call('- 3');
                       })
                   : null,
               style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
@@ -446,9 +481,12 @@ class _NumberLineBalanceCanvasState extends State<NumberLineBalanceCanvas> {
               OutlinedButton.icon(
                 key: const Key('btn_reset_balance'),
                 onPressed: () => setState(() {
+                  HapticFeedbackService().selectionClick();
                   _leftWeight = 3;
                   _rightWeight = 11;
+                  _lastDualAction = null;
                   widget.onEquationChanged?.call("2x + $_leftWeight = $_rightWeight");
+                  widget.onDualCodingAction?.call('reset');
                 }),
                 icon: const Icon(Icons.replay, size: 14, color: Colors.white70),
                 label: const Text('Sıfırla', style: TextStyle(color: Colors.white70, fontSize: 12)),

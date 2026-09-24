@@ -230,6 +230,33 @@ void main() {
       expect(controller.text, '(x + 2)');
       expect(controller.selection.baseOffset, 7);
     });
+
+    testWidgets('Highlighted token from dual coding illuminates matching touchpad keys', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: Scaffold(
+            body: MathTouchpad(
+              controller: controller,
+              inputMode: InputMode.touchpad,
+              onModeChanged: (_) {},
+              onSubmit: () {},
+              highlightedToken: '- 3',
+            ),
+          ),
+        ),
+      );
+
+      final minusKey = find.byKey(const Key('touchpad_key_-'));
+      final threeKey = find.byKey(const Key('touchpad_key_3'));
+
+      expect(minusKey, findsOneWidget);
+      expect(threeKey, findsOneWidget);
+
+      final minusBtn = tester.widget<ElevatedButton>(minusKey);
+      final style = minusBtn.style;
+      expect(style?.backgroundColor?.resolve({}), const Color(0xFF0369A1));
+    });
   });
 }
 
