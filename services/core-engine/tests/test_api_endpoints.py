@@ -284,4 +284,45 @@ def test_protocol_22_rest_aliases():
     assert d6["lock_duration_seconds"] == 14 * 3600
 
 
+def test_api_token_bucket_rate_limiter_exceeded():
+    """Aşama 53: Saniyede 10 doğrulama isteği kuralı ve 429 Too Many Requests denetimi."""
+    session_id = "test-session-rate-limit"
+    payload = {
+        "session_id": session_id,
+        "node_id": "N07",
+        "step_number": 1,
+        "user_expression": "x**2 + 6*x = 2",
+        "target_equation": "x**2 + 6*x - 2 = 0",
+    }
+
+    # 10 burst isteği başarıyla kabul edilir
+    for i in range(10):
+        # Farklı client_msg_id kullanarak idempotency bypass edilir
+        req_payload = {**payload, "client_msg_id": f"burst_msg_{i}"}
+        resp = client.post("/api/v1/session/step/verify", json=req_payload)
+        assert resp.status_code == 200
+
+    # 11. anlık istekte token tükenir ve 429 Too Many Requests fırlatılır
+    overflow_resp = client.post("/api/v1/session/step/verify", json={**payload, "client_msg_id": "burst_msg_overflow"})
+    assert overflow_resp.status_code == 429
+    assert "Rate limit exceeded" in overflow_resp.json()["detail"]
+
+
+def test_api_payload_size_limit_10kb():
+    """Aşama 53: 10KB'ı aşan anormal payload'ların HTTP 413 ile reddedilmesi."""
+    # 10 * 1024 = 10240 bayttan büyük payload oluştur
+    large_expr = "x + " * 3000 + "1 = 0"
+    payload = {
+        "session_id": "test-session-large-payload",
+        "node_id": "N07",
+        "step_number": 1,
+        "user_expression": large_expr,
+        "target_equation": "x = 0",
+    }
+    resp = client.post("/api/v1/session/step/verify", json=payload)
+    assert resp.status_code == 413
+    assert "Payload Too Large" in resp.json()["detail"]
+
+
+
 

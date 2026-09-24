@@ -55,7 +55,30 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
             )
             raise
 
-# Sıkılaştırılmış CORS ayarları (app/core/config.py ve .env kaynaklı)
+from starlette.responses import JSONResponse
+
+MAX_PAYLOAD_SIZE_BYTES = 10 * 1024  # 10 KB (Aşama 53)
+
+class PayloadSizeLimitMiddleware(BaseHTTPMiddleware):
+    """
+    Aşama 53: Anormal büyük girdi gövdelerini (10KB üzeri) doğrudan reddeder.
+    """
+    async def dispatch(self, request: Request, call_next):
+        if request.method in ("POST", "PUT", "PATCH"):
+            content_length = request.headers.get("content-length")
+            if content_length:
+                try:
+                    if int(content_length) > MAX_PAYLOAD_SIZE_BYTES:
+                        return JSONResponse(
+                            status_code=413,
+                            content={"detail": "Payload Too Large: Maksimum istek boyutu 10KB sınırını aştı."},
+                        )
+                except ValueError:
+                    pass
+        return await call_next(request)
+
+# Sıkılaştırılmış CORS ve Güvenlik ayarları (app/core/config.py ve .env kaynaklı)
+app.add_middleware(PayloadSizeLimitMiddleware)
 app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(
     CORSMiddleware,

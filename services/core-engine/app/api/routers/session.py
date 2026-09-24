@@ -1,6 +1,7 @@
 import logging
 import math
 import time
+from threading import Lock
 from typing import Optional, Dict, List, Any
 from fastapi import APIRouter, HTTPException, status, WebSocket, WebSocketDisconnect
 from app.models.schemas import (
@@ -30,6 +31,44 @@ from app.api.deps import (
     _IDEMPOTENCY_CACHE,
 )
 
+class TokenBucketRateLimiter:
+    """
+    Aşama 53: Token Bucket Hız Sınırlayıcı.
+    Saniyede azami 10 doğrulama isteği kuralı (10 req/s burst limit).
+    """
+    def __init__(self, rate: float = 10.0, capacity: float = 10.0):
+        self.rate = rate
+        self.capacity = capacity
+        self.buckets: Dict[str, Dict[str, float]] = {}
+        self._lock = Lock()
+
+    def acquire(self, key: str = "default", tokens: float = 1.0) -> bool:
+        with self._lock:
+            now = time.monotonic()
+            if key not in self.buckets:
+                self.buckets[key] = {
+                    "tokens": self.capacity,
+                    "last_updated": now,
+                }
+            bucket = self.buckets[key]
+            elapsed = now - bucket["last_updated"]
+            bucket["last_updated"] = now
+            bucket["tokens"] = min(self.capacity, bucket["tokens"] + elapsed * self.rate)
+
+            if bucket["tokens"] >= tokens:
+                bucket["tokens"] -= tokens
+                return True
+            return False
+
+    def reset(self, key: Optional[str] = None):
+        with self._lock:
+            if key:
+                self.buckets.pop(key, None)
+            else:
+                self.buckets.clear()
+
+step_verify_rate_limiter = TokenBucketRateLimiter(rate=10.0, capacity=10.0)
+
 router = APIRouter(tags=["Session"])
 logger = logging.getLogger("session_websocket")
 
@@ -41,7 +80,15 @@ async def verify_step(request: StepVerificationRequest) -> StepVerificationRespo
     Doğru değilse 5 temel bozuk kuralı (Buggy Rules) arar.
     Destekler: client_msg_id ile tam idempotent yanıt önbelleklemesi.
     """
-    # 0. İdempotentlik Denetimi: Önceden işlenmiş adım tekrarlanırsa önbellekten dön
+    # 0. Aşama 53: Token Bucket Hız Sınırlaması (10 req/s limit)
+    rate_key = request.session_id or "default_session"
+    if not step_verify_rate_limiter.acquire(key=rate_key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Rate limit exceeded: Saniyede azami 10 doğrulama isteği gönderilebilir.",
+        )
+
+    # 1. İdempotentlik Denetimi: Önceden işlenmiş adım tekrarlanırsa önbellekten dön
     if request.client_msg_id and request.client_msg_id in _IDEMPOTENCY_CACHE:
         cached_resp = _IDEMPOTENCY_CACHE[request.client_msg_id]
         return cached_resp.model_copy(update={"is_replayed": True})
