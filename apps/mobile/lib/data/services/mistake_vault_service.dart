@@ -9,9 +9,70 @@ import 'engine_api_service.dart';
 /// Provides asynchronous local disk persistence and optional API synchronization.
 class MistakeVaultService extends ChangeNotifier {
   static final MistakeVaultService _instance = MistakeVaultService._internal();
+
+  /// Aşama 56: İç Depolama İzolasyonu Denetimi
+  /// Harici paylaşımlı dizinleri (/sdcard, /storage/emulated/0/Download) reddeder,
+  /// yalnızca güvenli uygulama içi depolamayı (app_flutter / sandbox) onaylar.
+  static bool isSafeInternalPath(String path) {
+    final lower = path.toLowerCase();
+    if (lower.contains('/sdcard') ||
+        lower.contains('/storage/emulated/0/download') ||
+        lower.contains('/external_sd')) {
+      return false;
+    }
+    return true;
+  }
+
+  /// Aşama 56: Varsayılan güvenli iç depolama dizini (app_flutter)
+  static String getDefaultInternalStoragePath() {
+    if (Platform.isAndroid || Platform.isIOS) {
+      return '/data/user/0/com.antigravity.mobilders/app_flutter/mistake_vault.json';
+    }
+    return '${Directory.systemTemp.path}/app_flutter/mistake_vault.json';
+  }
+
+  /// Aşama 56: Hassas Bilişsel Veri Minimizasyonu (Zero-PII)
+  /// Kişisel verileri, kullanıcı kimliklerini, cihaz bilgilerini filtreleyerek
+  /// yalnızca soru/düğüm ID'si, hata kuralı ve adım matematiğini saklar.
+  static Map<String, dynamic> sanitizeAndMinimize(Map<String, dynamic> raw) {
+    const sensitiveKeys = {
+      'user_id',
+      'student_id',
+      'student_name',
+      'email',
+      'device_id',
+      'ip_address',
+      'location',
+      'biometric_data',
+      'camera_feed',
+      'personal_notes',
+      'phone_number',
+    };
+    final sanitized = Map<String, dynamic>.from(raw);
+    for (final key in sensitiveKeys) {
+      sanitized.remove(key);
+    }
+    return {
+      'id': sanitized['id'] ?? '',
+      'bug_id': sanitized['bug_id'] ?? '',
+      'node_id': sanitized['node_id'] ?? '',
+      'problem': sanitized['problem'] ?? '',
+      'offending_step': sanitized['offending_step'] ?? '',
+      'correct_principle': sanitized['correct_principle'] ?? '',
+      'status': sanitized['status'] ?? 'open',
+      'stability_days': (sanitized['stability_days'] as num?)?.toDouble() ?? 0.5,
+      'is_due': sanitized['is_due'] ?? true,
+    };
+  }
+
   factory MistakeVaultService({String? storageFilePath}) {
-    if (storageFilePath != null && _instance.storageFilePath != storageFilePath) {
-      _instance.storageFilePath = storageFilePath;
+    final targetPath = storageFilePath ?? _instance.storageFilePath ?? getDefaultInternalStoragePath();
+    if (_instance.storageFilePath != targetPath) {
+      if (!isSafeInternalPath(targetPath)) {
+        _instance.storageFilePath = getDefaultInternalStoragePath();
+      } else {
+        _instance.storageFilePath = targetPath;
+      }
       _instance._loadFromDisk();
     }
     return _instance;
@@ -161,9 +222,13 @@ class MistakeVaultService extends ChangeNotifier {
   Future<void> _persistToDisk() async {
     if (storageFilePath == null) return;
     try {
+      if (!isSafeInternalPath(storageFilePath!)) {
+        storageFilePath = getDefaultInternalStoragePath();
+      }
       final file = File(storageFilePath!);
       await file.parent.create(recursive: true);
-      final listJson = _mistakes.map((m) => m.toJson()).toList();
+      // Aşama 56: Veri Minimizasyonu - Yalnızca pedagojik ve matematiksel alanlar saklanır
+      final listJson = _mistakes.map((m) => sanitizeAndMinimize(m.toJson())).toList();
       final tempFile = File('${storageFilePath!}.tmp');
       await tempFile.writeAsString(jsonEncode(listJson), flush: true);
       if (await tempFile.exists()) {
