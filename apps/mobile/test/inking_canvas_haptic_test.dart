@@ -1,3 +1,4 @@
+import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_learning_engine/core/services/haptic_feedback_service.dart';
@@ -161,6 +162,157 @@ void main() {
       );
       final p3 = VectorInkingPainter(strokes: [stroke]);
       expect(p3.shouldRepaint(p1), isTrue);
+    });
+
+    testWidgets('Stylus drawing records PointerDeviceKind.stylus and pressure in strokes', (tester) async {
+      List<VectorInkingStroke>? capturedStrokes;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 600,
+            child: VectorInkingCanvas(
+              onStrokesUpdated: (strokes) => capturedStrokes = strokes,
+            ),
+          ),
+        ),
+      ));
+
+      final stylusGesture = await tester.startGesture(
+        const Offset(120, 220),
+        pointer: 1,
+        kind: PointerDeviceKind.stylus,
+      );
+      await tester.pump();
+      await stylusGesture.moveBy(const Offset(30, 40));
+      await tester.pump();
+      await stylusGesture.up();
+      await tester.pumpAndSettle();
+
+      expect(capturedStrokes, isNotNull);
+      expect(capturedStrokes!.length, 1);
+      expect(capturedStrokes!.first.deviceKind, PointerDeviceKind.stylus);
+    });
+
+    testWidgets('Palm rejection rejects accidental touch down while stylus is active', (tester) async {
+      List<VectorInkingStroke>? capturedStrokes;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 600,
+            child: VectorInkingCanvas(
+              enablePalmRejection: true,
+              onStrokesUpdated: (strokes) => capturedStrokes = strokes,
+            ),
+          ),
+        ),
+      ));
+
+      // Stylus begins writing
+      final stylusGesture = await tester.startGesture(
+        const Offset(100, 150),
+        pointer: 1,
+        kind: PointerDeviceKind.stylus,
+      );
+      await tester.pump();
+
+      // Accidental palm touch down concurrently
+      final palmGesture = await tester.startGesture(
+        const Offset(250, 350),
+        pointer: 2,
+        kind: PointerDeviceKind.touch,
+      );
+      await tester.pump();
+      await palmGesture.moveBy(const Offset(20, 20));
+      await tester.pump();
+      await palmGesture.up();
+      await tester.pump();
+
+      // Finish stylus stroke
+      await stylusGesture.moveBy(const Offset(40, 40));
+      await tester.pump();
+      await stylusGesture.up();
+      await tester.pumpAndSettle();
+
+      // Palm stroke was rejected; only 1 stroke exists
+      expect(capturedStrokes, isNotNull);
+      expect(capturedStrokes!.length, 1);
+      expect(capturedStrokes!.first.deviceKind, PointerDeviceKind.stylus);
+    });
+
+    testWidgets('Stylus-only mode completely ignores finger touches', (tester) async {
+      List<VectorInkingStroke>? capturedStrokes;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 600,
+            child: VectorInkingCanvas(
+              stylusOnlyMode: true,
+              onStrokesUpdated: (strokes) => capturedStrokes = strokes,
+            ),
+          ),
+        ),
+      ));
+
+      final fingerTouch = await tester.startGesture(
+        const Offset(100, 200),
+        pointer: 1,
+        kind: PointerDeviceKind.touch,
+      );
+      await tester.pump();
+      await fingerTouch.moveBy(const Offset(30, 30));
+      await tester.pump();
+      await fingerTouch.up();
+      await tester.pumpAndSettle();
+
+      expect(capturedStrokes, isNull);
+    });
+
+    testWidgets('Header toggle toggles S-Pen only mode', (tester) async {
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 600,
+            child: VectorInkingCanvas(),
+          ),
+        ),
+      ));
+
+      expect(find.text('Tümü'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('inking_stylus_toggle')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('S-Pen'), findsOneWidget);
+    });
+
+    test('VectorInkingPoint and VectorInkingStroke JSON serialization preserves stylus fields', () {
+      const pt = VectorInkingPoint(
+        x: 45.5,
+        y: 89.2,
+        timestampMs: 12345678,
+        pressure: 0.72,
+        tilt: 0.15,
+        deviceKind: PointerDeviceKind.stylus,
+      );
+      final json = pt.toJson();
+      expect(json['x'], 45.5);
+      expect(json['p'], 0.72);
+      expect(json['tilt'], 0.15);
+      expect(json['kind'], 'stylus');
+
+      final stroke = VectorInkingStroke(
+        id: 's_test',
+        points: [pt],
+        color: Colors.cyan,
+        strokeWidth: 3.5,
+        deviceKind: PointerDeviceKind.stylus,
+      );
+      final strokeJson = stroke.toJson();
+      expect(strokeJson['id'], 's_test');
+      expect(strokeJson['kind'], 'stylus');
     });
   });
 }

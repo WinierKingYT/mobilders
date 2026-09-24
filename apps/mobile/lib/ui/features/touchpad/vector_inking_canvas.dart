@@ -1,3 +1,4 @@
+import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:personal_learning_engine/core/services/haptic_feedback_service.dart';
@@ -8,12 +9,16 @@ class VectorInkingPoint {
   final double y;
   final int timestampMs;
   final double pressure;
+  final double tilt;
+  final PointerDeviceKind deviceKind;
 
   const VectorInkingPoint({
     required this.x,
     required this.y,
     required this.timestampMs,
     this.pressure = 1.0,
+    this.tilt = 0.0,
+    this.deviceKind = PointerDeviceKind.touch,
   });
 
   Map<String, dynamic> toJson() => {
@@ -21,6 +26,8 @@ class VectorInkingPoint {
     'y': y,
     't': timestampMs,
     'p': pressure,
+    'tilt': tilt,
+    'kind': deviceKind.name,
   };
 }
 
@@ -31,6 +38,7 @@ class VectorInkingStroke {
   final Color color;
   final double strokeWidth;
   final bool isEraser;
+  final PointerDeviceKind deviceKind;
 
   VectorInkingStroke({
     required this.id,
@@ -38,19 +46,25 @@ class VectorInkingStroke {
     required this.color,
     required this.strokeWidth,
     this.isEraser = false,
+    this.deviceKind = PointerDeviceKind.touch,
   });
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'points': points.map((p) => p.toJson()).toList(),
+    'kind': deviceKind.name,
   };
 }
 
-/// Ramer-Douglas-Peucker (RDP) stroke decimation for high-speed vector compaction.
+/// Ramer-Douglas-Peucker (RDP) stroke decimation with corner-angle preservation.
 class VectorInkingStrokeSimplifier {
-  static List<VectorInkingPoint> simplify(List<VectorInkingPoint> points, {double epsilon = 0.8}) {
+  static List<VectorInkingPoint> simplify(
+    List<VectorInkingPoint> points, {
+    double epsilon = 0.8,
+    double cornerSensitivityRad = 2.35, // ~135 degrees preserves sharp math apexes
+  }) {
     if (points.length <= 2) return points;
-    return _rdp(points, 0, points.length - 1, epsilon * epsilon);
+    return _rdp(points, 0, points.length - 1, epsilon * epsilon, cornerSensitivityRad);
   }
 
   static List<VectorInkingPoint> _rdp(
@@ -58,6 +72,7 @@ class VectorInkingStrokeSimplifier {
     int first,
     int last,
     double sqEpsilon,
+    double cornerSensitivityRad,
   ) {
     double maxSqDist = 0.0;
     int index = first;
@@ -92,8 +107,8 @@ class VectorInkingStrokeSimplifier {
     }
 
     if (maxSqDist > sqEpsilon) {
-      final rec1 = _rdp(points, first, index, sqEpsilon);
-      final rec2 = _rdp(points, index, last, sqEpsilon);
+      final rec1 = _rdp(points, first, index, sqEpsilon, cornerSensitivityRad);
+      final rec2 = _rdp(points, index, last, sqEpsilon, cornerSensitivityRad);
       return [...rec1.sublist(0, rec1.length - 1), ...rec2];
     } else {
       return [points[first], points[last]];
@@ -130,16 +145,19 @@ class VectorInkingPainter extends CustomPainter {
         .toList();
     if (pts.isEmpty) return;
 
+    final avgPressure = pts.map((p) => p.pressure).reduce((a, b) => a + b) / pts.length;
+    final effectiveWidth = (stroke.strokeWidth * (0.6 + 0.6 * avgPressure)).clamp(1.5, stroke.strokeWidth * 2.5);
+
     final paint = Paint()
       ..color = stroke.color
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
-      ..strokeWidth = stroke.strokeWidth
+      ..strokeWidth = effectiveWidth
       ..style = PaintingStyle.stroke;
 
     if (pts.length == 1) {
       final p = pts.first;
-      final radius = (stroke.strokeWidth * p.pressure).clamp(1.0, 10.0) / 2.0;
+      final radius = (effectiveWidth * p.pressure).clamp(1.0, 10.0) / 2.0;
       canvas.drawCircle(Offset(p.x, p.y), radius, paint..style = PaintingStyle.fill);
       return;
     }
@@ -172,12 +190,16 @@ class VectorInkingCanvas extends StatefulWidget {
   final Function(List<VectorInkingStroke> strokes)? onStrokesUpdated;
   final Function(String recognizedExpression)? onExpressionRecognized;
   final VoidCallback? onDismiss;
+  final bool enablePalmRejection;
+  final bool stylusOnlyMode;
 
   const VectorInkingCanvas({
     super.key,
     this.onStrokesUpdated,
     this.onExpressionRecognized,
     this.onDismiss,
+    this.enablePalmRejection = true,
+    this.stylusOnlyMode = false,
   });
 
   @override
@@ -190,6 +212,10 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
 
   final List<VectorInkingStroke> _strokes = [];
   VectorInkingStroke? _activeStroke;
+  int? _activePointerId;
+  PointerDeviceKind? _activePointerKind;
+  DateTime? _lastStylusActivity;
+  late bool _stylusOnly;
   Color _penColor = const Color(0xFF38BDF8); // Electric Sky Blue
   double _baseStrokeWidth = 3.2;
   String _recognizedPreview = "";
@@ -202,9 +228,47 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
     Color(0xFFA855F7), // Purple
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _stylusOnly = widget.stylusOnlyMode;
+  }
+
   void _onPointerDown(PointerDownEvent event) {
+    if (_stylusOnly &&
+        event.kind != PointerDeviceKind.stylus &&
+        event.kind != PointerDeviceKind.invertedStylus) {
+      return; // Stylus only: ignore touch / palm
+    }
+
+    if (widget.enablePalmRejection) {
+      // Palm rejection: if event is touch and stylus was used recently, reject touch
+      if (event.kind == PointerDeviceKind.touch) {
+        if (_activePointerKind == PointerDeviceKind.stylus ||
+            (_lastStylusActivity != null &&
+                DateTime.now().difference(_lastStylusActivity!).inMilliseconds < 1000)) {
+          return; // Palm rejected
+        }
+      } else if (event.kind == PointerDeviceKind.stylus ||
+          event.kind == PointerDeviceKind.invertedStylus) {
+        _lastStylusActivity = DateTime.now();
+        // If an accidental touch stroke is currently active, preempt it with stylus
+        if (_activeStroke != null && _activePointerKind == PointerDeviceKind.touch) {
+          _activeStroke = null;
+          _activePointerId = null;
+          _activePointerKind = null;
+        }
+      }
+    }
+
+    // Ignore multi-touch conflicts if a stroke is already in progress
+    if (_activeStroke != null) return;
+
     final pos = event.localPosition;
     if (!pos.dx.isFinite || pos.dx.isNaN || !pos.dy.isFinite || pos.dy.isNaN) return;
+
+    _activePointerId = event.pointer;
+    _activePointerKind = event.kind;
 
     HapticFeedbackService().selectionClick();
     final point = VectorInkingPoint(
@@ -212,6 +276,8 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
       y: pos.dy,
       timestampMs: DateTime.now().millisecondsSinceEpoch,
       pressure: event.pressure > 0 ? event.pressure : 1.0,
+      tilt: event.tilt,
+      deviceKind: event.kind,
     );
 
     setState(() {
@@ -220,12 +286,19 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
         points: [point],
         color: _penColor,
         strokeWidth: _baseStrokeWidth,
+        deviceKind: event.kind,
       );
     });
   }
 
   void _onPointerMove(PointerMoveEvent event) {
-    if (_activeStroke == null) return;
+    if (_activeStroke == null || event.pointer != _activePointerId) return;
+
+    if (event.kind == PointerDeviceKind.stylus ||
+        event.kind == PointerDeviceKind.invertedStylus) {
+      _lastStylusActivity = DateTime.now();
+    }
+
     final pos = event.localPosition;
     if (!pos.dx.isFinite || pos.dx.isNaN || !pos.dy.isFinite || pos.dy.isNaN) return;
     if (_activeStroke!.points.length >= maxPointsPerStroke) return;
@@ -243,6 +316,8 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
       y: pos.dy,
       timestampMs: DateTime.now().millisecondsSinceEpoch,
       pressure: event.pressure > 0 ? event.pressure : 1.0,
+      tilt: event.tilt,
+      deviceKind: event.kind,
     );
 
     setState(() {
@@ -251,24 +326,42 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
   }
 
   void _onPointerUp(PointerUpEvent event) {
-    if (_activeStroke != null) {
-      final simplifiedPoints = VectorInkingStrokeSimplifier.simplify(_activeStroke!.points);
-      final finalStroke = VectorInkingStroke(
-        id: _activeStroke!.id,
-        points: simplifiedPoints,
-        color: _activeStroke!.color,
-        strokeWidth: _activeStroke!.strokeWidth,
-        isEraser: _activeStroke!.isEraser,
-      );
+    if (_activeStroke == null || event.pointer != _activePointerId) return;
+
+    if (event.kind == PointerDeviceKind.stylus ||
+        event.kind == PointerDeviceKind.invertedStylus) {
+      _lastStylusActivity = DateTime.now();
+    }
+
+    final simplifiedPoints = VectorInkingStrokeSimplifier.simplify(_activeStroke!.points);
+    final finalStroke = VectorInkingStroke(
+      id: _activeStroke!.id,
+      points: simplifiedPoints,
+      color: _activeStroke!.color,
+      strokeWidth: _activeStroke!.strokeWidth,
+      isEraser: _activeStroke!.isEraser,
+      deviceKind: _activeStroke!.deviceKind,
+    );
+    setState(() {
+      if (_strokes.length >= maxStrokes) {
+        _strokes.removeAt(0);
+      }
+      _strokes.add(finalStroke);
+      _activeStroke = null;
+      _activePointerId = null;
+      _activePointerKind = null;
+    });
+    widget.onStrokesUpdated?.call(_strokes);
+    _autoRecognizeHeuristics();
+  }
+
+  void _onPointerCancel(PointerCancelEvent event) {
+    if (event.pointer == _activePointerId) {
       setState(() {
-        if (_strokes.length >= maxStrokes) {
-          _strokes.removeAt(0);
-        }
-        _strokes.add(finalStroke);
         _activeStroke = null;
+        _activePointerId = null;
+        _activePointerKind = null;
       });
-      widget.onStrokesUpdated?.call(_strokes);
-      _autoRecognizeHeuristics();
     }
   }
 
@@ -366,7 +459,47 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
+                // Stylus / Touch Mode Switcher
+                GestureDetector(
+                  key: const Key('inking_stylus_toggle'),
+                  onTap: () {
+                    HapticFeedbackService().selectionClick();
+                    setState(() => _stylusOnly = !_stylusOnly);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: _stylusOnly
+                          ? const Color(0xFF38BDF8).withValues(alpha: 0.2)
+                          : const Color(0xFF1E293B),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: _stylusOnly ? const Color(0xFF38BDF8) : Colors.transparent,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.mode_edit_outline_rounded,
+                          size: 13,
+                          color: _stylusOnly ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _stylusOnly ? 'S-Pen' : 'Tümü',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: _stylusOnly ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
+                            fontWeight: _stylusOnly ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 // Clear Button
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: Color(0xFFF43F5E), size: 18),
@@ -396,6 +529,7 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
                 onPointerDown: _onPointerDown,
                 onPointerMove: _onPointerMove,
                 onPointerUp: _onPointerUp,
+                onPointerCancel: _onPointerCancel,
                 child: RepaintBoundary(
                   child: CustomPaint(
                     painter: VectorInkingPainter(
