@@ -76,9 +76,13 @@ def test_bkt_individualized_parameters():
     # High procedural student makes fewer careless slips (lower P(S))
     assert high_student_params.p_s < low_student_params.p_s
 
-    # In all cases, slip must not exceed theoretical ceiling of 0.25
-    assert high_student_params.p_s <= 0.25
-    assert low_student_params.p_s <= 0.25
+    # In all cases, slip must not exceed theoretical ceiling of 0.20 and guess <= 0.30, and p_t in [0.05, 0.40]
+    assert high_student_params.p_s <= 0.20
+    assert low_student_params.p_s <= 0.20
+    assert high_student_params.p_g <= 0.30
+    assert low_student_params.p_g <= 0.30
+    assert 0.05 <= high_student_params.p_t <= 0.40
+    assert 0.05 <= low_student_params.p_t <= 0.40
 
 
 # ==========================================

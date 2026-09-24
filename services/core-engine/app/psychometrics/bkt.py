@@ -23,9 +23,9 @@ def sigmoid(z: float) -> float:
 class BKTParameters(BaseModel):
     """Parameters for Bayesian Knowledge Tracing."""
     p_l0: float = Field(0.20, ge=0.0, le=1.0, description="Prior probability of knowing the skill")
-    p_t: float = Field(0.15, ge=0.0, le=1.0, description="Probability of transition (learning)")
-    p_s: float = Field(0.10, ge=0.0, le=0.25, description="Probability of slip (mistake despite knowing)")
-    p_g: float = Field(0.02, ge=0.0, le=0.50, description="Probability of guess (correct without knowing)")
+    p_t: float = Field(0.15, ge=0.05, le=0.40, description="Probability of transition (learning)")
+    p_s: float = Field(0.10, ge=0.0, le=0.20, description="Probability of slip (mistake despite knowing)")
+    p_g: float = Field(0.02, ge=0.0, le=0.30, description="Probability of guess (correct without knowing)")
 
 
 class IndividualizedBKT:
@@ -58,29 +58,29 @@ class IndividualizedBKT:
         Calculates individualized BKT parameters using logistic link functions:
         - P(L_0) = sigma(beta_0 + gamma_0 - b_0)
         - P(T)   = sigma(beta_t + eta_i * alpha_j - d_j)
-        - P(S)   = min(0.25, sigma(beta_s - kappa_i * theta_proc + omega_j))
-        - P(G)   = (1 / K) * sigma(beta_g - a_j * (theta_i - b_j)) [or open-ended default]
+        - P(S)   = min(0.20, sigma(beta_s - kappa_i * theta_proc + omega_j))
+        - P(G)   = min(0.30, (1 / K) * sigma(beta_g - a_j * (theta_i - b_j))) [or open-ended default]
         """
         # Prior knowledge
         z_l0 = beta_0 + gamma_0 - b_0
         p_l0 = max(0.01, min(0.95, sigmoid(z_l0)))
 
-        # Learning rate
+        # Learning rate: dynamic balancing within [0.05, 0.40] for stable mastery trajectory
         z_t = beta_t + (eta_i * alpha_j) - d_j
-        p_t = max(0.01, min(0.60, sigmoid(z_t)))
+        p_t = max(0.05, min(0.40, sigmoid(z_t)))
 
-        # Slip probability (strictly bounded <= 0.25)
+        # Slip probability (strictly bounded <= 0.20 and >= 0.01)
         z_s = beta_s - (kappa_i * theta_proc) + omega_j
-        p_s = min(0.25, max(0.01, sigmoid(z_s)))
+        p_s = min(0.20, max(0.01, sigmoid(z_s)))
 
-        # Guess probability
+        # Guess probability (strictly bounded <= 0.30 and >= 0.001)
         z_g = beta_g - (a_j * (theta_i - b_j))
         if num_choices and num_choices > 1:
             p_g = (1.0 / float(num_choices)) * sigmoid(z_g)
         else:
             # Open-ended math input: guess is very low
             p_g = 0.05 * sigmoid(z_g)
-        p_g = max(0.001, min(0.25, p_g))
+        p_g = max(0.001, min(0.30, p_g))
 
         return BKTParameters(p_l0=p_l0, p_t=p_t, p_s=p_s, p_g=p_g)
 
