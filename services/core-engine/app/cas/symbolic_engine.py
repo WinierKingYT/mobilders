@@ -641,4 +641,50 @@ class SymbolicEquivalenceEngine:
 
         return round(total, 6)
 
+    def detect_root_loss(
+        self, original_eq_str: str, simplified_eq_str: str, var: str = "x"
+    ) -> Tuple[bool, Set[Any]]:
+        """
+        Denklem sadeleştirmelerinde (örneğin x*(x - 2) = 0 -> x - 2 = 0)
+        sıfır veya diğer köklerin kaybolup kaybolmadığını denetler.
+        Returns: (has_root_loss, missing_roots)
+        """
+        orig_expr = self.parse_to_sympy(original_eq_str)
+        simp_expr = self.parse_to_sympy(simplified_eq_str)
+        var_sym = self.symbols.get(var, sp.Symbol(var))
+
+        try:
+            orig_roots = set(sp.solve(orig_expr, var_sym))
+            simp_roots = set(sp.solve(simp_expr, var_sym))
+            missing = orig_roots - simp_roots
+            return (len(missing) > 0, missing)
+        except Exception:
+            return (False, set())
+
+    def verify_inequality_step(
+        self, prev_ineq_str: str, next_ineq_str: str, var: str = "x"
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Eşitsizlik adımlarının (örneğin -2*x < 6 -> x > -3) doğruluğunu ve
+        negatif çarpan/bölenlerde yön değiştirme kuralına uyulup uyulmadığını doğrular.
+        Returns: (is_valid, feedback_message)
+        """
+        prev_clean = ImplicitMultiplicationPreprocessor.preprocess(prev_ineq_str)
+        next_clean = ImplicitMultiplicationPreprocessor.preprocess(next_ineq_str)
+        var_sym = self.symbols.get(var, sp.Symbol(var))
+
+        try:
+            prev_sym = sp.sympify(prev_clean, locals=self.symbols)
+            next_sym = sp.sympify(next_clean, locals=self.symbols)
+            prev_sol = sp.reduce_inequalities(prev_sym, var_sym)
+            next_sol = sp.reduce_inequalities(next_sym, var_sym)
+
+            if prev_sol == next_sol:
+                return True, None
+            else:
+                return False, "Eşitsizlik negatif bir sayı ile çarpıldığında veya bölündüğünde yön değiştirmelidir."
+        except Exception as e:
+            return False, f"Eşitsizlik çözümlenemedi: {e}"
+
+
 

@@ -169,6 +169,32 @@ def test_cas_sandbox_security_with_poly_symbols(cas):
         cas.parse_to_sympy("__import__('os').system('ls')")
 
 
+def test_cas_detect_root_loss(cas):
+    """x(x-2) = 0 denkleminde x=0 kök kaybının tespit edildiğini doğrular."""
+    has_loss, lost_roots = cas.detect_root_loss("x*(x - 2) = 0", "x - 2 = 0")
+    assert has_loss is True
+    assert 0 in lost_roots
+
+    # Kök kaybı olmayan geçerli denklem adımı
+    has_loss_valid, lost_roots_valid = cas.detect_root_loss("x**2 - 4 = 0", "(x - 2)*(x + 2) = 0")
+    assert has_loss_valid is False
+    assert len(lost_roots_valid) == 0
+
+
+def test_cas_verify_inequality_step(cas):
+    """Negatif sayı ile bölmede eşitsizlik yön değişiminin katı kontrolünü test eder."""
+    # -2x < 6 -> x > -3 (doğru yön değişimi)
+    is_valid, msg = cas.verify_inequality_step("-2*x < 6", "x > -3")
+    assert is_valid is True
+    assert msg is None
+
+    # -2x < 6 -> x < -3 (yön değişimi unutulmuş, hatalı adım)
+    is_valid_err, msg_err = cas.verify_inequality_step("-2*x < 6", "x < -3")
+    assert is_valid_err is False
+    assert "yön değiştirmelidir" in msg_err
+
+
+
 # ==============================================================================
 # 4. 10 BUGGY RULES — POSITIVE DETECTION (TRUE POSITIVES)
 # ==============================================================================

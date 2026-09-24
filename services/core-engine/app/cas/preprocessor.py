@@ -31,6 +31,7 @@ class ImplicitMultiplicationPreprocessor:
         s = s.replace("×", "*").replace("·", "*").replace("•", "*")
         s = s.replace("÷", "/")
         s = s.replace("±", "+")
+        s = s.replace("≤", "<=").replace("≥", ">=").replace("≠", "!=")
         s = s.replace("^", "**")
 
         # Çift veya çoklu eşitlik normalizasyonu: == -> =
@@ -87,8 +88,9 @@ class ImplicitMultiplicationPreprocessor:
         s = re.sub(r"(\d+),(\d+)", r"\1.\2", s)
 
         # Eşittir içeren denklemlerde LHS ve RHS'yi ayrı işle
-        if "=" in s:
-            parts = s.split("=")
+        # Ancak <=, >=, != eşitsizliklerini bozma
+        if re.search(r"(?<![<>!])=(?!=)", s):
+            parts = re.split(r"(?<![<>!])=(?!=)", s)
             processed_parts = [cls._preprocess_expression(p) for p in parts]
             return " = ".join(processed_parts)
         else:
