@@ -192,4 +192,80 @@ class AppTheme {
     final darkest = l1 > l2 ? l2 : l1;
     return (brightest + 0.05) / (darkest + 0.05);
   }
+
+  /// Current dynamic frame rate target adapting to battery levels (Stage 34)
+  static FrameRateTarget get currentFrameRate => BatteryPowerOptimizer().targetFrameRate;
+
+  /// Whether high-intensity particle animations are allowed under current battery state
+  static bool get areParticlesEnabled => BatteryPowerOptimizer().enableParticleEffects;
+
+  /// Whether device is in battery saver mode (battery <= 15%)
+  static bool get isLowPowerMode => BatteryPowerOptimizer().isLowPowerMode;
+}
+
+/// Dynamic refresh rate targets for Samsung Galaxy S22 LTPO display (Stage 34)
+enum FrameRateTarget {
+  highRefresh120Hz(120, Duration(microseconds: 8333)),
+  standard60Hz(60, Duration(microseconds: 16666)),
+  powerSaver30Hz(30, Duration(microseconds: 33333));
+
+  final int targetFps;
+  final Duration frameBudget;
+  const FrameRateTarget(this.targetFps, this.frameBudget);
+}
+
+/// Manages dynamic frame rate scaling (120Hz -> 60Hz) and visual throttling on low battery
+class BatteryPowerOptimizer with ChangeNotifier {
+  static final BatteryPowerOptimizer _instance = BatteryPowerOptimizer._internal();
+  factory BatteryPowerOptimizer() => _instance;
+  BatteryPowerOptimizer._internal();
+
+  bool _isLowPowerMode = false;
+  int _batteryLevelPercent = 100;
+  FrameRateTarget _targetFrameRate = FrameRateTarget.highRefresh120Hz;
+  bool _enableParticleEffects = true;
+  bool _enableHeavyCanvasAnimations = true;
+
+  bool get isLowPowerMode => _isLowPowerMode;
+  int get batteryLevelPercent => _batteryLevelPercent;
+  FrameRateTarget get targetFrameRate => _targetFrameRate;
+  bool get enableParticleEffects => _enableParticleEffects;
+  bool get enableHeavyCanvasAnimations => _enableHeavyCanvasAnimations;
+
+  /// Updates current battery state and dynamically throttles frame rates & visuals.
+  /// When battery drops to 15% or below (or manual power saver is active),
+  /// high-refresh (120Hz LTPO) throttles to standard 60Hz or 30Hz,
+  /// and heavy particle effects are disabled to conserve energy.
+  void updateBatteryState({
+    required int batteryLevelPercent,
+    bool? isPowerSaverActive,
+  }) {
+    _batteryLevelPercent = batteryLevelPercent.clamp(0, 100);
+    final isSaver = isPowerSaverActive ?? (_batteryLevelPercent <= 15);
+    _isLowPowerMode = isSaver;
+
+    if (_isLowPowerMode) {
+      if (_batteryLevelPercent <= 5) {
+        _targetFrameRate = FrameRateTarget.powerSaver30Hz;
+      } else {
+        _targetFrameRate = FrameRateTarget.standard60Hz;
+      }
+      _enableParticleEffects = false;
+      _enableHeavyCanvasAnimations = false;
+    } else {
+      _targetFrameRate = FrameRateTarget.highRefresh120Hz;
+      _enableParticleEffects = true;
+      _enableHeavyCanvasAnimations = true;
+    }
+    notifyListeners();
+  }
+
+  void reset() {
+    _isLowPowerMode = false;
+    _batteryLevelPercent = 100;
+    _targetFrameRate = FrameRateTarget.highRefresh120Hz;
+    _enableParticleEffects = true;
+    _enableHeavyCanvasAnimations = true;
+    notifyListeners();
+  }
 }

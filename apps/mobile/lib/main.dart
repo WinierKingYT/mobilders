@@ -22,6 +22,9 @@ class PersonalLearningEngineApp extends StatelessWidget {
 
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider<BatteryPowerOptimizer>.value(
+          value: BatteryPowerOptimizer(),
+        ),
         Provider<EngineApiService>(
           create: (_) => EngineApiService(),
           dispose: (_, service) => service.dispose(),

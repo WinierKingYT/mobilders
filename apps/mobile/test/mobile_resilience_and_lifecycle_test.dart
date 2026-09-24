@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_learning_engine/data/services/engine_api_service.dart';
 import 'package:personal_learning_engine/domain/models/misconception_profile_model.dart';
+import 'package:personal_learning_engine/ui/core/app_theme.dart';
 import 'package:personal_learning_engine/ui/features/analytics/views/misconception_profiler_screen.dart';
 import 'package:personal_learning_engine/ui/features/session/view_models/session_view_model.dart';
 import 'package:personal_learning_engine/ui/features/session/widgets/interactive_socratic_chat_dialog.dart';
@@ -231,6 +232,76 @@ void main() {
       expect(step!.isValid, false);
       expect(step.errorMessage, contains('çevrimdışı'));
       expect(vm.syncQueue.pendingCount, 1);
+    });
+  });
+
+  group('BatteryPowerOptimizer & Dynamic Refresh Rate (120Hz -> 60Hz) Tests (Stage 34)', () {
+    late BatteryPowerOptimizer optimizer;
+
+    setUp(() {
+      optimizer = BatteryPowerOptimizer();
+      optimizer.reset();
+    });
+
+    tearDown(() {
+      optimizer.reset();
+    });
+
+    test('Normal battery level (> 15%) maintains 120Hz LTPO refresh and enables particle effects', () {
+      optimizer.updateBatteryState(batteryLevelPercent: 85);
+
+      expect(optimizer.isLowPowerMode, isFalse);
+      expect(optimizer.batteryLevelPercent, equals(85));
+      expect(optimizer.targetFrameRate, equals(FrameRateTarget.highRefresh120Hz));
+      expect(optimizer.targetFrameRate.targetFps, equals(120));
+      expect(optimizer.enableParticleEffects, isTrue);
+      expect(optimizer.enableHeavyCanvasAnimations, isTrue);
+
+      expect(AppTheme.currentFrameRate, equals(FrameRateTarget.highRefresh120Hz));
+      expect(AppTheme.areParticlesEnabled, isTrue);
+      expect(AppTheme.isLowPowerMode, isFalse);
+    });
+
+    test('Low battery (<= 15%) dynamically throttles frame rate to 60Hz and disables particles', () {
+      optimizer.updateBatteryState(batteryLevelPercent: 14);
+
+      expect(optimizer.isLowPowerMode, isTrue);
+      expect(optimizer.batteryLevelPercent, equals(14));
+      expect(optimizer.targetFrameRate, equals(FrameRateTarget.standard60Hz));
+      expect(optimizer.targetFrameRate.targetFps, equals(60));
+      expect(optimizer.enableParticleEffects, isFalse);
+      expect(optimizer.enableHeavyCanvasAnimations, isFalse);
+
+      expect(AppTheme.currentFrameRate, equals(FrameRateTarget.standard60Hz));
+      expect(AppTheme.areParticlesEnabled, isFalse);
+      expect(AppTheme.isLowPowerMode, isTrue);
+    });
+
+    test('Critical battery (<= 5%) throttles frame rate to 30Hz power saver mode', () {
+      optimizer.updateBatteryState(batteryLevelPercent: 4);
+
+      expect(optimizer.isLowPowerMode, isTrue);
+      expect(optimizer.targetFrameRate, equals(FrameRateTarget.powerSaver30Hz));
+      expect(optimizer.targetFrameRate.targetFps, equals(30));
+      expect(optimizer.enableParticleEffects, isFalse);
+    });
+
+    test('Manual power saver trigger forces 60Hz throttle regardless of battery level', () {
+      optimizer.updateBatteryState(batteryLevelPercent: 90, isPowerSaverActive: true);
+
+      expect(optimizer.isLowPowerMode, isTrue);
+      expect(optimizer.targetFrameRate, equals(FrameRateTarget.standard60Hz));
+      expect(optimizer.enableParticleEffects, isFalse);
+    });
+
+    test('Reset restores 100% battery state and 120Hz high refresh target', () {
+      optimizer.updateBatteryState(batteryLevelPercent: 10);
+      expect(optimizer.isLowPowerMode, isTrue);
+
+      optimizer.reset();
+      expect(optimizer.isLowPowerMode, isFalse);
+      expect(optimizer.targetFrameRate, equals(FrameRateTarget.highRefresh120Hz));
+      expect(optimizer.enableParticleEffects, isTrue);
     });
   });
 }
