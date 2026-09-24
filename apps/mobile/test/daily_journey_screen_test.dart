@@ -292,4 +292,92 @@ void main() {
     expect(find.byType(InteractiveCoordinateCanvas), findsNothing);
     expect(find.byType(EuclideanCanvas), findsNothing);
   });
+
+  group('DailyJourneyScreen Micro-Goal Animation & Offline Progress Tests (Stage 64)', () {
+    testWidgets('Renders animated micro-goal progress bar and updates on phase transition', (tester) async {
+      final apiService = EngineApiService();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            Provider<EngineApiService>.value(value: apiService),
+            ChangeNotifierProvider<SessionViewModel>(
+              create: (_) => SessionViewModel(
+                apiService: apiService,
+                sessionId: 'test-session-064',
+                targetEquation: 'x^2 + 6x - 2 = 0',
+              ),
+            ),
+            ChangeNotifierProvider<DiagnosticViewModel>(
+              create: (_) => DiagnosticViewModel(
+                apiService: apiService,
+                sessionId: 'test-cat-064',
+              ),
+            ),
+          ],
+          child: const MaterialApp(
+            home: DailyJourneyScreen(initialPhase: DailyPhase.warmup),
+          ),
+        ),
+      );
+
+      // Verify micro-goal progress bar container exists
+      expect(find.byKey(const Key('micro_goal_progress_container')), findsOneWidget);
+      expect(find.byKey(const Key('micro_goal_progress_bar')), findsOneWidget);
+      expect(find.textContaining('0 / 4 Tamamlandı'), findsOneWidget);
+
+      // Verify offline daily progress badge
+      expect(find.byKey(const Key('offline_daily_progress_badge')), findsOneWidget);
+
+      // Advance from Warmup to Diagnostic
+      final advanceBtn = find.text('Isınmayı Tamamla -> CAT Teşhise Başla');
+      expect(advanceBtn, findsOneWidget);
+      await tester.tap(advanceBtn);
+      await tester.pumpAndSettle();
+
+      // Micro-goal completion badge must be visible with 25% Akış
+      expect(find.byKey(const Key('micro_goal_completion_badge')), findsOneWidget);
+      expect(find.textContaining('1 / 4 Tamamlandı'), findsOneWidget);
+      expect(find.text('25% Akış'), findsOneWidget);
+    });
+
+    testWidgets('Initializes in problemBoard phase and reflects 50% flow and offline records', (tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final apiService = EngineApiService();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            Provider<EngineApiService>.value(value: apiService),
+            ChangeNotifierProvider<SessionViewModel>(
+              create: (_) => SessionViewModel(
+                apiService: apiService,
+                sessionId: 'test-session-064-b',
+                targetEquation: 'x^2 + 6x - 2 = 0',
+              ),
+            ),
+            ChangeNotifierProvider<DiagnosticViewModel>(
+              create: (_) => DiagnosticViewModel(
+                apiService: apiService,
+                sessionId: 'test-cat-064-b',
+              ),
+            ),
+          ],
+          child: const MaterialApp(
+            home: DailyJourneyScreen(initialPhase: DailyPhase.problemBoard),
+          ),
+        ),
+      );
+
+      // In problemBoard (phase index 2), progress is 2 / 4 = 50%
+      expect(find.textContaining('2 / 4 Tamamlandı'), findsOneWidget);
+      expect(find.text('50% Akış'), findsOneWidget);
+      expect(find.byKey(const Key('offline_daily_progress_badge')), findsOneWidget);
+    });
+  });
 }
+

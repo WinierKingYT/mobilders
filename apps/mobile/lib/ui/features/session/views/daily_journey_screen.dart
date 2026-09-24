@@ -45,6 +45,14 @@ class DailyJourneyScreen extends StatefulWidget {
   final void Function(int tabIndex)? onNavigateToTab;
   final DailyPhase initialPhase;
 
+  static final Set<String> _offlineDailyProgressCache = {};
+
+  static int get offlineDailyProgressCount => _offlineDailyProgressCache.length;
+
+  static void resetOfflineDailyProgressCache() {
+    _offlineDailyProgressCache.clear();
+  }
+
   const DailyJourneyScreen({
     super.key,
     this.onNavigateToTab,
@@ -60,10 +68,22 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
   bool _showScratchpad = false;
   ActiveVisualCanvas _activeCanvas = ActiveVisualCanvas.none;
 
+  void _recordOfflineStep(String phaseKey) {
+    DailyJourneyScreen._offlineDailyProgressCache.add(phaseKey);
+  }
+
+  void _setPhase(DailyPhase phase) {
+    setState(() {
+      _currentPhase = phase;
+      _recordOfflineStep(_currentPhase.name);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     _currentPhase = widget.initialPhase;
+    _recordOfflineStep(_currentPhase.name);
   }
 
   bool get _showGeometricCanvas => _activeCanvas == ActiveVisualCanvas.geometric;
@@ -360,6 +380,119 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
               _buildStepIndicator("4. Kapanış", DailyPhase.reflection),
             ],
           ),
+          _buildMicroGoalProgressBar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMicroGoalProgressBar() {
+    const totalGoals = 4;
+    final completedGoals = _currentPhase.index.clamp(0, totalGoals);
+    final progress = completedGoals / totalGoals;
+
+    return Container(
+      key: const Key('micro_goal_progress_container'),
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B).withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.stars_rounded, color: Color(0xFFF59E0B), size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    "Günlük Mikro-Kazanım: $completedGoals / $totalGoals Tamamlandı",
+                    style: const TextStyle(
+                      color: Color(0xFFF1F5F9),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    key: const Key('offline_daily_progress_badge'),
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                    margin: const EdgeInsets.only(right: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFF38BDF8), width: 0.6),
+                    ),
+                    child: Text(
+                      "${DailyJourneyScreen.offlineDailyProgressCount} Çevrimdışı Kayıt",
+                      style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 9, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  if (completedGoals > 0)
+                    Container(
+                      key: const Key('micro_goal_completion_badge'),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFF10B981), width: 0.8),
+                      ),
+                      child: Text(
+                        "${(progress * 100).toInt()}% Akış",
+                        style: const TextStyle(color: Color(0xFF34D399), fontSize: 9.5, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Stack(
+            children: [
+              Container(
+                height: 5,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              TweenAnimationBuilder<double>(
+                key: const Key('micro_goal_progress_bar'),
+                tween: Tween<double>(begin: 0.0, end: progress),
+                duration: const Duration(milliseconds: 350),
+                curve: Curves.easeOutCubic,
+                builder: (context, animatedValue, child) {
+                  return FractionallySizedBox(
+                    widthFactor: animatedValue.clamp(0.001, 1.0),
+                    child: Container(
+                      height: 5,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF38BDF8), Color(0xFF10B981)],
+                        ),
+                        borderRadius: BorderRadius.circular(3),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF38BDF8).withValues(alpha: 0.5),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -424,7 +557,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
     switch (_currentPhase) {
       case DailyPhase.warmup:
         return WarmupPhaseView(
-          onCompleted: () => setState(() => _currentPhase = DailyPhase.diagnostic),
+          onCompleted: () => _setPhase(DailyPhase.diagnostic),
         );
       case DailyPhase.diagnostic:
         return Consumer<DiagnosticViewModel>(
@@ -434,7 +567,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
             }
             return DiagnosticScreen(
               showAppBar: false,
-              onCompleted: () => setState(() => _currentPhase = DailyPhase.problemBoard),
+              onCompleted: () => _setPhase(DailyPhase.problemBoard),
             );
           },
         );
@@ -503,7 +636,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
                       ),
                       onPressed: () {
                         HapticFeedbackService().selectionClick();
-                        setState(() => _currentPhase = DailyPhase.reflection);
+                        _setPhase(DailyPhase.reflection);
                       },
                       icon: const Icon(Icons.arrow_forward, size: 16),
                       label: const Text("Metabilişsel Kapanışa Geç"),
@@ -516,7 +649,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
         );
       case DailyPhase.reflection:
         return ReflectionPhaseView(
-          onCompleted: () => setState(() => _currentPhase = DailyPhase.completed),
+          onCompleted: () => _setPhase(DailyPhase.completed),
         );
       case DailyPhase.completed:
         return CircadianLockView(
@@ -554,7 +687,7 @@ class _DailyJourneyScreenState extends State<DailyJourneyScreen> {
             ),
             onPressed: () {
               HapticFeedbackService().selectionClick();
-              setState(() => _currentPhase = DailyPhase.problemBoard);
+              _setPhase(DailyPhase.problemBoard);
             },
             child: const Text("Çözüm Tahtasına İlerle (10 Dk)"),
           ),
