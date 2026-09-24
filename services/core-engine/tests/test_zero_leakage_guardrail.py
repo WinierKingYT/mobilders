@@ -261,3 +261,50 @@ def test_socratic_pipeline_resilient_fallback(pipeline):
     assert len(log.final_output) > 0
 
 
+def test_cas_ast_token_whitelist_and_code_injection_defense():
+    """
+    Aşama 54: Matematik İfade Ayrıştırıcısında AST Beyaz Liste Denetimi & Kod Enjeksiyon Koruması.
+    '__', 'import', 'exec', 'eval', string literalleri ve rastgele kod çalıştırma girişimleri
+    Zero-Execution garantisiyle SecurityViolationError veya ValueError fırlatmalıdır.
+    """
+    from app.cas.symbolic_engine import SymbolicEquivalenceEngine, SecurityViolationError
+
+    engine = SymbolicEquivalenceEngine()
+
+    malicious_vectors = [
+        "__import__('os').system('dir')",
+        "__import__('sys').exit(0)",
+        "import os",
+        "exec('x = 5')",
+        "eval('2 + 2')",
+        "compile('x = 1', '<string>', 'exec')",
+        "globals()['__builtins__']",
+        "locals()['x']",
+        "open('/etc/passwd')",
+        "(1).__class__.__bases__[0].__subclasses__()",
+        "lambda x: x + 1",
+        "subprocess.call(['ls'])",
+        "system('echo hacked')",
+        "x + 'string_injection'",
+        "x + b'bytes_injection'",
+    ]
+
+    for attack in malicious_vectors:
+        with pytest.raises((SecurityViolationError, ValueError)) as excinfo:
+            engine.parse_to_sympy(attack)
+        assert any(term in str(excinfo.value).lower() for term in ["güvenlik", "yasaklı", "sözdizimi", "tanımsız", "security"])
+
+    # Meşru matematiksel ifadelerin sorunsuz çalıştığını doğrula (Zero-Execution)
+    valid_expressions = [
+        "x**2 - 5*x + 6 = 0",
+        "sin(x) + cos(x) = 1",
+        "sqrt(x + 4) = 3",
+        "Abs(x - 2) = 5",
+        "ln(x) + log(x) = 2",
+    ]
+    for expr in valid_expressions:
+        parsed = engine.parse_to_sympy(expr)
+        assert parsed is not None
+
+
+

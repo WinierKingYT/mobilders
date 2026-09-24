@@ -132,9 +132,17 @@ class SymbolicEquivalenceEngine:
 
     def sanitize_and_validate_ast(self, raw_str: str) -> None:
         """
-        Girdi metnini Python AST seviyesinde inceler.
-        Yasaklı fonksiyon çağrılarını, modül yüklemelerini ve derinlik aşımlarını engeller.
+        Aşama 54: Girdi metnini Python AST seviyesinde inceler.
+        Yasaklı fonksiyon çağrılarını, modül yüklemelerini, dunder ('__'), import, exec
+        ifadelerini ve kod enjeksiyon vektörlerini tamamen engeller (Zero-Execution).
         """
+        # Aşama 54: Token Beyaz Liste & Kod Enjeksiyon Ön Kontrolleri
+        raw_lower = raw_str.lower()
+        forbidden_tokens = ["__", "import", "exec", "eval", "compile", "globals", "locals", "builtins", "open", "system", "subprocess", "lambda"]
+        for token in forbidden_tokens:
+            if token in raw_lower:
+                raise SecurityViolationError(f"Güvenlik İhlali: Yasaklı kod enjeksiyon ifadesi tespit edildi: '{token}'")
+
         # Örtük çarpma ve mobil doğal sözdizimi ön-işlemesi
         normalized = ImplicitMultiplicationPreprocessor.preprocess(raw_str)
 
@@ -164,7 +172,7 @@ class SymbolicEquivalenceEngine:
         if current_depth > self.max_ast_depth:
             raise SecurityViolationError(f"AST derinlik sınırı aşıldı (> {self.max_ast_depth})")
 
-        # İzin verilen düğüm türleri
+        # Aşama 54: İzin verilen matematiksel AST düğüm türleri beyaz listesi
         allowed_types = (
             ast.Expression,
             ast.BinOp,
@@ -185,6 +193,11 @@ class SymbolicEquivalenceEngine:
         if not isinstance(node, allowed_types):
             raise SecurityViolationError(f"Yasaklı AST düğümü tespit edildi: {type(node).__name__}")
 
+        # Sabit denetimi: Yalnızca int, float, complex sayılara izin verilir (string/bytes yasaktır)
+        if isinstance(node, ast.Constant):
+            if not isinstance(node.value, (int, float, complex)):
+                raise SecurityViolationError(f"Güvenlik İhlali: Yasaklı sabit türü '{type(node.value).__name__}'. Sadece sayısal değerler kabul edilir.")
+
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Pow):
             exp_val = None
             if isinstance(node.right, ast.Constant) and isinstance(node.right.value, (int, float)):
@@ -196,6 +209,8 @@ class SymbolicEquivalenceEngine:
                 raise SecurityViolationError(f"Aşırı derece/üs tespit edildi: {exp_val} (> {self.MAX_POLYNOMIAL_DEGREE})")
 
         if isinstance(node, ast.Name):
+            if "__" in node.id or node.id.lower() in {"import", "exec", "eval", "compile", "globals", "locals", "open"}:
+                raise SecurityViolationError(f"Güvenlik İhlali: Yasaklı değişken veya anahtar kelime: '{node.id}'")
             if node.id not in self.ALLOWED_VARIABLES and node.id not in self.ALLOWED_FUNCTIONS:
                 raise SecurityViolationError(f"Tanımsız veya yetkisiz değişken/fonksiyon: '{node.id}'")
 
@@ -203,6 +218,8 @@ class SymbolicEquivalenceEngine:
             if not isinstance(node.func, ast.Name) or node.func.id not in self.ALLOWED_FUNCTIONS:
                 func_name = getattr(node.func, "id", "unknown")
                 raise SecurityViolationError(f"Yasaklı fonksiyon çağrısı: '{func_name}'")
+            if node.keywords:
+                raise SecurityViolationError("Güvenlik İhlali: Fonksiyonlarda isimli parametreler (keywords) yasaktır.")
 
         for child in ast.iter_child_nodes(node):
             self._check_ast_safety(child, current_depth + 1)
