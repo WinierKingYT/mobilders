@@ -58,6 +58,7 @@ class _MisconceptionProfilerScreenState extends State<MisconceptionProfilerScree
         return AppColors.accentWarning; // Amber 500
       case 'in_remediation':
         return const Color(0xFF38BDF8); // Cyan 400
+      case 'mastered':
       case 'cured':
         return AppColors.accentCorrect; // Emerald 500
       default:
@@ -73,6 +74,7 @@ class _MisconceptionProfilerScreenState extends State<MisconceptionProfilerScree
         return '⚠️ Açık Hata';
       case 'in_remediation':
         return '🔄 Telafide';
+      case 'mastered':
       case 'cured':
         return '✅ Aşılmış';
       default:
@@ -219,6 +221,151 @@ class _MisconceptionProfilerScreenState extends State<MisconceptionProfilerScree
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildHeatMapSection([List<MisconceptionCategory>? targetCategories]) {
+    final categories = targetCategories ?? _profile?.categories ?? [];
+    final allNodes = categories.expand((c) => c.nodes).toList();
+    if (allNodes.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final criticalCount = allNodes.where((n) => n.status == 'critical').length;
+    final warningCount = allNodes.where((n) => n.status == 'warning').length;
+    final remediationCount = allNodes.where((n) => n.status == 'in_remediation').length;
+    final curedCount = allNodes.where((n) => n.status == 'cured' || n.status == 'mastered').length;
+
+    return Container(
+      key: const Key('misconception_heat_map_section'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Text("🔥", style: TextStyle(fontSize: 18)),
+                  SizedBox(width: 8),
+                  Text(
+                    "Kavramsal Isı Haritası",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.accentCorrect.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.accentCorrect.withValues(alpha: 0.4)),
+                ),
+                child: Text(
+                  "$curedCount / ${allNodes.length} Aşılmış",
+                  style: const TextStyle(
+                    color: AppColors.accentCorrect,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "Yanılgıların zümrüt yeşiline dönüşümünü takip et",
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          ),
+          const SizedBox(height: 14),
+          // Legend
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildHeatLegendItem("Kritik", criticalCount, AppColors.accentError),
+              _buildHeatLegendItem("Açık Hata", warningCount, AppColors.accentWarning),
+              _buildHeatLegendItem("Telafide", remediationCount, const Color(0xFF38BDF8)),
+              _buildHeatLegendItem("Aşılmış", curedCount, AppColors.accentCorrect),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // Heatmap grid tiles
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: allNodes.map((node) {
+              final color = _getStatusColor(node.status);
+              return Tooltip(
+                message: "${node.title} (${_getStatusLabel(node.status)})",
+                child: InkWell(
+                  key: Key('heat_tile_${node.bugId}'),
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => _showMisconceptionAutopsySheet(context, node),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: color, width: 1.2),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          node.bugId,
+                          style: TextStyle(
+                            color: color,
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeatLegendItem(String label, int count, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          "$label ($count)",
+          style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+        ),
+      ],
     );
   }
 
@@ -421,6 +568,8 @@ class _MisconceptionProfilerScreenState extends State<MisconceptionProfilerScree
           ],
         ),
         const SizedBox(height: 12),
+        _buildHeatMapSection(filteredCategories),
+        const SizedBox(height: 14),
         ...filteredCategories.map((cat) => _buildCategoryTreeBranch(cat)),
       ],
     );

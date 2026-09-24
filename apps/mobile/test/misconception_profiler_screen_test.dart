@@ -218,5 +218,30 @@ void main() {
       expect(find.byKey(const Key('category_tile_ISARET_VE_DAGILMA')), findsOneWidget);
       expect(find.byKey(const Key('category_tile_KUADRATIK_DENKLEMLER')), findsNothing);
     });
+
+    testWidgets('renders heat map section and opens autopsy sheet when heat tile is tapped', (tester) async {
+      final mock = createMockProfile();
+
+      await tester.pumpWidget(buildTestableWidget(initialProfile: mock));
+      await tester.pumpAndSettle();
+
+      // Heat map section should exist
+      expect(find.byKey(const Key('misconception_heat_map_section')), findsOneWidget);
+      expect(find.text('Kavramsal Isı Haritası'), findsOneWidget);
+      expect(find.text('1 / 2 Aşılmış'), findsOneWidget);
+
+      // Heat tiles should be rendered for each node
+      expect(find.byKey(const Key('heat_tile_BUG-QUAD-01')), findsOneWidget);
+      expect(find.byKey(const Key('heat_tile_SIGN_FLIP')), findsOneWidget);
+
+      // Tapping heat tile opens autopsy bottom sheet
+      await tester.ensureVisible(find.byKey(const Key('heat_tile_BUG-QUAD-01')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('heat_tile_BUG-QUAD-01')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('misconception_detail_sheet')), findsOneWidget);
+      expect(find.text('Sıfır-Çarpım Kuralı İhlali'), findsWidgets);
+    });
   });
 }
