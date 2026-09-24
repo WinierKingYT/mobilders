@@ -164,7 +164,23 @@ class MistakeVaultService extends ChangeNotifier {
       final file = File(storageFilePath!);
       await file.parent.create(recursive: true);
       final listJson = _mistakes.map((m) => m.toJson()).toList();
-      await file.writeAsString(jsonEncode(listJson), flush: true);
+      final tempFile = File('${storageFilePath!}.tmp');
+      await tempFile.writeAsString(jsonEncode(listJson), flush: true);
+      if (await tempFile.exists()) {
+        try {
+          if (await file.exists()) {
+            await file.delete();
+          }
+          await tempFile.rename(file.path);
+        } catch (_) {
+          try {
+            await file.writeAsString(jsonEncode(listJson), flush: true);
+            if (await tempFile.exists()) {
+              await tempFile.delete();
+            }
+          } catch (_) {}
+        }
+      }
     } catch (e) {
       debugPrint("MistakeVaultService persist warning: $e");
     }
@@ -174,16 +190,43 @@ class MistakeVaultService extends ChangeNotifier {
     if (storageFilePath == null) return;
     try {
       final file = File(storageFilePath!);
+      String content = '';
       if (await file.exists()) {
-        final content = await file.readAsString();
-        if (content.isNotEmpty) {
-          final decoded = jsonDecode(content);
-          if (decoded is List) {
-            _mistakes.clear();
-            for (final item in decoded) {
+        content = await file.readAsString();
+      } else {
+        final tempFile = File('${storageFilePath!}.tmp');
+        if (await tempFile.exists()) {
+          content = await tempFile.readAsString();
+        }
+      }
+
+      if (content.isNotEmpty) {
+        dynamic decoded;
+        try {
+          decoded = jsonDecode(content);
+        } catch (jsonErr) {
+          debugPrint("MistakeVaultService main json parse failed, trying temp: $jsonErr");
+          final tempFile = File('${storageFilePath!}.tmp');
+          if (await tempFile.exists()) {
+            final tempContent = await tempFile.readAsString();
+            if (tempContent.isNotEmpty) {
+              decoded = jsonDecode(tempContent);
+            }
+          }
+        }
+
+        if (decoded is List) {
+          _mistakes.clear();
+          for (final item in decoded) {
+            try {
               if (item is Map<String, dynamic>) {
                 _mistakes.add(MistakeAutopsyItem.fromJson(item));
+              } else if (item is Map) {
+                _mistakes.add(MistakeAutopsyItem.fromJson(Map<String, dynamic>.from(item)));
               }
+            } catch (err) {
+              // Corrupt record isolated: skip bad record and preserve all valid records
+              debugPrint("MistakeVaultService corrupt record isolated: $err");
             }
           }
         }

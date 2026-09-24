@@ -808,4 +808,36 @@ def test_30_day_fsrs_remediation_simulation():
     assert vault.get_mistake(r.mistake_id).status == MistakeStatus.CURED
 
 
+def test_vault_atomic_json_export_import_and_corrupt_isolation(tmp_path):
+    """Bozuk kayıtların izole edildiğini ve JSON dışa/içe aktarımının atomik çalıştığını doğrular."""
+    vault = CognitiveMistakeVault(db_path=str(tmp_path / "vault.db"))
+    r = vault.record_mistake(
+        user_id="user_iso",
+        node_id="N12",
+        bug_id="BUG-POLY-01",
+        problem_statement="x^2 = 4",
+        offending_step="x = 2",
+        correct_principle="x = 2 veya x = -2",
+        remediation_directive="Çift dereceli köklerde mutlak değer.",
+    )
+
+    export_file = str(tmp_path / "export_mistakes.json")
+    vault.export_to_json(export_file)
+
+    # Corrupt one entry in the JSON by appending an invalid structure
+    import json
+    with open(export_file, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    # Append invalid structure
+    data.append({"corrupt_key": "broken", "status": "invalid_enum_state"})
+    with open(export_file, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+
+    new_vault = CognitiveMistakeVault(db_path=str(tmp_path / "new_vault.db"))
+    imported = new_vault.import_from_json(export_file)
+    assert imported >= 1
+    assert new_vault.get_mistake(r.mistake_id) is not None
+
+
 

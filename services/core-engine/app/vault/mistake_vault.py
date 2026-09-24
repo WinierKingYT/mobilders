@@ -8,6 +8,7 @@ import time
 import uuid
 import sqlite3
 import json
+import os
 import threading
 from enum import Enum
 from typing import Optional, Dict, Any, List
@@ -160,54 +161,219 @@ class CognitiveMistakeVault:
             dsr_repetitions, dsr_lapses,
             self_corr_stage_val, consec_clean, history_json
         ) = row
+
+        try:
+            stab = float(dsr_stability)
+            if not math.isfinite(stab) or stab <= 0:
+                stab = 0.5
+        except Exception:
+            stab = 0.5
+
+        try:
+            diff = float(dsr_difficulty)
+            if not math.isfinite(diff):
+                diff = 5.0
+        except Exception:
+            diff = 5.0
+
+        try:
+            ret = float(dsr_retrievability)
+            if not math.isfinite(ret):
+                ret = 1.0
+        except Exception:
+            ret = 1.0
+
+        try:
+            reps = int(dsr_repetitions)
+        except Exception:
+            reps = 0
+
+        try:
+            laps = int(dsr_lapses)
+        except Exception:
+            laps = 0
+
         dsr = DSRState(
-            stability=float(dsr_stability),
-            difficulty=float(dsr_difficulty),
-            retrievability=float(dsr_retrievability),
-            repetitions=int(dsr_repetitions),
-            lapses=int(dsr_lapses),
+            stability=stab,
+            difficulty=diff,
+            retrievability=ret,
+            repetitions=reps,
+            lapses=laps,
         )
+
         try:
             status_enum = MistakeStatus(status_val)
-        except ValueError:
+        except Exception:
             status_enum = MistakeStatus.OPEN
 
         try:
             stage_enum = SelfCorrectionStage(int(self_corr_stage_val))
-        except ValueError:
+        except Exception:
             stage_enum = SelfCorrectionStage.STAGE_1_IDENTIFY
 
         try:
             parsed_history = json.loads(history_json) if history_json else []
+            if not isinstance(parsed_history, list):
+                parsed_history = []
         except Exception:
             parsed_history = []
 
+        try:
+            c_at = float(created_at)
+            if not math.isfinite(c_at):
+                c_at = time.time()
+        except Exception:
+            c_at = time.time()
+
+        lr_at = None
+        if last_reviewed_at is not None:
+            try:
+                lr_val = float(last_reviewed_at)
+                if math.isfinite(lr_val):
+                    lr_at = lr_val
+            except Exception:
+                lr_at = None
+
+        try:
+            d_date = float(due_date)
+            if not math.isfinite(d_date):
+                d_date = time.time()
+        except Exception:
+            d_date = time.time()
+
+        try:
+            c_clean = int(consec_clean)
+        except Exception:
+            c_clean = 0
+
         return MistakeRecord(
-            mistake_id=mistake_id,
-            user_id=user_id,
-            node_id=node_id,
-            bug_id=bug_id,
-            problem_statement=problem_statement,
-            offending_step=offending_step,
-            correct_principle=correct_principle,
-            remediation_directive=remediation_directive,
-            created_at=float(created_at),
-            last_reviewed_at=float(last_reviewed_at) if last_reviewed_at is not None else None,
-            due_date=float(due_date),
+            mistake_id=str(mistake_id),
+            user_id=str(user_id),
+            node_id=str(node_id),
+            bug_id=str(bug_id),
+            problem_statement=str(problem_statement),
+            offending_step=str(offending_step),
+            correct_principle=str(correct_principle),
+            remediation_directive=str(remediation_directive),
+            created_at=c_at,
+            last_reviewed_at=lr_at,
+            due_date=d_date,
             status=status_enum,
             dsr_state=dsr,
             self_correction_stage=stage_enum,
-            consecutive_clean_solves=int(consec_clean),
+            consecutive_clean_solves=c_clean,
             history=parsed_history,
         )
 
     def _load_all_from_db(self) -> None:
-        """Veritabanındaki tüm kayıtları önbelleğe yükler."""
+        """Veritabanındaki tüm kayıtları önbelleğe yükler (bozuk kayıtları izole eder)."""
         cursor = self._conn.cursor()
         cursor.execute("SELECT * FROM mistake_records")
         for row in cursor.fetchall():
-            rec = self._row_to_record(row)
-            self._records[rec.mistake_id] = rec
+            try:
+                rec = self._row_to_record(row)
+                self._records[rec.mistake_id] = rec
+            except Exception:
+                # Isolate corrupt records so the remaining valid vault items load without breaking
+                continue
+
+    def export_to_json(self, filepath: str) -> None:
+        """Atomically writes all records to a JSON file using a .tmp file."""
+        records_data = []
+        with self._lock:
+            for r in self._records.values():
+                status_str = r.status.value if hasattr(r.status, "value") else str(r.status)
+                stage_val = (
+                    r.self_correction_stage.value
+                    if hasattr(r.self_correction_stage, "value")
+                    else int(r.self_correction_stage)
+                )
+                records_data.append({
+                    "mistake_id": r.mistake_id,
+                    "user_id": r.user_id,
+                    "node_id": r.node_id,
+                    "bug_id": r.bug_id,
+                    "problem_statement": r.problem_statement,
+                    "offending_step": r.offending_step,
+                    "correct_principle": r.correct_principle,
+                    "remediation_directive": r.remediation_directive,
+                    "created_at": r.created_at,
+                    "last_reviewed_at": r.last_reviewed_at,
+                    "due_date": r.due_date,
+                    "status": status_str,
+                    "stability": r.dsr_state.stability,
+                    "difficulty": r.dsr_state.difficulty,
+                    "retrievability": r.dsr_state.retrievability,
+                    "repetitions": r.dsr_state.repetitions,
+                    "lapses": r.dsr_state.lapses,
+                    "self_correction_stage": stage_val,
+                    "consecutive_clean_solves": r.consecutive_clean_solves,
+                    "history": r.history,
+                })
+
+        tmp_path = filepath + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(records_data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, filepath)
+
+    def import_from_json(self, filepath: str) -> int:
+        """Imports records from JSON, isolating and skipping corrupt records."""
+        if not os.path.exists(filepath):
+            return 0
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            return 0
+        if not isinstance(data, list):
+            return 0
+        imported_count = 0
+        for item in data:
+            try:
+                if not isinstance(item, dict):
+                    continue
+                try:
+                    status_enum = MistakeStatus(item.get("status", "open"))
+                except Exception:
+                    status_enum = MistakeStatus.OPEN
+
+                try:
+                    stage_enum = SelfCorrectionStage(int(item.get("self_correction_stage", 1)))
+                except Exception:
+                    stage_enum = SelfCorrectionStage.STAGE_1_IDENTIFY
+
+                dsr = DSRState(
+                    stability=float(item.get("stability", 0.5)),
+                    difficulty=float(item.get("difficulty", 5.0)),
+                    retrievability=float(item.get("retrievability", 1.0)),
+                    repetitions=int(item.get("repetitions", 0)),
+                    lapses=int(item.get("lapses", 0)),
+                )
+                rec = MistakeRecord(
+                    mistake_id=str(item.get("mistake_id", uuid.uuid4())),
+                    user_id=str(item.get("user_id", "default_user")),
+                    node_id=str(item.get("node_id", "N01")),
+                    bug_id=str(item.get("bug_id", "BUG-UNKNOWN")),
+                    problem_statement=str(item.get("problem_statement", "")),
+                    offending_step=str(item.get("offending_step", "")),
+                    correct_principle=str(item.get("correct_principle", "")),
+                    remediation_directive=str(item.get("remediation_directive", "")),
+                    created_at=float(item.get("created_at", time.time())),
+                    last_reviewed_at=float(item["last_reviewed_at"]) if item.get("last_reviewed_at") is not None else None,
+                    due_date=float(item.get("due_date", time.time())),
+                    status=status_enum,
+                    dsr_state=dsr,
+                    self_correction_stage=stage_enum,
+                    consecutive_clean_solves=int(item.get("consecutive_clean_solves", 0)),
+                    history=item.get("history", []) if isinstance(item.get("history"), list) else [],
+                )
+                self._records[rec.mistake_id] = rec
+                self._save_record_to_db(rec)
+                imported_count += 1
+            except Exception:
+                # Isolate corrupt record
+                continue
+        return imported_count
 
     def record_mistake(
         self,

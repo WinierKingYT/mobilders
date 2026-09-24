@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -503,6 +504,56 @@ void main() {
 
       expect(launchedItem?.id, equals('m_lin'));
       expect(launchedEquation, equals('3x - 5 = 10'));
+    });
+
+    test('MistakeVaultService handles corrupt JSON records by isolating and preserving valid ones', () async {
+      final tempDir = await Directory.systemTemp.createTemp('vault_test_');
+      final tempPath = '${tempDir.path}/mistakes.json';
+
+      // Prepare file with one valid record and one corrupt record
+      final file = File(tempPath);
+      final rawData = [
+        {
+          "id": "valid_1",
+          "bug_id": "BUG-VALID-01",
+          "node_id": "N10",
+          "problem": "2x = 4",
+          "offending_step": "x = 1",
+          "correct_principle": "x = 2",
+          "status": "open",
+          "stability_days": 1.0,
+          "is_due": true
+        },
+        {
+          "id": "corrupt_1",
+          "bug_id": 99999, // wrong type, might trigger error in standard strict decoders
+          "status": null
+        }
+      ];
+      await file.writeAsString(jsonEncode(rawData));
+
+      final service = MistakeVaultService(storageFilePath: tempPath);
+      await service.load();
+
+      // Corrupt record isolated, valid record preserved
+      expect(service.mistakes.any((m) => m.id == 'valid_1'), isTrue);
+
+      // Verify atomic disk persistence writes without corruption
+      service.recordMistake(
+        bugId: "BUG-NEW-02",
+        nodeId: "N15",
+        problem: "3x = 9",
+        offendingStep: "x = 2",
+        correctPrinciple: "x = 3",
+      );
+      await service.saveToDisk();
+
+      final reloaded = MistakeVaultService(storageFilePath: tempPath);
+      await reloaded.load();
+      expect(reloaded.mistakes.any((m) => m.bugId == "BUG-NEW-02"), isTrue);
+
+      // Cleanup
+      await tempDir.delete(recursive: true);
     });
   });
 }
