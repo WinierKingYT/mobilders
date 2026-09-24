@@ -280,5 +280,32 @@ void main() {
       expect(queue.pendingCount, 1);
       expect(queue.pendingEvents.first.targetEquation, '2x + 4 = 10');
     });
+
+    test('FileSessionStorageBackend validateIntegrity correctly detects truncated or malformed payloads', () {
+      expect(FileSessionStorageBackend.validateIntegrity('{"key": "value"}'), isTrue);
+      expect(FileSessionStorageBackend.validateIntegrity('[1, 2, 3]'), isTrue);
+
+      // Truncated/unclosed braces
+      expect(FileSessionStorageBackend.validateIntegrity('{"key": "val'), isFalse);
+      expect(FileSessionStorageBackend.validateIntegrity('[1, 2'), isFalse);
+      expect(FileSessionStorageBackend.validateIntegrity(''), isFalse);
+      expect(FileSessionStorageBackend.validateIntegrity(null), isFalse);
+    });
+
+    test('FileSessionStorageBackend recovers valid data from .tmp when primary is truncated', () async {
+      const key = 'truncation_recovery_test';
+      final primary = storage.getFile(key);
+      final tmp = File('${primary.path}.tmp');
+
+      // Primary is truncated due to simulated power cut
+      await primary.parent.create(recursive: true);
+      await primary.writeAsString('{"sessionId": "truncated_123"', flush: true);
+
+      // .tmp holds the complete valid payload
+      await tmp.writeAsString('{"sessionId": "truncated_123", "complete": true}', flush: true);
+
+      final recovered = await storage.read(key);
+      expect(recovered, equals('{"sessionId": "truncated_123", "complete": true}'));
+    });
   });
 }

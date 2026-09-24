@@ -223,6 +223,17 @@ class FileSessionStorageBackend implements SessionStorageBackend {
   /// Exposes file reference for testing and diagnostic verification.
   File getFile(String key) => _getFile(key);
 
+  /// Validates whether the raw string payload meets integrity requirements
+  /// (e.g. non-empty and has matching closing JSON brace/bracket, ensuring not truncated).
+  static bool validateIntegrity(String? raw) {
+    if (raw == null) return false;
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return false;
+    if (trimmed.startsWith('{') && !trimmed.endsWith('}')) return false;
+    if (trimmed.startsWith('[') && !trimmed.endsWith(']')) return false;
+    return true;
+  }
+
   @override
   Future<void> write(String key, String data) async {
     try {
@@ -231,9 +242,24 @@ class FileSessionStorageBackend implements SessionStorageBackend {
       final tmpFile = File('${file.path}.tmp');
       await tmpFile.writeAsString(data, flush: true);
       if (await file.exists()) {
-        await file.delete();
+        try {
+          await file.delete();
+        } catch (_) {}
       }
-      await tmpFile.rename(file.path);
+      try {
+        await tmpFile.rename(file.path);
+      } catch (_) {
+        try {
+          tmpFile.renameSync(file.path);
+        } catch (_) {
+          await file.writeAsString(data, flush: true);
+          try {
+            if (await tmpFile.exists()) {
+              await tmpFile.delete();
+            }
+          } catch (_) {}
+        }
+      }
     } catch (e) {
       debugPrint("FileSessionStorageBackend write warning: $e");
     }
@@ -245,9 +271,23 @@ class FileSessionStorageBackend implements SessionStorageBackend {
       final file = _getFile(key);
       final tmpFile = File('${file.path}.tmp');
       if (await file.exists()) {
-        return await file.readAsString();
+        final content = await file.readAsString();
+        if (validateIntegrity(content)) {
+          return content;
+        }
+        // If primary file is corrupted or truncated, check if valid .tmp exists
+        if (await tmpFile.exists()) {
+          final tmpContent = await tmpFile.readAsString();
+          if (validateIntegrity(tmpContent)) {
+            return tmpContent;
+          }
+        }
+        return content;
       } else if (await tmpFile.exists()) {
         try {
+          if (await file.exists()) {
+            await file.delete();
+          }
           await tmpFile.rename(file.path);
           return await file.readAsString();
         } catch (_) {
@@ -362,6 +402,17 @@ class SessionRestorationManager with WidgetsBindingObserver {
       if (raw == null || raw.trim().isEmpty) {
         return null;
       }
+      if (!FileSessionStorageBackend.validateIntegrity(raw)) {
+        if (_storage is FileSessionStorageBackend) {
+          try {
+            final f = (_storage as FileSessionStorageBackend).getFile(defaultDraftKey);
+            final bak = File('${f.path}.corrupt.bak');
+            await bak.writeAsString(raw, flush: true);
+          } catch (_) {}
+        }
+        await clearDraft();
+        return null;
+      }
 
       final Map<String, dynamic> map;
       try {
@@ -452,6 +503,17 @@ class SessionRestorationManager with WidgetsBindingObserver {
     try {
       final raw = await _storage.read(defaultFocusDraftKey);
       if (raw == null || raw.trim().isEmpty) {
+        return null;
+      }
+      if (!FileSessionStorageBackend.validateIntegrity(raw)) {
+        if (_storage is FileSessionStorageBackend) {
+          try {
+            final f = (_storage as FileSessionStorageBackend).getFile(defaultFocusDraftKey);
+            final bak = File('${f.path}.corrupt.bak');
+            await bak.writeAsString(raw, flush: true);
+          } catch (_) {}
+        }
+        await clearFocusDraft();
         return null;
       }
 
