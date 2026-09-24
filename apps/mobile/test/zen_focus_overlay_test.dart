@@ -114,5 +114,34 @@ void main() {
 
       expect(controller.text, 'x');
     });
+
+    testWidgets('Calm session timer toggle switches state between Süreyi Gizle and Sakin Seans', (tester) async {
+      await tester.pumpWidget(buildZenScreen());
+      await tester.pumpAndSettle();
+
+      final toggleBtn = find.byKey(const Key('zen_toggle_timer_button'));
+      expect(toggleBtn, findsOneWidget);
+      expect(find.text('Süreyi Gizle'), findsOneWidget);
+
+      await tester.tap(toggleBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sakin Seans'), findsOneWidget);
+
+      await tester.tap(toggleBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Süreyi Gizle'), findsOneWidget);
+    });
+
+    testWidgets('Cognitive spotlight highlights active step and dims past steps', (tester) async {
+      await viewModel.submitStep('x + 2 = 0');
+      await tester.pumpWidget(buildZenScreen());
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('zen_active_step_card')), findsOneWidget);
+      expect(find.text('✨ Bilişsel Odak'), findsOneWidget);
+      expect(find.text('Geçmiş Adımlar (Kademeli Karartma)'), findsOneWidget);
+    });
   });
 }

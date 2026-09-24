@@ -7,11 +7,12 @@ import '../../touchpad/zero_layout_shift_dock.dart';
 import '../view_models/session_view_model.dart';
 
 /// Zen Focus Overlay: Completely distraction-free, high-contrast math working environment
-class ZenFocusOverlay extends StatelessWidget {
+class ZenFocusOverlay extends StatefulWidget {
   final SessionViewModel viewModel;
   final TextEditingController inputController;
   final VoidCallback onExitZen;
   final VoidCallback onSubmit;
+  final bool initialHideTimer;
 
   const ZenFocusOverlay({
     super.key,
@@ -19,7 +20,21 @@ class ZenFocusOverlay extends StatelessWidget {
     required this.inputController,
     required this.onExitZen,
     required this.onSubmit,
+    this.initialHideTimer = false,
   });
+
+  @override
+  State<ZenFocusOverlay> createState() => _ZenFocusOverlayState();
+}
+
+class _ZenFocusOverlayState extends State<ZenFocusOverlay> {
+  late bool _hideTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _hideTimer = widget.initialHideTimer;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +43,7 @@ class ZenFocusOverlay extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            // Zen Header (Minimalist exit & focus badge)
+            // Zen Header (Minimalist exit, calm timer toggle & focus badge)
             _buildHeader(context),
 
             // Zen Focus Stage (Target Formula & Rainbow Live Step)
@@ -44,13 +59,13 @@ class ZenFocusOverlay extends StatelessWidget {
                     _buildTargetEquationCard(),
                     const SizedBox(height: 24),
 
-                    // Past Steps Mini Breadcrumbs
-                    if (viewModel.steps.isNotEmpty)
-                      _buildStepsBreadcrumb(viewModel.steps),
+                    // Past Steps Mini Breadcrumbs (with soft cognitive dimming)
+                    if (widget.viewModel.steps.isNotEmpty)
+                      _buildStepsBreadcrumb(widget.viewModel.steps),
 
                     const SizedBox(height: 24),
 
-                    // Current Active Step (Glowing focus ring + Rainbow Brackets)
+                    // Current Active Step (High-contrast spotlight + Rainbow Brackets)
                     _buildActiveStepCard(),
                   ],
                 ),
@@ -59,16 +74,16 @@ class ZenFocusOverlay extends StatelessWidget {
 
             // Bottom Zero Layout Shift Input Dock
             ZeroLayoutShiftDock(
-              currentMode: viewModel.inputMode,
-              onModeChanged: viewModel.setInputMode,
+              currentMode: widget.viewModel.inputMode,
+              onModeChanged: widget.viewModel.setInputMode,
               isZenModeActive: true,
-              onToggleZenMode: onExitZen,
+              onToggleZenMode: widget.onExitZen,
               child: MathTouchpad(
-                controller: inputController,
-                inputMode: viewModel.inputMode,
-                onModeChanged: viewModel.setInputMode,
-                onSubmit: onSubmit,
-                isSubmitting: viewModel.isSubmitting,
+                controller: widget.inputController,
+                inputMode: widget.viewModel.inputMode,
+                onModeChanged: widget.viewModel.setInputMode,
+                onSubmit: widget.onSubmit,
+                isSubmitting: widget.viewModel.isSubmitting,
               ),
             ),
           ],
@@ -105,10 +120,52 @@ class ZenFocusOverlay extends StatelessWidget {
               ),
             ],
           ),
-          IconButton(
-            icon: const Icon(Icons.close_rounded, color: AppColors.textMuted, size: 22),
-            tooltip: 'Zen Modundan Çık',
-            onPressed: onExitZen,
+          Row(
+            children: [
+              InkWell(
+                key: const Key('zen_toggle_timer_button'),
+                borderRadius: BorderRadius.circular(8),
+                onTap: () {
+                  setState(() => _hideTimer = !_hideTimer);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: _hideTimer ? const Color(0xFF10B981) : const Color(0xFF334155),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _hideTimer ? Icons.spa_outlined : Icons.timer_outlined,
+                        color: _hideTimer ? const Color(0xFF34D399) : const Color(0xFF38BDF8),
+                        size: 14,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        _hideTimer ? 'Sakin Seans' : 'Süreyi Gizle',
+                        style: TextStyle(
+                          color: _hideTimer ? const Color(0xFF34D399) : AppColors.textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.close_rounded, color: AppColors.textMuted, size: 22),
+                tooltip: 'Zen Modundan Çık',
+                onPressed: widget.onExitZen,
+              ),
+            ],
           ),
         ],
       ),
@@ -116,7 +173,7 @@ class ZenFocusOverlay extends StatelessWidget {
   }
 
   Widget _buildTargetEquationCard() {
-    final prettyTarget = MathTypography.toPrettyMath(viewModel.targetEquation);
+    final prettyTarget = MathTypography.toPrettyMath(widget.viewModel.targetEquation);
 
     return Container(
       width: double.infinity,
@@ -159,53 +216,70 @@ class ZenFocusOverlay extends StatelessWidget {
   }
 
   Widget _buildStepsBreadcrumb(List<SolutionStep> steps) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 6,
-      alignment: WrapAlignment.center,
-      children: steps.map((s) {
-        final isValid = s.isValid;
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: isValid
-                ? AppColors.accentCorrect.withValues(alpha: 0.15)
-                : AppColors.accentError.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isValid ? AppColors.accentCorrect : AppColors.accentError,
-              width: 0.8,
-            ),
+    return Column(
+      children: [
+        const Text(
+          'Geçmiş Adımlar (Kademeli Karartma)',
+          style: TextStyle(
+            color: Color(0xFF64748B),
+            fontSize: 10,
+            letterSpacing: 1.0,
           ),
-          child: Text(
-            MathTypography.toPrettyMath(s.userExpression),
-            style: TextStyle(
-              fontSize: 13,
-              fontFamily: 'monospace',
-              fontWeight: FontWeight.w600,
-              color: isValid ? AppColors.accentCorrect : AppColors.accentError,
-            ),
+        ),
+        const SizedBox(height: 6),
+        Opacity(
+          opacity: 0.45,
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            alignment: WrapAlignment.center,
+            children: steps.map((s) {
+              final isValid = s.isValid;
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isValid
+                      ? AppColors.accentCorrect.withValues(alpha: 0.15)
+                      : AppColors.accentError.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isValid ? AppColors.accentCorrect : AppColors.accentError,
+                    width: 0.8,
+                  ),
+                ),
+                child: Text(
+                  MathTypography.toPrettyMath(s.userExpression),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w600,
+                    color: isValid ? AppColors.accentCorrect : AppColors.accentError,
+                  ),
+                ),
+              );
+            }).toList(),
           ),
-        );
-      }).toList(),
+        ),
+      ],
     );
   }
 
   Widget _buildActiveStepCard() {
     return Container(
+      key: const Key('zen_active_step_card'),
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       decoration: BoxDecoration(
         color: AppColors.zenSurface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppColors.zenGlow.withValues(alpha: 0.5),
-          width: 1.5,
+          color: AppColors.zenGlow,
+          width: 2.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.zenGlow.withValues(alpha: 0.12),
-            blurRadius: 18,
+            color: AppColors.zenGlow.withValues(alpha: 0.25),
+            blurRadius: 20,
             spreadRadius: 2,
           ),
         ],
@@ -215,8 +289,24 @@ class ZenFocusOverlay extends StatelessWidget {
         children: [
           Row(
             children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.zenGlow.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  '✨ Bilişsel Odak',
+                  style: TextStyle(
+                    color: AppColors.zenGlow,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
               Text(
-                'Adım ${viewModel.steps.length + 1}',
+                'Adım ${widget.viewModel.steps.length + 1}',
                 style: const TextStyle(
                   color: AppColors.zenGlow,
                   fontSize: 12,
@@ -236,7 +326,7 @@ class ZenFocusOverlay extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           ValueListenableBuilder<TextEditingValue>(
-            valueListenable: inputController,
+            valueListenable: widget.inputController,
             builder: (context, value, _) {
               if (value.text.isEmpty) {
                 return const Text(

@@ -39,6 +39,7 @@ class FocusSessionScreen extends StatefulWidget {
 class _FocusSessionScreenState extends State<FocusSessionScreen> {
   late final TextEditingController _inputController;
   late final FocusNode _inputFocusNode;
+  bool _hideTimer = false;
 
   @override
   void initState() {
@@ -384,6 +385,39 @@ class _FocusSessionScreenState extends State<FocusSessionScreen> {
                 ),
               ),
               const SizedBox(width: 4),
+              IconButton(
+                key: const Key('focus_toggle_calm_timer_btn'),
+                icon: Icon(
+                  _hideTimer ? Icons.spa_outlined : Icons.timer_outlined,
+                  color: _hideTimer ? const Color(0xFF34D399) : const Color(0xFF38BDF8),
+                  size: 20,
+                ),
+                tooltip: _hideTimer ? 'Süreyi Göster' : 'Süreyi Gizle (Sakin Seans)',
+                onPressed: () {
+                  HapticFeedbackService().selectionClick();
+                  setState(() => _hideTimer = !_hideTimer);
+                },
+              ),
+              if (_hideTimer) ...[
+                const SizedBox(width: 4),
+                Container(
+                  key: const Key('focus_calm_mode_badge'),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF065F46).withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFF10B981)),
+                  ),
+                  child: const Text(
+                    '🧘 Sakin Mod',
+                    style: TextStyle(
+                      color: Color(0xFF34D399),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
               IconButton(
                 icon: const Icon(Icons.toys_rounded, color: Colors.amberAccent, size: 20),
                 tooltip: 'Mikro-Kum Havuzu',
