@@ -158,3 +158,34 @@ class BrunerFadingOrchestrator:
         if current_stage == BrunerStage.SYMBOLIC:
             return BrunerStage.ICONIC
         return BrunerStage.ENACTIVE
+
+    @classmethod
+    def calculate_fading(
+        cls,
+        stage: BrunerStage,
+        successful_steps: int = 0,
+        bkt_mastery: float = 0.0,
+    ) -> Dict[str, Any]:
+        """
+        Calculates the visual scaffolding opacity and mode transition.
+        Enactive starts at opacity 1.0; as steps succeed, opacity fades (1.0 -> 0.8 -> 0.6 -> ...)
+        and transitions the learner smoothly to pure Symbolic algebra.
+        """
+        if stage == BrunerStage.SYMBOLIC or bkt_mastery >= 0.75:
+            return {
+                "opacity": 0.0,
+                "scaffold_visible": False,
+                "mode": "symbolic",
+                "algebraic_equation_prominence": 1.0,
+            }
+
+        base_opacity = 1.0 if stage == BrunerStage.ENACTIVE else 0.6
+        faded_opacity = max(0.2, base_opacity - (successful_steps * 0.2))
+
+        return {
+            "opacity": round(faded_opacity, 2),
+            "scaffold_visible": faded_opacity > 0.0,
+            "mode": "enactive" if stage == BrunerStage.ENACTIVE else "iconic",
+            "algebraic_equation_prominence": round(1.0 - faded_opacity, 2),
+        }
+

@@ -99,5 +99,46 @@ void main() {
     // Shaded slices should automatically be capped at 3, not remain at 4!
     expect(find.textContaining('Kesir Değeri = 3 / 3'), findsOneWidget);
   });
+
+  testWidgets('Balance scale updates bidirectional equation and respects scaffold opacity', (WidgetTester tester) async {
+    String? latestEquation;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: NumberLineBalanceCanvas(
+            initialMode: RootCanvasMode.balanceScale,
+            scaffoldOpacity: 0.6,
+            onEquationChanged: (eq) => latestEquation = eq,
+          ),
+        ),
+      ),
+    );
+
+    // Initial check
+    expect(find.byKey(const Key('dynamic_algebraic_equation_card')), findsOneWidget);
+    expect(find.text('2x + 3 = 11'), findsWidgets);
+
+    // Verify AnimatedOpacity uses scaffoldOpacity
+    final animatedOpacityFinder = find.byKey(const Key('balance_scale_manipulatives'));
+    expect(animatedOpacityFinder, findsOneWidget);
+    final animatedOpacityWidget = tester.widget<AnimatedOpacity>(animatedOpacityFinder);
+    expect(animatedOpacityWidget.opacity, 0.6);
+
+    // Subtract 3
+    await tester.tap(find.text('Her İki Kefeden 3 Eksilt (-3)'));
+    await tester.pump();
+
+    // Equation updates to 2x = 8 => x = 4
+    expect(find.text('2x = 8  =>  x = 4'), findsOneWidget);
+    expect(latestEquation, '2x = 8');
+
+    // Reset balance
+    await tester.tap(find.byKey(const Key('btn_reset_balance')));
+    await tester.pump();
+
+    expect(find.text('2x + 3 = 11'), findsWidgets);
+    expect(latestEquation, '2x + 3 = 11');
+  });
 }
 

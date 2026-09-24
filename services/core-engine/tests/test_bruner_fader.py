@@ -39,3 +39,22 @@ def test_progress_and_regress_stages():
 
     back = BrunerFadingOrchestrator.regress_stage(BrunerStage.SYMBOLIC)
     assert back == BrunerStage.ICONIC
+
+
+def test_calculate_fading_enactive_fades_with_success():
+    f0 = BrunerFadingOrchestrator.calculate_fading(BrunerStage.ENACTIVE, successful_steps=0)
+    assert f0["opacity"] == 1.0
+    assert f0["mode"] == "enactive"
+
+    f2 = BrunerFadingOrchestrator.calculate_fading(BrunerStage.ENACTIVE, successful_steps=2)
+    assert f2["opacity"] == 0.6
+    assert f2["algebraic_equation_prominence"] == 0.4
+
+
+def test_calculate_fading_symbolic_is_pure_algebra():
+    f_sym = BrunerFadingOrchestrator.calculate_fading(BrunerStage.SYMBOLIC)
+    assert f_sym["opacity"] == 0.0
+    assert f_sym["scaffold_visible"] is False
+    assert f_sym["mode"] == "symbolic"
+    assert f_sym["algebraic_equation_prominence"] == 1.0
+

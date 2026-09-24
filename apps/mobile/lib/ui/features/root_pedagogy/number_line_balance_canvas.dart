@@ -10,10 +10,14 @@ enum RootCanvasMode {
 /// Bruner E-I-S (Enactive - Iconic - Symbolic) ilkelerine göre Seviye -3..-1 kök kavramları öğretir.
 class NumberLineBalanceCanvas extends StatefulWidget {
   final RootCanvasMode initialMode;
+  final double scaffoldOpacity;
+  final ValueChanged<String>? onEquationChanged;
 
   const NumberLineBalanceCanvas({
     super.key,
     this.initialMode = RootCanvasMode.numberLine,
+    this.scaffoldOpacity = 1.0,
+    this.onEquationChanged,
   });
 
   @override
@@ -328,9 +332,44 @@ class _NumberLineBalanceCanvasState extends State<NumberLineBalanceCanvas> {
     // 2x + leftWeight = rightWeight
     final int leftTotal = 2 * _boxValue + _leftWeight;
     final bool isBalanced = leftTotal == _rightWeight;
+    final currentEq = _leftWeight == 0
+        ? "2x = $_rightWeight"
+        : "2x + $_leftWeight = $_rightWeight";
 
     return Column(
       children: [
+        // Eşzamanlı Çift Yönlü Cebirsel Denklem Kartı
+        Container(
+          key: const Key('dynamic_algebraic_equation_card'),
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.cyanAccent.withValues(alpha: 0.5)),
+          ),
+          child: Column(
+            children: [
+              const Text(
+                "Eşzamanlı Cebirsel Denklem (Çift Yönlü Yansıma)",
+                style: TextStyle(color: Colors.white70, fontSize: 11),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _leftWeight == 0
+                    ? "2x = $_rightWeight  =>  x = ${_rightWeight ~/ 2}"
+                    : currentEq,
+                key: const Key('dynamic_algebraic_equation_text'),
+                style: const TextStyle(
+                  color: Colors.cyanAccent,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
@@ -348,36 +387,41 @@ class _NumberLineBalanceCanvasState extends State<NumberLineBalanceCanvas> {
           ),
         ),
         const SizedBox(height: 16),
-        // Terazi Kollarının Görsel Temsili
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            // Sol Kefe
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.blueAccent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
-              child: Column(
-                children: [
-                  const Text('2x Kutusu', style: TextStyle(color: Colors.cyanAccent, fontSize: 11, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text('+ $_leftWeight Ağırlık', style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                ],
+        // Terazi Kollarının Görsel Temsili (İskele Solma Destekli)
+        AnimatedOpacity(
+          key: const Key('balance_scale_manipulatives'),
+          duration: const Duration(milliseconds: 300),
+          opacity: widget.scaffoldOpacity.clamp(0.1, 1.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              // Sol Kefe
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: Colors.blueAccent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
+                child: Column(
+                  children: [
+                    const Text('2x Kutusu', style: TextStyle(color: Colors.cyanAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text('+ $_leftWeight Ağırlık', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                  ],
+                ),
               ),
-            ),
-            const Icon(Icons.balance, color: Colors.amberAccent, size: 36),
-            // Sağ Kefe
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.purpleAccent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
-              child: Column(
-                children: [
-                  const Text('Sabit Sayı', style: TextStyle(color: Colors.purpleAccent, fontSize: 11, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text('$_rightWeight Ağırlık', style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                ],
+              const Icon(Icons.balance, color: Colors.amberAccent, size: 36),
+              // Sağ Kefe
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: Colors.purpleAccent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
+                child: Column(
+                  children: [
+                    const Text('Sabit Sayı', style: TextStyle(color: Colors.purpleAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text('$_rightWeight Ağırlık', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 14),
         // İki taraftan aynı ağırlığı çıkarma butonu
@@ -389,6 +433,9 @@ class _NumberLineBalanceCanvasState extends State<NumberLineBalanceCanvas> {
                   ? () => setState(() {
                         _leftWeight -= 3;
                         _rightWeight -= 3;
+                        widget.onEquationChanged?.call(
+                          _leftWeight == 0 ? "2x = $_rightWeight" : "2x + $_leftWeight = $_rightWeight",
+                        );
                       })
                   : null,
               style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
@@ -401,6 +448,7 @@ class _NumberLineBalanceCanvasState extends State<NumberLineBalanceCanvas> {
                 onPressed: () => setState(() {
                   _leftWeight = 3;
                   _rightWeight = 11;
+                  widget.onEquationChanged?.call("2x + $_leftWeight = $_rightWeight");
                 }),
                 icon: const Icon(Icons.replay, size: 14, color: Colors.white70),
                 label: const Text('Sıfırla', style: TextStyle(color: Colors.white70, fontSize: 12)),
