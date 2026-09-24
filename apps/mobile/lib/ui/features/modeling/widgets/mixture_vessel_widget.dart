@@ -17,12 +17,24 @@ class MixtureVesselWidget extends StatelessWidget {
     this.soluteName = 'Tuz',
   });
 
+  /// Fiziksel Gerçeklik: Hacim kırpma (V > 0)
+  static double clampVolume(double v, {double minVolume = 0.001}) =>
+      (v.isFinite && v > 0) ? v : minVolume;
+
+  /// Fiziksel Gerçeklik: Yüzde kırpma (0 <= p <= 100)
+  static double clampPercentage(double p) =>
+      p.isFinite ? p.clamp(0.0, 100.0) : 0.0;
+
+  /// Fiziksel Gerçeklik: Oran kırpma (0 <= r <= 1)
+  static double clampRatio(double r) =>
+      r.isFinite ? r.clamp(0.0, 1.0) : 0.0;
+
   @override
   Widget build(BuildContext context) {
     final double safeVol1 = (volume1.isFinite && volume1 >= 0) ? volume1 : 0.0;
-    final double safePct1 = (percentage1.isFinite && percentage1 >= 0) ? percentage1.clamp(0.0, 100.0) : 0.0;
+    final double safePct1 = clampPercentage(percentage1);
     final double safeVol2 = (volume2.isFinite && volume2 >= 0) ? volume2 : 0.0;
-    final double safePct2 = (percentage2.isFinite && percentage2 >= 0) ? percentage2.clamp(0.0, 100.0) : 0.0;
+    final double safePct2 = clampPercentage(percentage2);
     final double totalVolume = safeVol1 + safeVol2;
     final double totalSolute = (safeVol1 * (safePct1 / 100.0)) + (safeVol2 * (safePct2 / 100.0));
     final double finalPercentage = totalVolume > 0 ? (totalSolute / totalVolume) * 100.0 : 0.0;

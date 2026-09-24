@@ -10,6 +10,61 @@ enum ModelingStageType {
   solve,
 }
 
+/// Fiziksel Gerçeklik ve Sınır Değer Koruması (Aşama 36)
+class ProblemModelingPhysics {
+  /// Zaman parametresi kırpma: t >= 0
+  static double clampTime(double t) {
+    if (!t.isFinite || t < 0.0) return 0.0;
+    return t;
+  }
+
+  /// Hız parametresi kırpma: v > 0 (fiziksel hareket için pozitif hız)
+  static double clampVelocity(double v, {double minVelocity = 0.001}) {
+    if (!v.isFinite || v <= 0.0) return minVelocity;
+    return v;
+  }
+
+  /// Hacim parametresi kırpma: V > 0 (fiziksel kap için pozitif hacim)
+  static double clampVolume(double v, {double minVolume = 0.001}) {
+    if (!v.isFinite || v <= 0.0) return minVolume;
+    return v;
+  }
+
+  /// Madde/Konsantrasyon oranı kırpma: 0 <= r <= 1.0
+  static double clampRatio(double r) {
+    if (!r.isFinite || r < 0.0) return 0.0;
+    if (r > 1.0) return 1.0;
+    return r;
+  }
+
+  /// Madde yüzdesi kırpma: 0 <= p <= 100.0
+  static double clampPercentage(double p) {
+    if (!p.isFinite || p < 0.0) return 0.0;
+    if (p > 100.0) return 100.0;
+    return p;
+  }
+
+  /// İşçi problemleri için sıfıra bölme ve tanımsızlık kontrolü
+  static bool isDivisionByZeroOrNonPositiveWorkTime(String input, {bool isWorkProblem = false}) {
+    final clean = input.replaceAll(' ', '');
+    if (clean.contains('/0') || clean.contains('/+0')) return true;
+    if (isWorkProblem) {
+      if (clean.contains('/-') ||
+          clean.contains('t=0') ||
+          clean.contains('t<=0') ||
+          clean == '0' ||
+          clean == '0gün' ||
+          clean == '0gun') {
+        return true;
+      }
+      if (clean.startsWith('-') || clean.contains('=-')) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
 /// Sokratik Modelleme Problemi Veri Modeli
 class ProblemPreset {
   final String id;
@@ -331,6 +386,25 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
     } else if (_currentStage == ModelingStageType.equation) {
       // Aşama 2: Eşitliği Kur (Buggy Rules & Algebraic Equivalence)
       final clean = input.replaceAll(' ', '');
+      final bool isWorkProblem = preset.id == 'PROB_WORK_01' || preset.category.contains('İşçi');
+
+      // 0. Sıfıra Bölme ve Tanımsızlık Koruması (İşçi problemleri & genel)
+      if (clean.contains('/0') ||
+          clean.contains('/+0') ||
+          (isWorkProblem &&
+              (clean.contains('/-') ||
+                  clean.contains('t=0') ||
+                  clean.contains('1/0') ||
+                  clean.contains('t<=0')))) {
+        HapticFeedbackService().stepError();
+        setState(() {
+          _detectedBugId = 'BUG-PROB-DIV-ZERO';
+          _socraticFeedback =
+              'Çalışma süresi sıfır veya negatif olamaz (sıfıra bölme tanımsızdır).';
+          _isSubmitting = false;
+        });
+        return;
+      }
 
       // 1. Buggy Rule Kontrolleri
       if (input.contains('x + 5 = 2y') || clean.contains('x+5=2y') || input.contains('tekbirkisiyeyasartisi')) {
@@ -445,8 +519,26 @@ class _ProblemModelingViewState extends State<ProblemModelingView> {
         }
       }
     } else if (_currentStage == ModelingStageType.solve) {
-      // Aşama 3: Çöz ve Reel Dünya Doğrulaması (Zero Leakage)
-      if (input.contains('-')) {
+      final bool isWorkProblem = preset.id == 'PROB_WORK_01' || preset.category.contains('İşçi');
+      final clean = input.replaceAll(' ', '');
+
+      // İşçi problemleri: t > 0 güvencesi (sıfır veya negatif girildiğinde tanımsızlık geribildirimi)
+      if (isWorkProblem &&
+          (clean == '0' ||
+              clean == 't=0' ||
+              clean == '0gün' ||
+              clean == '0gun' ||
+              clean.contains('/0') ||
+              clean.contains('-') ||
+              clean.contains('=-'))) {
+        HapticFeedbackService().stepError();
+        setState(() {
+          _detectedBugId = 'BUG-PROB-DIV-ZERO';
+          _socraticFeedback =
+              'Çalışma süresi sıfır veya negatif olamaz (sıfıra bölme tanımsızdır).';
+          _isSubmitting = false;
+        });
+      } else if (input.contains('-')) {
         HapticFeedbackService().stepError();
         setState(() {
           _detectedBugId = 'BUG-PROB-10';

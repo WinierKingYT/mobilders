@@ -21,9 +21,19 @@ class MotionDiagramWidget extends StatelessWidget {
     this.meetingTimeHours = 4.0,
   });
 
+  /// Fiziksel Gerçeklik: Mesafe kırpma (d >= 0)
+  static double clampDistance(double d) => (d.isFinite && d >= 0) ? d : 0.0;
+
+  /// Fiziksel Gerçeklik: Hız kırpma (v > 0)
+  static double clampVelocity(double v, {double minVelocity = 0.001}) =>
+      (v.isFinite && v > 0) ? v : minVelocity;
+
+  /// Fiziksel Gerçeklik: Zaman kırpma (t >= 0)
+  static double clampTime(double t) => (t.isFinite && t >= 0) ? t : 0.0;
+
   @override
   Widget build(BuildContext context) {
-    final double safeDist = (distanceKm.isFinite && distanceKm >= 0) ? distanceKm : 0.0;
+    final double safeDist = clampDistance(distanceKm);
     final double safeV1 = (vehicle1Speed.isFinite && vehicle1Speed >= 0) ? vehicle1Speed : 0.0;
     final double safeV2 = (vehicle2Speed.isFinite && vehicle2Speed >= 0) ? vehicle2Speed : 0.0;
     final double relativeSpeed = isOppositeDirection

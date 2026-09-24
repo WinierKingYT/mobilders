@@ -365,6 +365,110 @@ void main() {
 
     expect(find.text('Modelleme Başarıyla Tamamlandı!'), findsOneWidget);
   });
+
+  test('ProblemModelingPhysics clamps time, velocity, volume, ratio, and percentage strictly', () {
+    expect(ProblemModelingPhysics.clampTime(-5.0), 0.0);
+    expect(ProblemModelingPhysics.clampTime(12.5), 12.5);
+    expect(ProblemModelingPhysics.clampTime(double.nan), 0.0);
+
+    expect(ProblemModelingPhysics.clampVelocity(-10.0), 0.001);
+    expect(ProblemModelingPhysics.clampVelocity(0.0), 0.001);
+    expect(ProblemModelingPhysics.clampVelocity(65.0), 65.0);
+
+    expect(ProblemModelingPhysics.clampVolume(-2.0), 0.001);
+    expect(ProblemModelingPhysics.clampVolume(0.0), 0.001);
+    expect(ProblemModelingPhysics.clampVolume(40.0), 40.0);
+
+    expect(ProblemModelingPhysics.clampRatio(-0.2), 0.0);
+    expect(ProblemModelingPhysics.clampRatio(0.45), 0.45);
+    expect(ProblemModelingPhysics.clampRatio(1.5), 1.0);
+
+    expect(ProblemModelingPhysics.clampPercentage(-10.0), 0.0);
+    expect(ProblemModelingPhysics.clampPercentage(25.0), 25.0);
+    expect(ProblemModelingPhysics.clampPercentage(150.0), 100.0);
+
+    expect(MotionDiagramWidget.clampDistance(-100.0), 0.0);
+    expect(MotionDiagramWidget.clampVelocity(0.0), 0.001);
+    expect(MotionDiagramWidget.clampTime(-2.0), 0.0);
+
+    expect(MixtureVesselWidget.clampVolume(0.0), 0.001);
+    expect(MixtureVesselWidget.clampPercentage(-5.0), 0.0);
+    expect(MixtureVesselWidget.clampRatio(2.0), 1.0);
+  });
+
+  testWidgets('ProblemModelingView detects BUG-PROB-DIV-ZERO when division by zero entered in equation', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1200, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ProblemModelingView(),
+      ),
+    );
+
+    // Switch to İşçi Problemleri
+    await tester.tap(find.byKey(const Key('preset_chip_PROB_WORK_01')));
+    await tester.pumpAndSettle();
+
+    // Stage 1: Variable 't'
+    await tester.enterText(find.byKey(const Key('modeling_input_field')), 't = süre');
+    await tester.tap(find.byKey(const Key('modeling_submit_button')));
+    await tester.pumpAndSettle();
+
+    // Stage 2: Input with division by zero '1/0 + 1/12 = 1/t'
+    await tester.enterText(find.byKey(const Key('modeling_input_field')), '1/0 + 1/12 = 1/t');
+    await tester.tap(find.byKey(const Key('modeling_submit_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bilişsel Yanılgı: BUG-PROB-DIV-ZERO'), findsOneWidget);
+    expect(find.text('Çalışma süresi sıfır veya negatif olamaz (sıfıra bölme tanımsızdır).'), findsOneWidget);
+  });
+
+  testWidgets('ProblemModelingView detects BUG-PROB-DIV-ZERO when work time is zero in solve stage', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1200, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ProblemModelingView(),
+      ),
+    );
+
+    // Switch to İşçi Problemleri
+    await tester.tap(find.byKey(const Key('preset_chip_PROB_WORK_01')));
+    await tester.pumpAndSettle();
+
+    // Stage 1: Variable 't'
+    await tester.enterText(find.byKey(const Key('modeling_input_field')), 't = süre');
+    await tester.tap(find.byKey(const Key('modeling_submit_button')));
+    await tester.pumpAndSettle();
+
+    // Stage 2: Valid equation '1/6 + 1/12 = 1/t'
+    await tester.enterText(find.byKey(const Key('modeling_input_field')), '1/6 + 1/12 = 1/t');
+    await tester.tap(find.byKey(const Key('modeling_submit_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Aşama 3: Çöz ve Doğrula'), findsOneWidget);
+
+    // Stage 3: Zero work time 't = 0'
+    await tester.enterText(find.byKey(const Key('modeling_input_field')), 't = 0');
+    await tester.tap(find.byKey(const Key('modeling_submit_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bilişsel Yanılgı: BUG-PROB-DIV-ZERO'), findsOneWidget);
+    expect(find.text('Çalışma süresi sıfır veya negatif olamaz (sıfıra bölme tanımsızdır).'), findsOneWidget);
+
+    // Stage 3: Correct answer '4'
+    await tester.enterText(find.byKey(const Key('modeling_input_field')), '4');
+    await tester.tap(find.byKey(const Key('modeling_submit_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Modelleme Başarıyla Tamamlandı!'), findsOneWidget);
+  });
 }
 
 class _MockModelingEngineApiService extends Fake implements EngineApiService {
