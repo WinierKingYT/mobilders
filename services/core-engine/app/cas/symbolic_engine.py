@@ -37,7 +37,7 @@ class SymbolicEquivalenceEngine:
         "sqrt", "Abs", "degree", "rem", "quo", "Poly",
         "sin", "cos", "tan", "cot", "sec", "csc",
         "asin", "acos", "atan",
-        "log", "ln", "exp",
+        "log", "ln", "log10", "exp",
         "diff", "limit", "Derivative", "Limit",
         "integrate", "Integral"
     }
@@ -78,6 +78,7 @@ class SymbolicEquivalenceEngine:
         self.symbols["atan"] = sp.atan
         self.symbols["log"] = sp.log
         self.symbols["ln"] = sp.log
+        self.symbols["log10"] = lambda arg: sp.log(arg, 10)
         self.symbols["exp"] = sp.exp
         self.symbols["diff"] = sp.diff
         self.symbols["limit"] = sp.limit
@@ -292,6 +293,26 @@ class SymbolicEquivalenceEngine:
 
         if diff == 0 or getattr(diff, "is_zero", False):
             return True, "0"
+
+        # Trigonometrik sadeleştirme fallback'i (sp.trigsimp ve sin rewrite)
+        try:
+            trig_diff = sp.trigsimp(diff)
+            if trig_diff == 0 or getattr(trig_diff, "is_zero", False):
+                return True, "0"
+            if any(func in str(diff) for func in ("tan", "cot", "sec", "csc")):
+                rewritten_diff = sp.trigsimp(diff.rewrite(sp.sin))
+                if rewritten_diff == 0 or getattr(rewritten_diff, "is_zero", False):
+                    return True, "0"
+        except Exception:
+            pass
+
+        # Logaritmik sadeleştirme fallback'i (sp.expand_log)
+        try:
+            log_diff = sp.simplify(sp.expand_log(diff, force=True))
+            if log_diff == 0 or getattr(log_diff, "is_zero", False):
+                return True, "0"
+        except Exception:
+            pass
 
         # 2. Skaler kat denklem eşdeğerliği (c * target_expr == user_expr, c != 0)
         # Yalnızca denklemlerde (LHS = RHS) geçerlidir; türev veya fonksiyon değerlerinde skaler kat eşit kabul edilemez.

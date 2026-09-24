@@ -138,6 +138,23 @@ def test_cas_log_equalities(cas):
     assert cas.verify_log_equality("log(a) + log(b)", "log(a+b)") is False
 
 
+def test_cas_log10_base_protection_and_trigsimp_fallback(cas):
+    """log10 taban korumasını ve trigsimp fallback eşdeğerliğini test eder."""
+    # log10 özellikleri
+    assert cas.verify_log_equality("log10(a) + log10(b)", "log10(a*b)") is True
+    assert cas.verify_log_equality("log10(100)", "2") is True
+    # log10(x) ile ln(x) tabanları farklı olduğu için eşit olmamalı
+    assert cas.verify_log_equality("log10(x)", "ln(x)") is False
+
+    # verify_equivalence trigsimp fallback
+    is_equiv, _, _ = cas.verify_equivalence("sin(x)**2 + cos(x)**2 = 1", "1 = 1")
+    assert is_equiv is True
+
+    is_equiv_tan, _, _ = cas.verify_equivalence("tan(x)*cos(x) = sin(x)", "sin(x) = sin(x)")
+    assert is_equiv_tan is True
+
+
+
 def test_cas_domain_constraints_log_argument(cas):
     """Logaritma argümanının pozitiflik şartını evaluate_domain_constraints ile doğrular."""
     # x = 1 için log(x - 2) argümanı -1 <= 0 olduğu için reddedilmeli

@@ -114,7 +114,7 @@ class ImplicitMultiplicationPreprocessor:
             "sqrt", "abs", "degree", "rem", "quo", "poly",
             "sin", "cos", "tan", "cot", "sec", "csc",
             "asin", "acos", "atan",
-            "log", "ln", "exp",
+            "log", "ln", "log10", "exp",
             "diff", "limit", "derivative",
             "integrate", "integral"
         }
