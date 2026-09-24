@@ -1,11 +1,19 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:personal_learning_engine/data/services/engine_api_service.dart';
+import 'package:personal_learning_engine/data/services/offline_sync_queue.dart';
+import 'package:personal_learning_engine/data/services/session_restoration_manager.dart';
 import 'package:personal_learning_engine/domain/models/misconception_profile_model.dart';
+import 'package:personal_learning_engine/domain/models/solution_step.dart';
 import 'package:personal_learning_engine/ui/core/app_theme.dart';
 import 'package:personal_learning_engine/ui/features/analytics/views/misconception_profiler_screen.dart';
 import 'package:personal_learning_engine/ui/features/session/view_models/session_view_model.dart';
 import 'package:personal_learning_engine/ui/features/session/widgets/interactive_socratic_chat_dialog.dart';
+import 'package:personal_learning_engine/ui/features/touchpad/math_touchpad.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -302,6 +310,158 @@ void main() {
       expect(optimizer.isLowPowerMode, isFalse);
       expect(optimizer.targetFrameRate, equals(FrameRateTarget.highRefresh120Hz));
       expect(optimizer.enableParticleEffects, isTrue);
+    });
+  });
+
+  group('Cold Boot, Application Termination & Offline Recovery Tests (Stage 59)', () {
+    test('Lifecycle & Cold Boot: Application termination restores session steps and state', () async {
+      final tempDir = Directory.systemTemp.createTempSync('cold_boot_sim_');
+      final backend = FileSessionStorageBackend(baseDirectoryPath: tempDir.path);
+      final manager = SessionRestorationManager(storage: backend);
+
+      final steps = [
+        const SolutionStep(
+          stepNumber: 1,
+          userExpression: 'x^2 - 5x = -6',
+          isValid: true,
+          isTargetReached: false,
+          elapsedMs: 1200,
+          canonicalExpression: 'x^2 - 5*x + 6 = 0',
+        ),
+        const SolutionStep(
+          stepNumber: 2,
+          userExpression: '(x - 2)(x - 3) = 0',
+          isValid: true,
+          isTargetReached: false,
+          elapsedMs: 1400,
+          canonicalExpression: '(x - 2)*(x - 3) = 0',
+        ),
+        const SolutionStep(
+          stepNumber: 3,
+          userExpression: 'x = 2 or x = 3',
+          isValid: true,
+          isTargetReached: true,
+          elapsedMs: 1600,
+          canonicalExpression: 'x = 2',
+        ),
+      ];
+
+      // Uygulama kapanmadan önce aktif seansı kaydet
+      await manager.saveDraft(
+        sessionId: 'sess_cold_boot_01',
+        nodeId: 'N15',
+        targetEquation: 'x^2 - 5*x + 6 = 0',
+        draftText: 'x = 2 or x = 3',
+        inputMode: InputMode.touchpad,
+        steps: steps,
+        currentPl: 0.85,
+      );
+
+      expect((await manager.restoreDraft()), isNotNull);
+
+      // Uygulama kapanması ve soğuk başlatma simülasyonu (Cold Boot)
+      final coldBootBackend = FileSessionStorageBackend(baseDirectoryPath: tempDir.path);
+      final coldBootManager = SessionRestorationManager(storage: coldBootBackend);
+
+      final restored = await coldBootManager.restoreDraft();
+      expect(restored, isNotNull);
+      expect(restored!.sessionId, equals('sess_cold_boot_01'));
+      expect(restored.nodeId, equals('N15'));
+      expect(restored.targetEquation, equals('x^2 - 5*x + 6 = 0'));
+      expect(restored.draftText, equals('x = 2 or x = 3'));
+      expect(restored.currentPl, equals(0.85));
+
+      final restoredSteps = restored.toSolutionSteps();
+      expect(restoredSteps.length, equals(3));
+      expect(restoredSteps[0].userExpression, equals('x^2 - 5x = -6'));
+      expect(restoredSteps[1].userExpression, equals('(x - 2)(x - 3) = 0'));
+      expect(restoredSteps[2].userExpression, equals('x = 2 or x = 3'));
+      expect(restoredSteps[2].isTargetReached, isTrue);
+
+      try {
+        tempDir.deleteSync(recursive: true);
+      } catch (_) {}
+    });
+
+    test('Offline Step Recovery: 5 consecutive steps are queued and synced upon reconnection', () async {
+      final tempQueueFile = File('${Directory.systemTemp.path}/offline_queue_test_59.json');
+      final syncQueue = OfflineSyncQueue(storageFilePath: tempQueueFile.path);
+      await syncQueue.clearQueue();
+
+      // Çevrimdışıyken girilen 5 ardışık adımı simüle et
+      final offlineSteps = [
+        'x^2 - 5x = -6',
+        'x^2 - 5x + 6 = 0',
+        '(x - 2)(x - 3) = 0',
+        'x - 2 = 0 or x - 3 = 0',
+        'x = 2 or x = 3',
+      ];
+
+      for (int i = 0; i < offlineSteps.length; i++) {
+        final event = UnsyncedStepEvent(
+          clientMsgId: 'cmsg_offline_${i + 1}',
+          sessionId: 'sess_offline_5steps',
+          nodeId: 'N15',
+          stepNumber: i + 1,
+          userExpression: offlineSteps[i],
+          targetEquation: 'x^2 - 5*x + 6 = 0',
+          previousStep: i > 0 ? offlineSteps[i - 1] : null,
+          clientTimestamp: DateTime.now(),
+          elapsedMs: 1200 + i * 100,
+          currentPl: 0.20 + i * 0.10,
+        );
+        syncQueue.enqueueStep(event);
+      }
+
+      expect(syncQueue.pendingCount, equals(5));
+
+      // Sunucu yeniden bağlandığında batch replay paketi kabul edilir
+      final mockClient = MockClient((request) async {
+        if (request.url.path.contains('/api/v1/session/replay-queue')) {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          final events = body['events'] as List<dynamic>;
+          expect(events.length, equals(5));
+
+          final replayed = events.map((e) {
+            final num = e['step_number'] as int;
+            return {
+              'step_number': num,
+              'is_valid': true,
+              'is_target_reached': num == 5,
+              'canonical_expression': e['user_expression'],
+              'error_message': null,
+            };
+          }).toList();
+
+          return http.Response(
+            jsonEncode({
+              'replayed_steps': replayed,
+              'latest_p_l': 0.85,
+              'is_target_reached': true,
+              'synced_count': 5,
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('Not Found', 404);
+      });
+
+      final onlineApi = EngineApiService(client: mockClient);
+
+      // Yeniden bağlanma sonrası kuyruk replay edilir
+      final result = await syncQueue.replayBatch(onlineApi);
+
+      expect(result.syncedCount, equals(5));
+      expect(result.isTargetReached, isTrue);
+      expect(result.latestPl, equals(0.85));
+      expect(syncQueue.pendingCount, equals(0));
+
+      try {
+        if (tempQueueFile.existsSync()) {
+          tempQueueFile.deleteSync();
+        }
+      } catch (_) {}
     });
   });
 }
