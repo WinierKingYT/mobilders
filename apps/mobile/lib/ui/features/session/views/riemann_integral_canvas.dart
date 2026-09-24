@@ -6,6 +6,8 @@ enum RiemannMethod {
   right,
   midpoint,
   trapezoid,
+  lower,
+  upper,
 }
 
 enum IntegralFunctionType {
@@ -114,6 +116,8 @@ class RiemannIntegralPainter extends CustomPainter {
         canvas.drawPath(trapPath, rectBorderPaint);
       } else {
         double evalX;
+        final yLeft = _f(xLeft);
+        final yRight = _f(xRight);
         switch (method) {
           case RiemannMethod.left:
             evalX = xLeft;
@@ -123,6 +127,12 @@ class RiemannIntegralPainter extends CustomPainter {
             break;
           case RiemannMethod.midpoint:
             evalX = xLeft + 0.5 * dx;
+            break;
+          case RiemannMethod.lower:
+            evalX = yLeft <= yRight ? xLeft : xRight;
+            break;
+          case RiemannMethod.upper:
+            evalX = yLeft >= yRight ? xLeft : xRight;
             break;
           default:
             evalX = xLeft;
@@ -191,6 +201,10 @@ class RiemannIntegralPainter extends CustomPainter {
         return const Color(0xFF34D399); // emerald
       case RiemannMethod.trapezoid:
         return const Color(0xFFA78BFA); // purple
+      case RiemannMethod.lower:
+        return const Color(0xFF06B6D4); // cyan (Alt Toplam / Darboux Lower)
+      case RiemannMethod.upper:
+        return const Color(0xFFEC4899); // pink (Üst Toplam / Darboux Upper)
     }
   }
 
@@ -233,6 +247,13 @@ class RiemannIntegralCanvas extends StatefulWidget {
     this.initialFunc = IntegralFunctionType.parabola,
   });
 
+  /// Bölüntü sayısı sınırlandırma (n in [2, 100])
+  static int clampN(int n) {
+    if (n < 2) return 2;
+    if (n > 100) return 100;
+    return n;
+  }
+
   @override
   State<RiemannIntegralCanvas> createState() => _RiemannIntegralCanvasState();
 }
@@ -247,7 +268,7 @@ class _RiemannIntegralCanvasState extends State<RiemannIntegralCanvas> {
   @override
   void initState() {
     super.initState();
-    _n = widget.initialN.clamp(2, 64);
+    _n = RiemannIntegralCanvas.clampN(widget.initialN);
     _method = widget.initialMethod;
     _funcType = widget.initialFunc;
   }
@@ -256,7 +277,7 @@ class _RiemannIntegralCanvasState extends State<RiemannIntegralCanvas> {
   void didUpdateWidget(covariant RiemannIntegralCanvas oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialN != widget.initialN) {
-      _n = widget.initialN.clamp(2, 64);
+      _n = RiemannIntegralCanvas.clampN(widget.initialN);
     }
     if (oldWidget.initialMethod != widget.initialMethod) {
       _method = widget.initialMethod;
@@ -299,25 +320,33 @@ class _RiemannIntegralCanvasState extends State<RiemannIntegralCanvas> {
     for (int i = 0; i < effectiveN; i++) {
       final xLeft = _a + i * dx;
       final xRight = _a + (i + 1) * dx;
+      final yLeft = _f(xLeft);
+      final yRight = _f(xRight);
 
       if (_method == RiemannMethod.trapezoid) {
-        sum += 0.5 * (_f(xLeft) + _f(xRight)) * dx;
+        sum += 0.5 * (yLeft + yRight) * dx;
       } else {
-        double evalX;
+        double evalY;
         switch (_method) {
           case RiemannMethod.left:
-            evalX = xLeft;
+            evalY = yLeft;
             break;
           case RiemannMethod.right:
-            evalX = xRight;
+            evalY = yRight;
             break;
           case RiemannMethod.midpoint:
-            evalX = xLeft + 0.5 * dx;
+            evalY = _f(xLeft + 0.5 * dx);
+            break;
+          case RiemannMethod.lower:
+            evalY = math.min(yLeft, yRight);
+            break;
+          case RiemannMethod.upper:
+            evalY = math.max(yLeft, yRight);
             break;
           default:
-            evalX = xLeft;
+            evalY = yLeft;
         }
-        sum += _f(evalX) * dx;
+        sum += evalY * dx;
       }
     }
     return sum;
@@ -411,13 +440,17 @@ class _RiemannIntegralCanvasState extends State<RiemannIntegralCanvas> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
+                  _buildMethodChip("Alt Toplam", RiemannMethod.lower),
+                  const SizedBox(width: 8),
+                  _buildMethodChip("Üst Toplam", RiemannMethod.upper),
+                  const SizedBox(width: 8),
+                  _buildMethodChip("Yamuk Kuralı", RiemannMethod.trapezoid),
+                  const SizedBox(width: 8),
                   _buildMethodChip("Sol Toplam", RiemannMethod.left),
                   const SizedBox(width: 8),
                   _buildMethodChip("Sağ Toplam", RiemannMethod.right),
                   const SizedBox(width: 8),
                   _buildMethodChip("Orta Nokta", RiemannMethod.midpoint),
-                  const SizedBox(width: 8),
-                  _buildMethodChip("Yamuk Kuralı", RiemannMethod.trapezoid),
                 ],
               ),
             ),
@@ -479,7 +512,7 @@ class _RiemannIntegralCanvasState extends State<RiemannIntegralCanvas> {
             ),
             const SizedBox(height: 12),
 
-            // Partition Slider (n)
+            // Partition Slider (n in [2, 100])
             Row(
               children: [
                 Text(
@@ -501,20 +534,20 @@ class _RiemannIntegralCanvasState extends State<RiemannIntegralCanvas> {
                 overlayColor: const Color(0xFF38BDF8).withValues(alpha: 0.2),
               ),
               child: Slider(
-                value: _n.clamp(2, 64).toDouble(),
+                value: _n.clamp(2, 100).toDouble(),
                 min: 2,
-                max: 64,
-                divisions: 31,
+                max: 100,
+                divisions: 98,
                 label: "n = $_n",
                 onChanged: (val) {
                   setState(() {
-                    _n = val.round().clamp(2, 64);
+                    _n = RiemannIntegralCanvas.clampN(val.round());
                   });
                 },
               ),
             ),
 
-            // Quick Preset Chips (n = 4, 16, 64)
+            // Quick Preset Chips (n = 4, 16, 64, 100)
             Wrap(
               alignment: WrapAlignment.center,
               spacing: 8,
@@ -523,6 +556,7 @@ class _RiemannIntegralCanvasState extends State<RiemannIntegralCanvas> {
                 _buildNPresetChip("n = 4 (Kaba)", 4),
                 _buildNPresetChip("n = 16 (Dengeli)", 16),
                 _buildNPresetChip("n = 64 (Limit)", 64),
+                _buildNPresetChip("n = 100 (Limit n→∞)", 100),
               ],
             ),
           ],

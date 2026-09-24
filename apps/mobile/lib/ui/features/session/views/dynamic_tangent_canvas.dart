@@ -211,6 +211,13 @@ class DynamicTangentCanvas extends StatefulWidget {
     this.initialH = 1.0,
   });
 
+  /// h parametresi sınırlandırma (h >= 0.001 ile h = 0 tanımsızlığını önleme)
+  static double clampH(double h) {
+    if (!h.isFinite || h < 0.001) return 0.001;
+    if (h > 2.0) return 2.0;
+    return h;
+  }
+
   @override
   State<DynamicTangentCanvas> createState() => _DynamicTangentCanvasState();
 }
@@ -225,7 +232,7 @@ class _DynamicTangentCanvasState extends State<DynamicTangentCanvas> {
     super.initState();
     _curveType = CalculusCurveType.parabola;
     _x0 = widget.initialX0.isFinite ? widget.initialX0.clamp(-3.0, 3.0) : 1.0;
-    _h = widget.initialH.isFinite ? widget.initialH.clamp(0.02, 2.0) : 1.0;
+    _h = DynamicTangentCanvas.clampH(widget.initialH);
   }
 
   @override
@@ -235,12 +242,13 @@ class _DynamicTangentCanvasState extends State<DynamicTangentCanvas> {
       _x0 = widget.initialX0.isFinite ? widget.initialX0.clamp(-3.0, 3.0) : 1.0;
     }
     if (oldWidget.initialH != widget.initialH) {
-      _h = widget.initialH.isFinite ? widget.initialH.clamp(0.02, 2.0) : 1.0;
+      _h = DynamicTangentCanvas.clampH(widget.initialH);
     }
   }
 
   double _computeSecantSlope() {
-    if (_h.abs() < 1e-6) {
+    // h -> 0 tanımsızlık koruması (h >= 0.001 veya limit yaklaşımı)
+    if (_h.abs() < 0.001) {
       return _computeTangentSlope();
     }
     double f(double x) {
@@ -483,12 +491,41 @@ class _DynamicTangentCanvasState extends State<DynamicTangentCanvas> {
           ),
           const SizedBox(height: 14),
 
+          // Instantaneous derivative limit formula card: m = lim_{h->0} [f(x0+h)-f(x0)]/h = f'(x0)
+          Container(
+            key: const Key('instantaneous_slope_formula_card'),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.functions, color: Color(0xFF38BDF8), size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "Anlık Eğim: m = lim_{h→0} [f(x₀+h) - f(x₀)] / h = f'(x₀) = ${mTan.toStringAsFixed(3)}",
+                    style: const TextStyle(
+                      color: Color(0xFF38BDF8),
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
           // h-Slider & Presets
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                "Adım Boyutu (h = ${_h.toStringAsFixed(2)})",
+                "Adım Boyutu (h = ${_h.toStringAsFixed(3)})",
                 style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
               ),
               Text(
@@ -509,16 +546,16 @@ class _DynamicTangentCanvasState extends State<DynamicTangentCanvas> {
               overlayColor: const Color(0xFF38BDF8).withValues(alpha: 0.2),
             ),
             child: Slider(
-              value: _h.clamp(0.02, 2.0),
-              min: 0.02,
+              value: DynamicTangentCanvas.clampH(_h),
+              min: 0.001,
               max: 2.0,
               onChanged: (val) {
-                setState(() => _h = val.clamp(0.02, 2.0));
+                setState(() => _h = DynamicTangentCanvas.clampH(val));
               },
             ),
           ),
 
-          // Presets: h -> 1.5, 0.8, 0.3, 0.05
+          // Presets: h -> 1.5, 0.8, 0.3, 0.02, 0.001
           Wrap(
             spacing: 8,
             children: [
@@ -545,6 +582,13 @@ class _DynamicTangentCanvasState extends State<DynamicTangentCanvas> {
                 backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.25),
                 labelStyle: const TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.bold),
                 onPressed: () => setState(() => _h = 0.02),
+              ),
+              ActionChip(
+                key: const Key('tangent_preset_h_limit_0001'),
+                label: const Text("h → 0.001 (Türev Limiti)"),
+                backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.35),
+                labelStyle: const TextStyle(color: Color(0xFF34D399), fontSize: 11, fontWeight: FontWeight.bold),
+                onPressed: () => setState(() => _h = 0.001),
               ),
             ],
           ),

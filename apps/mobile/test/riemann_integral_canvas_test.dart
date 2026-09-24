@@ -90,5 +90,69 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text("Riemann İntegral & Alan Simülatörü"), findsOneWidget);
   });
+
+  test('RiemannIntegralCanvas.clampN clamps n strictly into [2, 100]', () {
+    expect(RiemannIntegralCanvas.clampN(0), 2);
+    expect(RiemannIntegralCanvas.clampN(1), 2);
+    expect(RiemannIntegralCanvas.clampN(-10), 2);
+    expect(RiemannIntegralCanvas.clampN(50), 50);
+    expect(RiemannIntegralCanvas.clampN(100), 100);
+    expect(RiemannIntegralCanvas.clampN(250), 100);
+  });
+
+  testWidgets('RiemannIntegralCanvas computes Alt Toplam (lower) and Üst Toplam (upper) correctly', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: RiemannIntegralCanvas(
+              initialN: 4,
+              initialMethod: RiemannMethod.lower,
+              initialFunc: IntegralFunctionType.parabola,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Initial with Alt Toplam on f(x)=0.5x^2, n=4 on [0, 2]:
+    // dx = 0.5. Intervals: [0, 0.5], [0.5, 1], [1, 1.5], [1.5, 2]
+    // Since f(x)=0.5x^2 is increasing on [0, 2], lower Darboux sum equals left sum = 0.8750
+    expect(find.text("0.8750"), findsOneWidget);
+
+    // Switch to Üst Toplam
+    final upperChip = find.text("Üst Toplam");
+    expect(upperChip, findsOneWidget);
+    await tester.tap(upperChip);
+    await tester.pumpAndSettle();
+
+    // Upper Darboux sum equals right sum:
+    // dx * (f(0.5) + f(1) + f(1.5) + f(2)) = 0.5 * (0.125 + 0.5 + 1.125 + 2.0) = 0.5 * 3.75 = 1.8750
+    expect(find.text("1.8750"), findsOneWidget);
+  });
+
+  testWidgets('RiemannIntegralCanvas preset n=100 triggers limit convergence badge', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: RiemannIntegralCanvas(
+              initialN: 4,
+              initialMethod: RiemannMethod.left,
+              initialFunc: IntegralFunctionType.parabola,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final limitChip = find.text("n = 100 (Limit n→∞)");
+    expect(limitChip, findsOneWidget);
+    await tester.ensureVisible(limitChip);
+    await tester.tap(limitChip);
+    await tester.pumpAndSettle();
+
+    expect(find.text("Yakınsadı (Limit!)"), findsOneWidget);
+  });
 }
 
