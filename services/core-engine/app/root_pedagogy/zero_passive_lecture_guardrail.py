@@ -33,9 +33,38 @@ class ZeroPassiveLectureGuardrail:
         r"\b(özetle\s+anlatmak\s+gerekirse|özetlemek\s+gerekirse)\b",
         r"\b(öncelikle\s+bilmelisiniz\s+ki|bilindiği\s+üzere)\b",
         r"\b(teorik\s+olarak\s+açıklarsak|konu\s+anlatımına\s+geçelim)\b",
+        r"\b(videoyu\s+izleyin|dersi\s+dinleyin)\b",
+        r"\b(burayı\s+ezberleyelim|ezberlememiz\s+gerekir)\b",
+        r"\b(şimdi\s+arkamıza\s+yaslanalım)\b",
     ]
 
-    ACTION_ENDINGS = ("?", "!", "yaz.", "yazın.", "dene.", "deneyin.", "çöz.", "hesapla.", "bakalım.")
+    ACTION_ENDINGS = (
+        "?",
+        "!",
+        "yaz.",
+        "yazın.",
+        "dene.",
+        "deneyin.",
+        "çöz.",
+        "hesapla.",
+        "bakalım.",
+        "bul.",
+        "bulun.",
+        "belirle.",
+        "söyle.",
+    )
+
+    @classmethod
+    def enforce(cls, text: str, fallback_directive: str = "Şimdi sen dene?") -> str:
+        """
+        Guarantees actionable, non-passive text. If invalid or passive, returns sanitized version.
+        """
+        result = cls.validate_and_sanitize(text)
+        if result.is_valid:
+            return result.sanitized_text
+        if result.sanitized_text:
+            return result.sanitized_text
+        return fallback_directive
 
     @classmethod
     def validate_and_sanitize(cls, text: str) -> GuardrailResult:

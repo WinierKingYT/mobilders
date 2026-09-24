@@ -39,3 +39,27 @@ def test_guardrail_appends_action_directive_if_passive():
     result = ZeroPassiveLectureGuardrail.validate_and_sanitize(statement)
     assert result.is_valid is False
     assert result.sanitized_text.endswith("Şimdi sen dene?")
+
+
+def test_guardrail_accepts_extended_action_verbs():
+    text = "Her iki tarafı x katsayısına böl ve sonucu bul."
+    result = ZeroPassiveLectureGuardrail.validate_and_sanitize(text)
+    assert result.is_valid is True
+
+
+def test_guardrail_rejects_new_passive_patterns():
+    passive = "Önce burayı ezberleyelim ve formüle bakalım."
+    result = ZeroPassiveLectureGuardrail.validate_and_sanitize(passive)
+    assert result.is_valid is False
+    assert "ezberleyelim" in result.violation_reason
+
+
+
+def test_guardrail_enforce_helper():
+    clean = ZeroPassiveLectureGuardrail.enforce("3x = 12 ise x kaçtır?")
+    assert clean == "3x = 12 ise x kaçtır?"
+
+    passive = "Burayı ezberleyelim."
+    enforced = ZeroPassiveLectureGuardrail.enforce(passive)
+    assert "Şimdi sen dene?" in enforced
+

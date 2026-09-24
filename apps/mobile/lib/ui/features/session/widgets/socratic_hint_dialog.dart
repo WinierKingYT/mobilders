@@ -55,7 +55,7 @@ class SocraticHintData {
         groundingExample: 'Yarım elma ile çeyrek elmayı toplamak için ikisini de çeyrek cinsinden (aynı birimle) ifade ederiz: 1/2 + 1/4 = 2/4 + 1/4.',
         discoveryQuestion: 'Paydaları farklı olan kesirleri tek bir kesir çizgisi altında toplamak için ilk olarak neyi eşitlemeliyiz?',
         expectedKeywords: ['payda', 'ortak', 'kat', 'ekok', 'okek', 'eşitle', 'genişlet'],
-        guidanceIfStuck: 'İpucu: Kesirlerin altındaki sayıları ortak bir katta buluşturmamız gerekir.',
+        guidanceIfStuck: 'İpucu: Kesirlerin altındaki sayıları ortak bir katta buluşturmamız gerekir. Hangi katta eşitlersin?',
       );
     }
     // Default equation balance
