@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../../core/services/haptic_feedback_service.dart';
@@ -10,7 +11,7 @@ enum InputMode {
   inkingCanvas,
 }
 
-class MathTouchpad extends StatelessWidget {
+class MathTouchpad extends StatefulWidget {
   final TextEditingController controller;
   final VoidCallback onSubmit;
   final InputMode inputMode;
@@ -27,6 +28,43 @@ class MathTouchpad extends StatelessWidget {
     this.isSubmitting = false,
     this.highlightedToken,
   });
+
+  @override
+  State<MathTouchpad> createState() => _MathTouchpadState();
+}
+
+class _MathTouchpadState extends State<MathTouchpad> {
+  Timer? _holdDeleteTimer;
+
+  TextEditingController get controller => widget.controller;
+  VoidCallback get onSubmit => widget.onSubmit;
+  InputMode get inputMode => widget.inputMode;
+  ValueChanged<InputMode> get onModeChanged => widget.onModeChanged;
+  bool get isSubmitting => widget.isSubmitting;
+  String? get highlightedToken => widget.highlightedToken;
+
+  @override
+  void dispose() {
+    _holdDeleteTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startHoldToDelete() {
+    _backspace();
+    _holdDeleteTimer?.cancel();
+    _holdDeleteTimer = Timer.periodic(const Duration(milliseconds: 75), (_) {
+      if (controller.text.isEmpty) {
+        _stopHoldToDelete();
+      } else {
+        _backspace();
+      }
+    });
+  }
+
+  void _stopHoldToDelete() {
+    _holdDeleteTimer?.cancel();
+    _holdDeleteTimer = null;
+  }
 
   void _insertText(String text) {
     HapticFeedbackService().keyPress();
@@ -342,7 +380,7 @@ class MathTouchpad extends StatelessWidget {
             _key('5', () => _insertText('5')),
             _key('6', () => _insertText('6')),
             _key('0', () => _insertText('0')),
-            _actionKey('⌫', _backspace, icon: Icons.backspace_outlined),
+            _backspaceKey(),
           ]),
           const SizedBox(height: 6),
 
@@ -393,25 +431,29 @@ class MathTouchpad extends StatelessWidget {
         ? Colors.white
         : AppColors.touchpadKeyText;
 
-    return SizedBox(
-      height: 42,
-      child: ElevatedButton(
-        key: Key('touchpad_key_$label'),
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: bgColor,
-          foregroundColor: fgColor,
-          elevation: isHighlighted ? 4 : 1,
-          padding: EdgeInsets.zero,
-          side: isHighlighted ? const BorderSide(color: Color(0xFF38BDF8), width: 2) : BorderSide.none,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: isOp ? 17 : 19,
-            fontWeight: isHighlighted ? FontWeight.bold : FontWeight.w600,
-            fontFamily: isOp ? null : 'monospace',
+    return Semantics(
+      label: _getSemanticLabel(label),
+      button: true,
+      child: SizedBox(
+        height: 42,
+        child: ElevatedButton(
+          key: Key('touchpad_key_$label'),
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: bgColor,
+            foregroundColor: fgColor,
+            elevation: isHighlighted ? 4 : 1,
+            padding: EdgeInsets.zero,
+            side: isHighlighted ? const BorderSide(color: Color(0xFF38BDF8), width: 2) : BorderSide.none,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: isOp ? 17 : 19,
+              fontWeight: isHighlighted ? FontWeight.bold : FontWeight.w600,
+              fontFamily: isOp ? null : 'monospace',
+            ),
           ),
         ),
       ),
@@ -430,7 +472,10 @@ class MathTouchpad extends StatelessWidget {
       height: 42,
       child: Tooltip(
         message: tooltip ?? '',
-        child: ElevatedButton(
+        child: Semantics(
+          label: _getSemanticLabel(label),
+          button: true,
+          child: ElevatedButton(
           onPressed: onPressed,
           style: ElevatedButton.styleFrom(
             backgroundColor: color ?? AppColors.touchpadOpBg,
@@ -446,35 +491,129 @@ class MathTouchpad extends StatelessWidget {
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
         ),
+        ),
       ),
     );
   }
 
   Widget _submitKey() {
-    return SizedBox(
-      height: 42,
-      child: ElevatedButton(
-        onPressed: isSubmitting
-            ? null
-            : () {
-                HapticFeedbackService().selectionClick();
-                onSubmit();
-              },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.touchpadActionBg,
-          foregroundColor: Colors.white,
-          elevation: 2,
-          padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    return Semantics(
+      label: 'adımı onayla ve gönder',
+      button: true,
+      child: SizedBox(
+        height: 42,
+        child: ElevatedButton(
+          key: const Key('touchpad_submit_key'),
+          onPressed: isSubmitting
+              ? null
+              : () {
+                  HapticFeedbackService().selectionClick();
+                  onSubmit();
+                },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.touchpadActionBg,
+            foregroundColor: Colors.white,
+            elevation: 2,
+            padding: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          child: isSubmitting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : const Icon(Icons.arrow_forward_rounded, size: 21),
         ),
-        child: isSubmitting
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-              )
-            : const Icon(Icons.arrow_forward_rounded, size: 21),
       ),
     );
+  }
+
+  Widget _backspaceKey() {
+    return Semantics(
+      label: 'silme tuşu, basılı tutulduğunda sürekli siler',
+      button: true,
+      child: SizedBox(
+        height: 42,
+        child: GestureDetector(
+          key: const Key('touchpad_key_backspace'),
+          behavior: HitTestBehavior.opaque,
+          onTap: _backspace,
+          onLongPressStart: (_) => _startHoldToDelete(),
+          onLongPressEnd: (_) => _stopHoldToDelete(),
+          onLongPressCancel: _stopHoldToDelete,
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.touchpadOpBg,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 1,
+                  offset: Offset(0, 1),
+                ),
+              ],
+            ),
+            alignment: Alignment.center,
+            child: const Icon(Icons.backspace_outlined, size: 19, color: AppColors.touchpadKeyText),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getSemanticLabel(String label) {
+    switch (label) {
+      case 'x':
+        return 'x değişkeni';
+      case 'x²':
+        return 'x kare';
+      case '√':
+        return 'karekök';
+      case '±':
+        return 'artı eksi işareti';
+      case 'C':
+        return 'tümünü temizle';
+      case '(':
+        return 'aç parantez';
+      case ')':
+        return 'kapa parantez';
+      case '=':
+        return 'eşittir';
+      case '+':
+        return 'artı';
+      case '-':
+        return 'eksi';
+      case '7':
+        return 'yedi';
+      case '8':
+        return 'sekiz';
+      case '9':
+        return 'dokuz';
+      case '×':
+        return 'çarpı';
+      case '÷':
+        return 'bölü';
+      case '4':
+        return 'dört';
+      case '5':
+        return 'beş';
+      case '6':
+        return 'altı';
+      case '0':
+        return 'sıfır';
+      case '1':
+        return 'bir';
+      case '2':
+        return 'iki';
+      case '3':
+        return 'üç';
+      case '⌨':
+        return 'serbest klavyeye geç';
+      case '⌫':
+        return 'silme tuşu, basılı tutulduğunda sürekli siler';
+      default:
+        return label;
+    }
   }
 }

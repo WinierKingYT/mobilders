@@ -257,6 +257,56 @@ void main() {
       final style = minusBtn.style;
       expect(style?.backgroundColor?.resolve({}), const Color(0xFF0369A1));
     });
+
+    testWidgets('Hold-to-delete periodically clears text when held', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: Scaffold(
+            body: MathTouchpad(
+              controller: controller,
+              inputMode: InputMode.touchpad,
+              onModeChanged: (_) {},
+              onSubmit: () {},
+            ),
+          ),
+        ),
+      );
+
+      controller.text = '12345';
+      final backspaceFinder = find.byKey(const Key('touchpad_key_backspace'));
+      expect(backspaceFinder, findsOneWidget);
+
+      // Perform long press gesture
+      final gesture = await tester.startGesture(tester.getCenter(backspaceFinder));
+      await tester.pump(const Duration(milliseconds: 600)); // triggers onLongPressStart
+      await tester.pump(const Duration(milliseconds: 160)); // triggers periodic deletes
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(controller.text.length < 5, isTrue);
+    });
+
+    testWidgets('Touchpad keys have accessible Turkish TalkBack Semantics labels', (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: Scaffold(
+            body: MathTouchpad(
+              controller: controller,
+              inputMode: InputMode.touchpad,
+              onModeChanged: (_) {},
+              onSubmit: () {},
+            ),
+          ),
+        ),
+      );
+
+      expect(find.bySemanticsLabel('x değişkeni'), findsOneWidget);
+      expect(find.bySemanticsLabel('x kare'), findsOneWidget);
+      expect(find.bySemanticsLabel('silme tuşu, basılı tutulduğunda sürekli siler'), findsOneWidget);
+      expect(find.bySemanticsLabel('adımı onayla ve gönder'), findsOneWidget);
+    });
   });
 }
 
