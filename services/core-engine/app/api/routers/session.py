@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import math
 import time
@@ -314,7 +315,15 @@ async def session_websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             try:
-                data = await websocket.receive_json()
+                # Aşama 55: 60 saniyelik keep-alive zaman aşımı (hayalet oturum temizliği)
+                data = await asyncio.wait_for(websocket.receive_json(), timeout=60.0)
+            except asyncio.TimeoutError:
+                logger.info("WebSocket keep-alive zaman aşımı (60 sn): Hayalet oturum nazikçe kapatılıyor.")
+                try:
+                    await websocket.close(code=1000, reason="Keep-alive timeout (60s inactivity)")
+                except Exception:
+                    pass
+                break
             except WebSocketDisconnect:
                 raise
             except Exception as e:
@@ -487,6 +496,14 @@ async def session_websocket_endpoint(websocket: WebSocket):
 
                 elif msg_type == "PING":
                     await websocket.send_json({"type": "PONG", "timestamp": time.time()})
+
+                elif msg_type == "DISCONNECT":
+                    logger.info("WebSocket istemcisinden temiz kapanış bildirimi (1000) alındı.")
+                    try:
+                        await websocket.close(code=1000, reason="Client clean disconnect")
+                    except Exception:
+                        pass
+                    break
 
                 else:
                     await websocket.send_json({

@@ -205,7 +205,13 @@ class SessionWebSocketService {
     _subscription?.cancel();
     _subscription = null;
     try {
-      _channel?.sink.close();
+      // Aşama 55: Temiz Kapanış Bildirimi (code 1000 ve DISCONNECT paketi)
+      if (_isConnected && _channel != null) {
+        try {
+          _channel!.sink.add(jsonEncode({"type": "DISCONNECT", "code": 1000}));
+        } catch (_) {}
+      }
+      _channel?.sink.close(1000, "Clean client disconnect");
     } catch (_) {}
     _channel = null;
     _isConnected = false;

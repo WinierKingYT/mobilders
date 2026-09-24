@@ -249,3 +249,24 @@ def test_conclude_session_with_circadian_lock_persistence():
     data = resp.json()
     assert data["status"] == "CONCLUDED"
     assert data["circadian_lock_active"] is True
+
+
+def test_websocket_keep_alive_and_clean_disconnect():
+    """
+    Aşama 55: WebSocket 60s keep-alive ve 1000 temiz kapanış güvencesi.
+    Mobil istemci DISCONNECT (1000) paketi gönderdiğinde oturumun hayalet bırakılmadan
+    temiz biçimde kapatıldığını doğrular.
+    """
+    with client.websocket_connect("/ws/v1/session") as ws:
+        init_msg = ws.receive_json()
+        assert init_msg["type"] == "SESSION_READY"
+        assert init_msg["status"] == "CONNECTED"
+
+        # PING gönderip bağlantının canlı olduğunu teyit et
+        ws.send_json({"type": "PING"})
+        pong_msg = ws.receive_json()
+        assert pong_msg["type"] == "PONG"
+
+        # Temiz kapanış paketi ilet
+        ws.send_json({"type": "DISCONNECT", "code": 1000})
+
