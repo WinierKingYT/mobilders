@@ -65,10 +65,14 @@ class ScratchpadPainter extends CustomPainter {
 
 class ScratchpadOverlay extends StatefulWidget {
   final VoidCallback onClose;
+  final bool initialPassThrough;
+  final ValueChanged<bool>? onPassThroughChanged;
 
   const ScratchpadOverlay({
     super.key,
     required this.onClose,
+    this.initialPassThrough = false,
+    this.onPassThroughChanged,
   });
 
   @override
@@ -76,13 +80,15 @@ class ScratchpadOverlay extends StatefulWidget {
 }
 
 class _ScratchpadOverlayState extends State<ScratchpadOverlay> {
-  static const int maxStrokes = 500;
+  static const int maxStrokes = 50; // Azami 50 vuruş sınırlandırması (Ring Buffer)
   static const int maxPointsPerStroke = 2000;
 
   final List<DrawingStroke> _strokes = [];
+  final List<DrawingStroke> _redoStack = [];
   DrawingStroke? _currentStroke;
   Color _selectedColor = const Color(0xFFF8FAFC);
   double _strokeWidth = 3.0;
+  late bool _isPassThrough;
 
   final List<Color> _palette = const [
     Color(0xFFF8FAFC), // White/Slate
@@ -93,31 +99,78 @@ class _ScratchpadOverlayState extends State<ScratchpadOverlay> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _isPassThrough = widget.initialPassThrough;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xF0090D16), // Deep Dark Transparent Overlay
+      color: _isPassThrough ? null : const Color(0xF0090D16), // Transparan veya Deep Dark Overlay
       child: SafeArea(
         child: Column(
           children: [
             // Header Controls
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Color(0xFF1E293B))),
+              decoration: BoxDecoration(
+                color: _isPassThrough ? const Color(0xEE0F172A) : null,
+                border: const Border(bottom: BorderSide(color: Color(0xFF1E293B))),
               ),
               child: Row(
                 children: [
                   const Icon(Icons.gesture, color: Color(0xFF38BDF8), size: 20),
                   const SizedBox(width: 8),
-                  const Text(
-                    "Serbest Karalama (Scratchpad)",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                  Expanded(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Flexible(
+                          child: Text(
+                            "Serbest Karalama (Scratchpad)",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (_isPassThrough) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: const Color(0xFF10B981)),
+                            ),
+                            child: const Text(
+                              "Geçirgen Mod",
+                              style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  const Spacer(),
+                  // Pass-Through (Geçirgen Mod) Toggle
+                  IconButton(
+                    key: const Key('scratchpad_passthrough_toggle'),
+                    icon: Icon(
+                      _isPassThrough ? Icons.touch_app : Icons.draw,
+                      color: _isPassThrough ? const Color(0xFF10B981) : const Color(0xFF38BDF8),
+                      size: 20,
+                    ),
+                    tooltip: _isPassThrough ? "Çizim Moduna Geç" : "Geçirgen Mod (Alttaki Katmana Dokun)",
+                    onPressed: () {
+                      setState(() {
+                        _isPassThrough = !_isPassThrough;
+                        widget.onPassThroughChanged?.call(_isPassThrough);
+                      });
+                    },
+                  ),
                   // Undo
                   IconButton(
                     icon: const Icon(Icons.undo, color: Color(0xFF94A3B8), size: 20),
@@ -125,7 +178,27 @@ class _ScratchpadOverlayState extends State<ScratchpadOverlay> {
                     onPressed: _strokes.isNotEmpty
                         ? () {
                             setState(() {
-                              _strokes.removeLast();
+                              _redoStack.add(_strokes.removeLast());
+                            });
+                          }
+                        : null,
+                  ),
+                  // Redo
+                  IconButton(
+                    key: const Key('scratchpad_redo_button'),
+                    icon: Icon(
+                      Icons.redo,
+                      color: _redoStack.isNotEmpty ? const Color(0xFF94A3B8) : Colors.white24,
+                      size: 20,
+                    ),
+                    tooltip: "Yinele",
+                    onPressed: _redoStack.isNotEmpty
+                        ? () {
+                            setState(() {
+                              if (_strokes.length >= maxStrokes) {
+                                _strokes.removeAt(0);
+                              }
+                              _strokes.add(_redoStack.removeLast());
                             });
                           }
                         : null,
@@ -134,10 +207,11 @@ class _ScratchpadOverlayState extends State<ScratchpadOverlay> {
                   IconButton(
                     icon: const Icon(Icons.delete_outline, color: Color(0xFFF43F5E), size: 20),
                     tooltip: "Temizle",
-                    onPressed: _strokes.isNotEmpty
+                    onPressed: (_strokes.isNotEmpty || _redoStack.isNotEmpty)
                         ? () {
                             setState(() {
                               _strokes.clear();
+                              _redoStack.clear();
                             });
                           }
                         : null,
@@ -154,49 +228,56 @@ class _ScratchpadOverlayState extends State<ScratchpadOverlay> {
 
             // Drawing Area
             Expanded(
-              child: GestureDetector(
-                onPanStart: (details) {
-                  final pos = details.localPosition;
-                  if (!pos.dx.isFinite || !pos.dy.isFinite) return;
-                  setState(() {
-                    _currentStroke = DrawingStroke(
-                      points: [pos],
-                      color: _selectedColor,
-                      strokeWidth: _strokeWidth,
-                    );
-                  });
-                },
-                onPanUpdate: (details) {
-                  final pos = details.localPosition;
-                  if (!pos.dx.isFinite || !pos.dy.isFinite) return;
-                  if ((_currentStroke?.points.length ?? 0) >= maxPointsPerStroke) return;
-                  setState(() {
-                    _currentStroke?.points.add(pos);
-                  });
-                },
-                onPanEnd: (details) {
-                  setState(() {
-                    if (_currentStroke != null) {
-                      if (_strokes.length >= maxStrokes) {
-                        _strokes.removeAt(0);
+              child: IgnorePointer(
+                ignoring: _isPassThrough,
+                child: GestureDetector(
+                  key: const Key('scratchpad_drawing_area'),
+                  behavior: HitTestBehavior.opaque,
+                  onPanStart: (details) {
+                    final pos = details.localPosition;
+                    if (!pos.dx.isFinite || !pos.dy.isFinite) return;
+                    setState(() {
+                      _currentStroke = DrawingStroke(
+                        points: [pos],
+                        color: _selectedColor,
+                        strokeWidth: _strokeWidth,
+                      );
+                    });
+                  },
+                  onPanUpdate: (details) {
+                    final pos = details.localPosition;
+                    if (!pos.dx.isFinite || !pos.dy.isFinite) return;
+                    if ((_currentStroke?.points.length ?? 0) >= maxPointsPerStroke) return;
+                    setState(() {
+                      _currentStroke?.points.add(pos);
+                    });
+                  },
+                  onPanEnd: (details) {
+                    setState(() {
+                      if (_currentStroke != null) {
+                        if (_strokes.length >= maxStrokes) {
+                          _strokes.removeAt(0);
+                        }
+                        _strokes.add(_currentStroke!);
+                        _redoStack.clear();
+                        _currentStroke = null;
                       }
-                      _strokes.add(_currentStroke!);
-                      _currentStroke = null;
-                    }
-                  });
-                },
-                child: CustomPaint(
-                  painter: ScratchpadPainter(
-                    strokes: _strokes,
-                    currentStroke: _currentStroke,
+                    });
+                  },
+                  child: CustomPaint(
+                    painter: ScratchpadPainter(
+                      strokes: _strokes,
+                      currentStroke: _currentStroke,
+                    ),
+                    size: Size.infinite,
                   ),
-                  size: Size.infinite,
                 ),
               ),
             ),
 
-            // Color Palette Bar
-            Container(
+            // Color Palette Bar (Sadece çizim modunda görünür, geçirgen modda gizlenir)
+            if (!_isPassThrough)
+              Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: const BoxDecoration(
                 color: Color(0xFF0F172A),
