@@ -553,7 +553,9 @@ void main() {
       expect(reloaded.mistakes.any((m) => m.bugId == "BUG-NEW-02"), isTrue);
 
       // Cleanup
-      await tempDir.delete(recursive: true);
+      try {
+        await tempDir.delete(recursive: true);
+      } catch (_) {}
     });
   });
 }

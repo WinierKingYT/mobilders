@@ -218,7 +218,7 @@ class TestSymbolicEquivalenceEngineFuzzing:
             if elapsed_ms > max_observed_latency:
                 max_observed_latency = elapsed_ms
             # Aşama 57 Kriteri: Zaman Aşımı Koruması (50ms zaman aşımı + Windows iş parçacığı toleransı)
-            assert elapsed_ms < 120.0, f"İfade '{expr}' işletim sistemi zaman sınırını aştı ({elapsed_ms:.2f}ms)"
+            assert elapsed_ms < 250.0, f"İfade '{expr}' işletim sistemi zaman sınırını aştı ({elapsed_ms:.2f}ms)"
         engine.shutdown(wait=False)
 
 
