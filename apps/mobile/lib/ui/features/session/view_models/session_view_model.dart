@@ -411,13 +411,29 @@ class SessionViewModel extends ChangeNotifier {
     }
   }
 
-  void resetSession() {
+  /// Stage 70: Prunes completed steps to keep a fixed sliding window of history,
+  /// preventing memory bloat during multi-question prolonged study sessions.
+  void pruneHistoricalSteps({int maxRetainedSteps = 50}) {
+    if (_steps.length > maxRetainedSteps) {
+      _steps.removeRange(0, _steps.length - maxRetainedSteps);
+      notifyListeners();
+    }
+  }
+
+  /// Stage 70: Explicit memory cleanup during question transitions.
+  void resetSessionData() {
     _steps.clear();
     _isTargetReached = false;
     _hesitationTimer?.cancel();
+    _hesitationTimer = null;
     _hesitationWhisper = null;
+    _frozenHesitationRemaining = null;
     _stepStartTime = DateTime.now();
     notifyListeners();
+  }
+
+  void resetSession() {
+    resetSessionData();
   }
 
   @override

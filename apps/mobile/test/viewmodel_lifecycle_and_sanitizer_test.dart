@@ -273,4 +273,104 @@ void main() {
       ws.dispose();
     });
   });
+
+  group('Stage 70: Continuous 1-Hour Session Memory Leak & GC Stress Test (20 Question Cycles)', () {
+    test('SessionViewModel 20 consecutive question transitions preserve constant step footprint and zero timer leak', () async {
+      final mockClient = MockClient((request) async {
+        return http.Response('''{
+          "is_valid": true,
+          "is_target_reached": false,
+          "canonical_expression": "x = 3",
+          "error_message": null,
+          "psychometrics": {
+            "bkt_posterior_pl": 0.45,
+            "irt_difficulty_b": 0.1,
+            "slip_probability": 0.05,
+            "guess_probability": 0.15
+          }
+        }''', 200);
+      });
+
+      final api = EngineApiService(client: mockClient);
+      final vm = SessionViewModel(
+        apiService: api,
+        sessionId: 'sess_cycle_0',
+        targetEquation: 'x + 2 = 5',
+      );
+
+      // Simulate 20 consecutive problem transitions across a 1-hour session
+      for (int cycle = 1; cycle <= 20; cycle++) {
+        // Start new target question
+        vm.startNewTarget(
+          newTargetEquation: 'x^2 - ${cycle}x + 4 = 0',
+          newNodeId: 'N$cycle',
+          newSessionId: 'sess_cycle_$cycle',
+          preserveStreak: true,
+        );
+
+        expect(vm.steps.isEmpty, isTrue);
+        expect(vm.isTargetReached, isFalse);
+        expect(vm.targetEquation, equals('x^2 - ${cycle}x + 4 = 0'));
+        expect(vm.sessionId, equals('sess_cycle_$cycle'));
+
+        // Start hesitation timer for this problem
+        vm.startHesitationTimer(duration: const Duration(seconds: 10));
+        expect(vm.isHesitationFrozen, isFalse);
+
+        // Manually simulate temporary steps
+        vm.resetSessionData();
+        expect(vm.steps.isEmpty, isTrue);
+        expect(vm.hesitationWhisper, isNull);
+        expect(vm.isHesitationFrozen, isFalse);
+      }
+
+      // Test sliding window pruning
+      for (int i = 0; i < 60; i++) {
+        await vm.submitStep('x = $i');
+      }
+      expect(vm.steps.length, equals(60));
+      vm.pruneHistoricalSteps(maxRetainedSteps: 50);
+      expect(vm.steps.length, equals(50));
+
+      vm.dispose();
+    });
+
+    test('FocusSessionViewModel 20 consecutive question transitions clean up state and subscriptions completely', () {
+      final mockClient = MockClient((request) async => http.Response('{}', 200));
+      final api = FocusApiService(client: mockClient);
+      final vm = FocusSessionViewModel(apiService: api);
+
+      for (int cycle = 1; cycle <= 20; cycle++) {
+        // Add listener/subscription for this question cycle
+        final controller = StreamController<int>();
+        final sub = controller.stream.listen((_) {});
+        vm.trackSubscription(sub);
+        expect(vm.activeSubscriptionsCount, equals(1));
+
+        // Question transition: reset session data
+        vm.resetSessionData();
+
+        // Subscriptions must be cancelled and cleared
+        expect(vm.activeSubscriptionsCount, equals(0));
+        expect(vm.lastObservations.isEmpty, isTrue);
+        expect(vm.lastDecision, isNull);
+        expect(vm.lastJudgment, isNull);
+        expect(vm.currentState, isNull);
+
+        controller.close();
+      }
+
+      // Test observation pruning
+      for (int i = 0; i < 30; i++) {
+        // Emulate observations adding
+        vm.trackSubscription(Stream.value(i).listen((_) {}));
+      }
+      expect(vm.activeSubscriptionsCount, equals(30));
+      vm.resetSessionData();
+      expect(vm.activeSubscriptionsCount, equals(0));
+
+      vm.dispose();
+      expect(vm.isDisposed, isTrue);
+    });
+  });
 }

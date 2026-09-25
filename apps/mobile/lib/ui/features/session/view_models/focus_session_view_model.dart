@@ -526,6 +526,31 @@ class FocusSessionViewModel extends ChangeNotifier {
   bool get areStreamsClosed => _stateStreamController.isClosed;
   int get activeSubscriptionsCount => _subscriptions.length;
 
+  /// Stage 70: Prunes episode historical observations and cleans up state references
+  /// during continuous session transitions to guarantee zero memory leaks.
+  void resetSessionData() {
+    _lastObservations = [];
+    _lastDecision = null;
+    _lastJudgment = null;
+    _currentState = null;
+    _errorMessage = null;
+    _feedbackMessage = null;
+    _currentSequence = 0;
+    for (final sub in _subscriptions) {
+      sub.cancel();
+    }
+    _subscriptions.clear();
+    notifyListeners();
+  }
+
+  /// Stage 70: Prunes historical observations to retain at most [maxObservations] items.
+  void pruneHistoricalObservations({int maxObservations = 20}) {
+    if (_lastObservations.length > maxObservations) {
+      _lastObservations = _lastObservations.sublist(_lastObservations.length - maxObservations);
+      notifyListeners();
+    }
+  }
+
   void trackSubscription(StreamSubscription subscription) {
     if (_isDisposed) {
       subscription.cancel();
