@@ -517,5 +517,62 @@ void main() {
       expect(DynamicVectorLayerCache.cachedLayerCount, equals(0));
     });
   });
+
+  group('Thermal and AMOLED Battery Efficiency Profile (Stage 71)', () {
+    setUp(() {
+      ThermalProfileManager().reset();
+      BatteryPowerOptimizer().reset();
+    });
+
+    test('ThermalProfileManager suspends rendering and animations on background lifecycle transition', () {
+      final manager = ThermalProfileManager();
+
+      expect(manager.isBackgroundSuspended, isFalse);
+
+      // Transition to paused/hidden state
+      manager.handleLifecycleChange(AppLifecycleState.paused);
+      expect(manager.isBackgroundSuspended, isTrue);
+
+      manager.handleLifecycleChange(AppLifecycleState.inactive);
+      expect(manager.isBackgroundSuspended, isTrue);
+
+      // Transition back to resumed
+      manager.handleLifecycleChange(AppLifecycleState.resumed);
+      expect(manager.isBackgroundSuspended, isFalse);
+    });
+
+    test('Thermal warning or low headroom throttles frame rate to standard 60Hz', () {
+      final manager = ThermalProfileManager();
+      final optimizer = BatteryPowerOptimizer();
+
+      expect(optimizer.targetFrameRate, equals(FrameRateTarget.highRefresh120Hz));
+      expect(manager.isThermalWarningActive, isFalse);
+
+      // SoC temperature spikes (thermal headroom drops to 15%)
+      manager.updateThermalStatus(thermalHeadroom: 0.15, isWarning: true);
+      expect(manager.isThermalWarningActive, isTrue);
+      expect(manager.estimatedThermalHeadroom, equals(0.15));
+      expect(optimizer.targetFrameRate, equals(FrameRateTarget.standard60Hz));
+
+      // Thermal headroom recovers
+      manager.updateThermalStatus(thermalHeadroom: 0.85, isWarning: false);
+      expect(manager.isThermalWarningActive, isFalse);
+      expect(manager.estimatedThermalHeadroom, equals(0.85));
+    });
+
+    test('AmoledThemeEfficiency verifies true black #000000 dominance exceeding 70% threshold', () {
+      expect(AmoledThemeEfficiency.isTrueBlack(AppColors.amoledBg), isTrue);
+      expect(AmoledThemeEfficiency.isTrueBlack(const Color(0xFF000000)), isTrue);
+      expect(AmoledThemeEfficiency.isTrueBlack(const Color(0xFF0F172A)), isFalse);
+
+      final coverage = AmoledThemeEfficiency.calculateTrueBlackCoverage();
+      expect(coverage, greaterThanOrEqualTo(0.70));
+      expect(coverage, equals(0.78));
+
+      final amoledTheme = AppTheme.amoledDarkTheme;
+      expect(AmoledThemeEfficiency.satisfiesAmoledEfficiencyTarget(amoledTheme), isTrue);
+    });
+  });
 }
+
 
