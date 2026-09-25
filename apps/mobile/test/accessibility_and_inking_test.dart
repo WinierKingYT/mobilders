@@ -1,3 +1,4 @@
+import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:personal_learning_engine/core/localization.dart';
@@ -246,6 +247,146 @@ void main() {
 
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
+    });
+
+    test('Stage 69: PalmRejectionFilter thresholding and device kind checks', () {
+      // Small touch contact -> Normal finger, NOT palm
+      const normalTouch = PointerDownEvent(
+        kind: PointerDeviceKind.touch,
+        size: 0.1,
+        radiusMajor: 8.0,
+        radiusMinor: 7.0,
+      );
+      expect(PalmRejectionFilter.isPalmTouch(normalTouch), isFalse);
+
+      // Large contact area (>0.4 size) -> Palm touch
+      const largeSizeTouch = PointerDownEvent(
+        kind: PointerDeviceKind.touch,
+        size: 0.55,
+        radiusMajor: 12.0,
+      );
+      expect(PalmRejectionFilter.isPalmTouch(largeSizeTouch), isTrue);
+
+      // Large contact radius (>25.0 dp) -> Palm touch
+      const largeRadiusTouch = PointerDownEvent(
+        kind: PointerDeviceKind.touch,
+        size: 0.2,
+        radiusMajor: 32.0,
+      );
+      expect(PalmRejectionFilter.isPalmTouch(largeRadiusTouch), isTrue);
+
+      // Stylus input is never rejected as palm regardless of size or radius
+      const stylusEvent = PointerDownEvent(
+        kind: PointerDeviceKind.stylus,
+        size: 0.8,
+        radiusMajor: 40.0,
+      );
+      expect(PalmRejectionFilter.isPalmTouch(stylusEvent), isFalse);
+    });
+
+    testWidgets('Stage 69: Palm Rejection Benchmark - Large contact area ignores stroke creation', (tester) async {
+      List<VectorInkingStroke> receivedStrokes = [];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 400,
+              height: 500,
+              child: VectorInkingCanvas(
+                enablePalmRejection: true,
+                onStrokesUpdated: (strokes) => receivedStrokes = strokes,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Dispatch accidental palm press event
+      await tester.sendEventToBinding(
+        const PointerDownEvent(
+          pointer: 10,
+          position: Offset(120, 200),
+          kind: PointerDeviceKind.touch,
+          size: 0.65,
+          radiusMajor: 38.0,
+        ),
+      );
+      await tester.pump();
+
+      await tester.sendEventToBinding(
+        const PointerMoveEvent(
+          pointer: 10,
+          position: Offset(140, 220),
+          kind: PointerDeviceKind.touch,
+          size: 0.65,
+        ),
+      );
+      await tester.pump();
+
+      await tester.sendEventToBinding(
+        const PointerUpEvent(
+          pointer: 10,
+          position: Offset(140, 220),
+          kind: PointerDeviceKind.touch,
+        ),
+      );
+      await tester.pump();
+
+      // Large palm contact must be completely discarded
+      expect(receivedStrokes, isEmpty);
+    });
+
+    testWidgets('Stage 69: Multi-touch Pinch & Palm Isolation freezes inking', (tester) async {
+      List<VectorInkingStroke> receivedStrokes = [];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 400,
+              height: 500,
+              child: VectorInkingCanvas(
+                enablePalmRejection: true,
+                onStrokesUpdated: (strokes) => receivedStrokes = strokes,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // First finger touches down
+      final g1 = await tester.startGesture(const Offset(100, 100), pointer: 1);
+      await tester.pump();
+
+      // Second finger / resting palm touches down simultaneously
+      final g2 = await tester.startGesture(const Offset(200, 200), pointer: 2);
+      await tester.pump();
+
+      // Moving while multi-touch active
+      await g1.moveBy(const Offset(30, 30));
+      await g2.moveBy(const Offset(-20, -20));
+      await tester.pump();
+
+      // Lift both fingers
+      await g1.up();
+      await g2.up();
+      await tester.pump();
+
+      // Multi-touch must cancel active touch stroke and produce 0 valid strokes
+      expect(receivedStrokes, isEmpty);
+
+      // Subsequent single touch should work normally
+      final g3 = await tester.startGesture(const Offset(150, 150), pointer: 3);
+      await tester.pump();
+      await g3.moveBy(const Offset(20, 20));
+      await tester.pump();
+      await g3.up();
+      await tester.pump();
+
+      expect(receivedStrokes.length, 1);
     });
   });
 }

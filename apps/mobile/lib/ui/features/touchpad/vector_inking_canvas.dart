@@ -67,6 +67,20 @@ class StylusTrajectoryPredictor {
   }
 }
 
+/// Multi-touch and palm rejection filter for touchscreen and S-Pen inputs (Stage 69).
+class PalmRejectionFilter {
+  static const double maxContactSize = 0.4;
+  static const double maxContactRadius = 25.0;
+
+  /// Returns true if the pointer event characteristics indicate an accidental palm contact.
+  static bool isPalmTouch(PointerDownEvent event) {
+    if (event.kind != PointerDeviceKind.touch) return false;
+    if (event.size > maxContactSize) return true;
+    if (event.radiusMajor > maxContactRadius || event.radiusMinor > maxContactRadius) return true;
+    return false;
+  }
+}
+
 /// Continuous vector stroke with high-precision timestamped trajectory points.
 class VectorInkingStroke {
   final String id;
@@ -249,6 +263,7 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
   static const int maxPointsPerStroke = 1500;
 
   final List<VectorInkingStroke> _strokes = [];
+  final Set<int> _activeTouchPointers = <int>{};
   VectorInkingStroke? _activeStroke;
   int? _activePointerId;
   PointerDeviceKind? _activePointerKind;
@@ -273,6 +288,10 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
   }
 
   void _onPointerDown(PointerDownEvent event) {
+    if (event.kind == PointerDeviceKind.touch) {
+      _activeTouchPointers.add(event.pointer);
+    }
+
     if (_stylusOnly &&
         event.kind != PointerDeviceKind.stylus &&
         event.kind != PointerDeviceKind.invertedStylus) {
@@ -280,6 +299,23 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
     }
 
     if (widget.enablePalmRejection) {
+      // Stage 69: Contact size and radius thresholding (palm rejection)
+      if (PalmRejectionFilter.isPalmTouch(event)) {
+        return;
+      }
+
+      // Stage 69: Multi-touch pinch / palm isolation - freeze inking when 2 or more touch contacts occur
+      if (event.kind == PointerDeviceKind.touch && _activeTouchPointers.length >= 2) {
+        if (_activeStroke != null && _activePointerKind == PointerDeviceKind.touch) {
+          setState(() {
+            _activeStroke = null;
+            _activePointerId = null;
+            _activePointerKind = null;
+          });
+        }
+        return;
+      }
+
       // Palm rejection: if event is touch and stylus was used recently, reject touch
       if (event.kind == PointerDeviceKind.touch) {
         if (_activePointerKind == PointerDeviceKind.stylus ||
@@ -330,6 +366,11 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
   }
 
   void _onPointerMove(PointerMoveEvent event) {
+    if (widget.enablePalmRejection &&
+        _activeTouchPointers.length >= 2 &&
+        event.kind == PointerDeviceKind.touch) {
+      return;
+    }
     if (_activeStroke == null || event.pointer != _activePointerId) return;
 
     if (event.kind == PointerDeviceKind.stylus ||
@@ -374,6 +415,9 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
   }
 
   void _onPointerUp(PointerUpEvent event) {
+    if (event.kind == PointerDeviceKind.touch) {
+      _activeTouchPointers.remove(event.pointer);
+    }
     if (_activeStroke == null || event.pointer != _activePointerId) return;
 
     if (event.kind == PointerDeviceKind.stylus ||
@@ -405,6 +449,9 @@ class _VectorInkingCanvasState extends State<VectorInkingCanvas> {
   }
 
   void _onPointerCancel(PointerCancelEvent event) {
+    if (event.kind == PointerDeviceKind.touch) {
+      _activeTouchPointers.remove(event.pointer);
+    }
     if (event.pointer == _activePointerId) {
       setState(() {
         _activeStroke = null;
