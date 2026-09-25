@@ -88,3 +88,84 @@ def test_voice_socratic_api_endpoint():
     assert "audio_stream_url" in data
     assert "socratic_guidance_text" in data
     assert data["latency_ms"] < 200.0
+
+
+def test_voice_socratic_vad_ambient_noise_filtering():
+    engine = VoiceSocraticEngine()
+
+    # Pure noise / cough / breath is filtered to silence and returns fallback
+    req_noise = VoiceSocraticRequest(
+        session_id="voice-noise-1",
+        audio_transcript="[öksürük] [nefes] ... *cough* uh um",
+        target_equation="x**2 - 4 = 0",
+        solution_roots=[-2.0, 2.0],
+        language="tr",
+    )
+    res_noise = engine.process_voice_turn(req_noise)
+    assert res_noise.vad_filtered is True
+    assert "Seni tam duyamadım" in res_noise.socratic_guidance_text
+
+    # Speech mixed with ambient breath artifact is cleaned
+    req_mixed = VoiceSocraticRequest(
+        session_id="voice-noise-2",
+        audio_transcript="[nefes] bu adımda ne yapacağım? [öksürük]",
+        target_equation="x**2 - 4 = 0",
+        solution_roots=[-2.0, 2.0],
+        language="tr",
+    )
+    res_mixed = engine.process_voice_turn(req_mixed)
+    assert res_mixed.vad_filtered is True
+    assert res_mixed.normalized_transcript == "bu adımda ne yapacağım?"
+    assert "?" in res_mixed.socratic_guidance_text
+
+
+def test_voice_socratic_spoken_math_normalization_turkish():
+    engine = VoiceSocraticEngine()
+
+    sample_spoken = "x kare artı 5x eksi 6 eşittir 0"
+    normalized = engine.normalize_spoken_math(sample_spoken, language="tr")
+    assert "x^2" in normalized
+    assert "+" in normalized
+    assert "-" in normalized
+    assert "=" in normalized
+
+    powers_and_roots = "x küp artı x üzeri 4 ve karekök 16 küçük eşittir y"
+    norm_powers = engine.normalize_spoken_math(powers_and_roots, language="tr")
+    assert "x^3" in norm_powers
+    assert "x^4" in norm_powers
+    assert "sqrt(16)" in norm_powers
+    assert "<=" in norm_powers
+
+
+def test_voice_socratic_spoken_math_normalization_english():
+    engine = VoiceSocraticEngine()
+
+    sample_en = "x squared plus three x minus four equals zero"
+    norm_en = engine.normalize_spoken_math(sample_en, language="en")
+    assert "x^2" in norm_en
+    assert "+" in norm_en
+    assert "-" in norm_en
+    assert "=" in norm_en
+
+    roots_en = "square root of 25 is equal to five"
+    norm_roots = engine.normalize_spoken_math(roots_en, language="en")
+    assert "sqrt(25)" in norm_roots
+    assert "=" in norm_roots
+
+
+def test_voice_socratic_end_to_end_spoken_math_turn():
+    engine = VoiceSocraticEngine()
+    req = VoiceSocraticRequest(
+        session_id="voice-math-e2e",
+        audio_transcript="x kare eksi 4 eşittir 0 denkleminde bir sonraki adım ne olmalı?",
+        target_equation="x**2 - 4 = 0",
+        solution_roots=[-2.0, 2.0],
+        language="tr",
+    )
+    res = engine.process_voice_turn(req)
+    assert res.zero_leakage_enforced is True
+    assert "x^2" in res.normalized_transcript
+    assert "?" in res.socratic_guidance_text
+    # Root 2 must not be leaked
+    assert "2" not in res.socratic_guidance_text
+

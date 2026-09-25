@@ -225,6 +225,8 @@ class VoiceSocraticResponse(BaseModel):
     zero_leakage_enforced: bool = Field(True, description="Cevap kaçırma filtresi devrede miydi?")
     socratic_ratio: float = Field(..., description="Soru / açıklama oranı")
     latency_ms: float = Field(..., description="İşlem süresi (ms)")
+    normalized_transcript: Optional[str] = Field(None, description="VAD ve matematik normalizasyonundan geçmiş girdi")
+    vad_filtered: bool = Field(False, description="Gürültü veya nefes sesi filtrelendi mi?")
 
 
 # ==========================================
